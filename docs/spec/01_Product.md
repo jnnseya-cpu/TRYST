@@ -151,6 +151,15 @@ The palette is sampled from the logo. Tokens live in [`assets/brand/tokens.json`
 
 Oxblood and oxblood-light are never used for text on dark grounds.
 
+### 3.3 No "AI" in the name or brand (founder, v1.3)
+
+TRYST is never named, branded or marketed as AI ([D-33](06_Decisions_and_Changes.md#2-decision-log)).
+
+- The words "AI", "A.I." and "artificial intelligence" never appear in the name, tagline, logo, app-store listings, marketing site, Herald content, ads, press materials, product UI or notifications.
+- The product describes what members get, not the technology: "your agent compares intentions and limits", "we settle the details before you speak".
+- Internal engineering documents (02, 03, 09) may describe models and agents in technical terms. That vocabulary never reaches a member or the public.
+- Enforced by `web/test/brand.test.ts`, which fails the build if any user-facing source contains these words.
+
 ---
 
 ## 4. Operating stance and principles
@@ -209,7 +218,7 @@ Every segment is first-class in the data model.
 
 > **S4 is the scarce asset.** S4 supply decides whether S3 and S5 have a product. S4 inbound is rationed, priced and capped ([03 §5.4](03_Backend.md#54-exposure-fairness)). Any ranking change that pushes S4 inbound above the cap is a regression, whatever it does to session metrics.
 
-Solo members may be attached or unattached. Partner awareness is self-declared, never verified, and never shown to others. ([D-01](06_Decisions_and_Changes.md#2-decision-log))
+**People in open relationships are welcome** (founder, v1.3): consensually non-monogamous and polyamorous members, solo or as a couple, join as S2 (solo) or S3/S5 (couples), mainly through the OPEN, SPARK and EMBER modes. Nothing in the product assumes secrecy from a partner. Solo members may be attached or unattached. Partner awareness is self-declared, never verified, and never shown to others. ([D-01](06_Decisions_and_Changes.md#2-decision-log))
 
 ### 5.2 Modes (member-facing) ↔ intent shapes (data)
 

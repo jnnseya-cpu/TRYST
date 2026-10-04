@@ -1,6 +1,6 @@
 package payments
 
-// BitriPay adapter (docs/spec/09_AI_Operating_System.md §8; FR-084, D-26).
+// BitriPay adapter (docs/spec/09_Operating_System.md §8; FR-084, D-26).
 //
 // BitriPay is integrated behind the same Provider interface as Stripe and the high-risk
 // acquirer, so it can be switched on per market without touching entitlements. It is

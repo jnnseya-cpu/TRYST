@@ -96,10 +96,10 @@ export default async function Home() {
       <section className="lp-section lp-hero">
         <div>
           <img className="logo reveal" src="/brand/tryst-logo.png" alt="TRYST" width={1254} height={1254} />
-          <p className="eyebrow reveal d1">For attached adults and couples</p>
+          <p className="eyebrow reveal d1">For attached adults, open relationships and couples</p>
           <h1 className="reveal d2">Private chemistry.<br /><em>Intelligent discretion.</em></h1>
           <p className="lede reveal d3">
-            A members&rsquo; club for one-off encounters, ongoing affairs, thirds and couples. Every member is a
+            A members&rsquo; club for one-off encounters, ongoing affairs, open relationships, thirds and couples. Every member is a
             verified adult. Our agents settle the awkward details before you say a word. And the whole thing is
             built to forget.
           </p>
@@ -178,7 +178,7 @@ export default async function Home() {
             <div className="lp-mode"><div className="name">EMBER</div><div className="who">Something ongoing</div><p>A recurring connection with agreed rhythm.</p></div>
             <div className="lp-mode"><div className="name">THIRD</div><div className="who">Couples and a third</div><p>Both partners verified. The third has an equal say.</p></div>
             <div className="lp-mode"><div className="name">QUAD</div><div className="who">Couple to couple</div><p>Four people, four accounts, one shared yes.</p></div>
-            <div className="lp-mode"><div className="name">OPEN</div><div className="who">Still exploring</div><p>Set your own lines and take your time.</p></div>
+            <div className="lp-mode"><div className="name">OPEN</div><div className="who">Open relationships</div><p>Openly non-monogamous, or still exploring. Set your own lines.</p></div>
           </div>
         </div>
       </section>

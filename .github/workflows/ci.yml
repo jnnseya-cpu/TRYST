@@ -17,7 +17,7 @@ jobs:
       - run: python3 scripts/check_spec.py
       - run: python3 scripts/gen_migrations.py --check
       - run: pip install pglast && python3 -c "import glob,pglast; [pglast.parse_sql(open(f).read()) for f in glob.glob('backend/migrations/*/*.sql')]; print('SQL parses')"
-      - run: python3 -c "import re,pglast; t=open('docs/spec/09_AI_Operating_System.md').read(); pglast.parse_sql(re.search(r'### 10.2 DDL\n\n\`\`\`sql\n(.*?)\`\`\`', t, re.S).group(1)); print('AI-OS DDL parses')"
+      - run: python3 -c "import re,pglast; t=open('docs/spec/09_Operating_System.md').read(); pglast.parse_sql(re.search(r'### 10.2 DDL\n\n\`\`\`sql\n(.*?)\`\`\`', t, re.S).group(1)); print('OS DDL parses')"
 
   contracts:
     name: OpenAPI and Protobuf contracts

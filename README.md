@@ -20,7 +20,7 @@ Start at [`docs/spec/00_README.md`](docs/spec/00_README.md).
 | [06 Decisions, errata, change log](docs/spec/06_Decisions_and_Changes.md) | Product owner, tech leads |
 | [07 Source B — founder brief (verbatim)](docs/spec/07_Source_B_Founder_Brief.md) | Everyone — the founder's specification word for word, with traceability |
 | [08 Source A — traceability](docs/spec/08_Source_A_Traceability.md) | Everyone — where each section of the consolidated Spec + ToS lives in the spec and code |
-| [09 AI Operating System](docs/spec/09_AI_Operating_System.md) | Everyone — agent workforce and governance, command centres, self-managing layer, BitriPay door, connectors, ops/partner APIs, B2B licensing |
+| [09 Operating System (internal)](docs/spec/09_Operating_System.md) | Everyone — agent workforce and governance, command centres, self-managing layer, BitriPay door, connectors, ops/partner APIs, B2B licensing |
 | [Combined PDF](docs/spec/TRYST_Spec_v1.3.pdf) | Reading and sharing |
 
 Consistency check (runs in CI): `python3 scripts/check_spec.py`

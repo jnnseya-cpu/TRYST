@@ -1,5 +1,5 @@
 // Package aigov is the AI Governance gate of the TRYST AI Operating System
-// (docs/spec/09_AI_Operating_System.md §5.4, §13; FR-080–FR-083, D-25, D-28).
+// (docs/spec/09_Operating_System.md §5.4, §13; FR-080–FR-083, D-25, D-28).
 //
 // Every agent action passes through Decide before it runs. The gate is deterministic code,
 // not a model: an agent cannot argue its way past it, and it fails closed. It enforces

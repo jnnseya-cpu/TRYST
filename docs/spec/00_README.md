@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| Version | **1.3 — Baseline (stable)**. v1.2 added the brand identity and account-holder-only login; v1.3 adds the AI Operating System ([09](09_AI_Operating_System.md); [06 §4](06_Decisions_and_Changes.md#4-change-log)) |
+| Version | **1.3 — Baseline (stable)**. v1.2 added the brand identity and account-holder-only login; v1.3 adds the internal operating system ([09](09_Operating_System.md); [06 §4](06_Decisions_and_Changes.md#4-change-log)) |
 | Date | 4 October 2026 |
 | Status | Stable for engineering planning and estimation. **Build start remains gated** on the written UK legal opinion and completed DPIA (Phase P0; see [01 §14](01_Product.md#14-compliance-envelope)). |
 | Owner | Office of the Group Chief Executive → TRYST SPV (pre-incorporation) |
@@ -27,7 +27,7 @@ The specification is split by audience. Each document owns its topics; the other
 | 06 | [Decisions, errata and change log](06_Decisions_and_Changes.md) | Product owner, tech leads | How v1.1 reconciled its sources, resolved and open decisions, errata fixed |
 | 07 | [Source B — founder brief (verbatim) and traceability](07_Source_B_Founder_Brief.md) | Everyone | The founder's 17 Sep 2026 specification word for word, plus where each part is implemented, the agent mapping and the FR-ID crosswalk |
 | 08 | [Source A — traceability](08_Source_A_Traceability.md) | Everyone | Where each section of the consolidated Spec + ToS lives in the spec and the code |
-| 09 | [AI Operating System](09_AI_Operating_System.md) | Leadership, engineering, security, payments, operations | Agent workforce and governance (autonomy levels, always-human actions, kill switch, audit chain), command centres for every user type, self-managing platform layer, BitriPay API door, connector register, ops and partner schemas and APIs, B2B licensing and ACU, Admin Super Control Centre, AI-OS roadmap |
+| 09 | [Operating System (internal)](09_Operating_System.md) | Leadership, engineering, security, payments, operations | Agent workforce and governance (autonomy levels, always-human actions, kill switch, audit chain), command centres for every user type, self-managing platform layer, BitriPay API door, connector register, ops and partner schemas and APIs, B2B licensing and ACU, Admin Super Control Centre, roadmap |
 
 A combined PDF of 00–09 is at [`TRYST_Spec_v1.3.pdf`](TRYST_Spec_v1.3.pdf). Brand assets (logo exactly as supplied, colour tokens) are in [`assets/brand/`](../../assets/brand/tokens.json).
 

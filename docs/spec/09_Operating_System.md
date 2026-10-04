@@ -1,4 +1,4 @@
-# 09 — TRYST AI Operating System (AI-OS) v1.3
+# 09 — TRYST Operating System (internal engineering) v1.3
 
 Part of the [TRYST v1.3 baseline](00_README.md). Written in response to the founder's *Master AI Operating System Architect* brief (4 Oct 2026), applied to TRYST. Decisions [D-25](06_Decisions_and_Changes.md#2-decision-log)–[D-32](06_Decisions_and_Changes.md#2-decision-log); requirements FR-080–FR-088.
 
@@ -42,15 +42,15 @@ Status: **Built** = in the codebase and tested. **Spec** = fully specified here 
 
 ## 1. Executive product vision
 
-### 1.1 What the AI-OS is
+### 1.1 What the OS is
 
-The TRYST AI-OS is the operating layer that runs TRYST: **a governed workforce of specialised AI agents, the data and event fabric they work on, and the command centres through which members, operators, partners and regulators see and steer them.** It turns TRYST from an app with some models into infrastructure that runs its own operations. It matches, protects, bills, supports, secures, monitors and repairs itself, and puts people in charge of every decision that cannot be undone.
+The TRYST operating system is the operating layer that runs TRYST: **a governed workforce of specialised AI agents, the data and event fabric they work on, and the command centres through which members, operators, partners and regulators see and steer them.** It turns TRYST from an app with some models into infrastructure that runs its own operations. It matches, protects, bills, supports, secures, monitors and repairs itself, and puts people in charge of every decision that cannot be undone.
 
 It is built for one product first. Discreet, verified, consent-first connection for partnered adults and couples is the hardest trust problem in consumer software. A system that can run that safely can be licensed to others ([§12.3](#123-b2b-licensing-white-label-and-api-revenue)).
 
 ### 1.2 What problem it solves
 
-| For | Problem today | What the AI-OS does |
+| For | Problem today | What the OS does |
 |---|---|---|
 | Members (S1–S6) | Volume without outcome; exposure risk; harassment; fakes; endless chat that never becomes a meeting | Agents pre-qualify, negotiate and protect; the member decides. Measured by QCAM, not time in app |
 | Couples (S3, S5) | Coordinating two people's consent with a third or another couple collapses | Envoy negotiates over a fixed schema; joint-veto modes; dual-consent controls |
@@ -68,7 +68,7 @@ It is built for one product first. Discreet, verified, consent-first connection 
 
 ### 1.4 Why the market needs it and why it can win
 
-Category leaders built on volume and on paid messaging, and they are held back by fake-profile and breach history (01 §2). The demand is proven (attributed, unaudited: Ashley Madison 80M+/91M+, E-32). The unmet need is **trust that is engineered, not claimed**. TRYST can win because the AI-OS makes the trustworthy behaviour the cheapest to run:
+Category leaders built on volume and on paid messaging, and they are held back by fake-profile and breach history (01 §2). The demand is proven (attributed, unaudited: Ashley Madison 80M+/91M+, E-32). The unmet need is **trust that is engineered, not claimed**. TRYST can win because the OS makes the trustworthy behaviour the cheapest to run:
 
 - automation carries trust and safety and support volume, so gross margin survives verification costs;
 - Envoy raises meets per intent (target +40% at G-P2), and that outcome is what members pay for;
@@ -80,7 +80,7 @@ Category leaders built on volume and on paid messaging, and they are held back b
 
 ### 2.1 Competitors
 
-| Platform type | Does well | Fails to solve | Where users are underserved | Where businesses lose money | Missing automation | How the AI-OS fills it |
+| Platform type | Does well | Fails to solve | Where users are underserved | Where businesses lose money | Missing automation | How the OS fills it |
 |---|---|---|---|---|---|---|
 | Affair sites (Ashley Madison, Gleeden, Victoria Milan) | Category awareness; explicit positioning | Fake and inactive profiles; breach legacy; pay-per-message mechanics | Women and couples face harassment volume; no real couple model | Chargebacks, refunds and trust loss from fake profiles; ads banned | No pre-qualification; manual moderation | V2 gate (E-01), Envoy handshake, Guardian on device, Keys refunded on reply, no fakes (P8) |
 | Mainstream dating (Tinder, Hinge, Bumble) | Scale; polished UX; ranking ML | Will not serve the partnered; engagement-maximising loops | Couples, thirds and the discreet are pushed off-platform | Paywall churn; moderation cost per MAU | Agents limited to profile tips | Purpose-built segments S1–S6 and modes; agents tied to QCAM |
@@ -90,7 +90,7 @@ Category leaders built on volume and on paid messaging, and they are held back b
 
 ### 2.2 The four structural gaps (from 01 §2.2, extended)
 
-| Gap | Evidence | AI-OS answer | Measured by |
+| Gap | Evidence | OS answer | Measured by |
 |---|---|---|---|
 | Outcome gap: volume without meets | Reply rates, ghosting, message volume as a KPI | Broker + Envoy + Aftercare reward loop | QCAM; meets per intent |
 | Trust gap: fakes, bots, sextortion | Category history; OSA duties | V2 gate, admission L1–L5, Guardian M6a–e, Fraud agent | Report rate per 1k threads; fake-profile prevalence |
@@ -103,7 +103,7 @@ The brief asks for a forensic review of TRYST itself. Findings against the v1.2 
 
 | Area | Weakness found | Fix (this document) | Phase |
 |---|---|---|---|
-| Technical | Identity store is in memory; DPoP not yet bound (D-24) | PostgreSQL IDENTITY-DB and DPoP are P1 items; AI-OS adds no dependency on them before P1 | P1 |
+| Technical | Identity store is in memory; DPoP not yet bound (D-24) | PostgreSQL IDENTITY-DB and DPoP are P1 items; OS adds no dependency on them before P1 | P1 |
 | Technical | No central registry of which agent may do what | `aigov` registry and gate (built, FR-080) | P1 |
 | Technical | Agent actions are not uniformly audited | Hash-chained audit log for every agent decision (built, FR-082) | P1 |
 | Commercial | One processor family; Stripe approval uncertain (D-22) | `PaymentProvider` with three adapters: Stripe, high-risk acquirer, BitriPay (built, sandbox) | P1 |
@@ -140,7 +140,7 @@ Every user type in the brief is listed. A type that does not exist in TRYST is m
 
 ### 3.2 User journeys
 
-The member journeys are Loops A–E (01 §6) and the screens in 04 §4. The AI-OS adds these journeys:
+The member journeys are Loops A–E (01 §6) and the screens in 04 §4. The operating system adds these journeys:
 
 | Journey | Steps | Agents | Human checkpoint |
 |---|---|---|---|
@@ -505,7 +505,7 @@ Purpose: help admins run the Super Control Centre (§14). It summarises alerts, 
 
 ## 6. Full platform modules
 
-Every module the brief lists, mapped to TRYST. Existing member modules are in 04 §4 and 03 §2.2; this table adds the AI-OS surfaces.
+Every module the brief lists, mapped to TRYST. Existing member modules are in 04 §4 and 03 §2.2; this table adds the OS surfaces.
 
 | Module | Users | What it does | Key screens / endpoints | Agents | Phase |
 |---|---|---|---|---|---|
@@ -800,9 +800,9 @@ Trunk-based development; every merge runs CI (spec check, contracts lint, Go, Py
 
 ## 10. Database schema
 
-The member data model is owned by [02 §4](02_Shared_Contracts.md#4-data-model) and is not repeated here. The AI-OS adds the **ops** and **partner** schemas below, in PROFILE-DB's cluster but with separate roles, so no member-plane role can read partner data and no ops role can read member tables.
+The member data model is owned by [02 §4](02_Shared_Contracts.md#4-data-model) and is not repeated here. The operating system adds the **ops** and **partner** schemas below, in PROFILE-DB's cluster but with separate roles, so no member-plane role can read partner data and no ops role can read member tables.
 
-### 10.1 ERD (AI-OS additions)
+### 10.1 ERD (OS additions)
 
 ```
 agent ───< agent_action           agent ───< agent_decision >─── staff_user (approver)
@@ -943,7 +943,7 @@ CREATE TABLE partner.acu_balance (
 | Inbound webhooks | `/v1/billing/{provider}/webhook` | Provider signature | Stripe, acquirer, BitriPay |
 | Outbound webhooks | Partner URLs | `TRYST-Signature` | Partners |
 
-### 11.2 Ops API endpoints (AI-OS)
+### 11.2 Ops API endpoints (OS)
 
 | Method | Path | Permission | Contract |
 |---|---|---|---|
@@ -1053,10 +1053,10 @@ Charge for agency and discretion; make resolution the profitable outcome (01 §1
 
 ### 12.4 Unit economics impact
 
-The AI-OS changes 01 §10.3 in three ways (to be measured in beta, not assumed):
+The OS changes 01 §10.3 in three ways (to be measured in beta, not assumed):
 
 1. **Cost per MAU down:** agent-handled support and T&S triage lower the variable ops cost, the main threat to gross margin identified in E-33.
-2. **Payer rate up:** ENVOY's value depends on G-P2 (meets per intent +40%); the AI-OS's job is to make that measurable and explainable.
+2. **Payer rate up:** ENVOY's value depends on G-P2 (meets per intent +40%); the OS's job is to make that measurable and explainable.
 3. **New revenue not dependent on member growth:** B2B licensing from P4, with near-zero marginal member risk.
 
 ### 12.5 Revenue optimisation, CLV, churn, upsell and cross-sell engines
@@ -1116,7 +1116,7 @@ The AI-OS changes 01 §10.3 in three ways (to be measured in beta, not assumed):
 
 ### 13.4 Compliance
 
-| Area | How the AI-OS meets it |
+| Area | How the OS meets it |
 |---|---|
 | UK GDPR / DPA 2018 (Art 9 special category) | Explicit consent, DPIA, self-hosted models for member data, minimisation, DSR automation, < 60 s erasure |
 | UK GDPR Art 22 (automated decisions) | Always-human classes; explanations from reason codes; appeal path (FR-035) |
@@ -1172,7 +1172,7 @@ Internal origin, staff SSO + hardware key, redacted by default, every view and a
 
 ## 15. Developer build roadmap
 
-The AI-OS phases align with TRYST's phases and gates (01 §12). The brief's five phases map as: **MVP = P1**, **Beta = P1 closed beta → P2**, **Commercial launch = P3**, **Enterprise version = P4**, **Global scale version = post-P4**.
+The OS phases align with TRYST's phases and gates (01 §12). The brief's five phases map as: **MVP = P1**, **Beta = P1 closed beta → P2**, **Commercial launch = P3**, **Enterprise version = P4**, **Global scale version = post-P4**.
 
 ### 15.1 MVP (P1, M2–M6)
 
@@ -1237,7 +1237,7 @@ The AI-OS phases align with TRYST's phases and gates (01 §12). The brief's five
 
 ## 16. Competitive advantage
 
-| Dimension | How the AI-OS wins | Why it is hard to copy |
+| Dimension | How the OS wins | Why it is hard to copy |
 |---|---|---|
 | More powerful | Agent-to-agent negotiation turns intent into meetings; agents carry safety, support and operations volume | Needs the consent schema, the asymmetric Brief design and member trust built together |
 | More profitable | Revenue tied to outcomes (ENVOY, QCAM); lower ops cost per MAU; B2B licensing from P4 | Competitors' revenue depends on message volume and paywalls they cannot drop |
@@ -1251,7 +1251,7 @@ The AI-OS phases align with TRYST's phases and gates (01 §12). The brief's five
 
 ## 17. Final output format and index
 
-This document is the developer-ready AI-OS specification for TRYST. The brief's required technical outputs map as follows:
+This document is the developer-ready OS specification for TRYST. The brief's required technical outputs map as follows:
 
 | Required output | Where |
 |---|---|
