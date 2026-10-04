@@ -14,6 +14,10 @@ export default function Home() {
         <a className="button" href="/sign-in">
           Sign in
         </a>
+        <p />
+        <a className="button" href="/join">
+          Join
+        </a>
       </section>
       <p className="note">
         The Exit button leaves this site instantly. It cannot hide your browser or network history — use a private

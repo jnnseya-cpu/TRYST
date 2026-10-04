@@ -13,8 +13,14 @@ const csp = [
   "form-action 'self'",
 ].join("; ");
 
+// Same-origin API: /v1/* is proxied to identity-svc, so the CSP can stay connect-src 'self'.
+const IDENTITY_URL = process.env.IDENTITY_URL ?? "http://localhost:8081";
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  async rewrites() {
+    return [{ source: "/v1/:path*", destination: `${IDENTITY_URL}/v1/:path*` }];
+  },
   async headers() {
     return [
       {

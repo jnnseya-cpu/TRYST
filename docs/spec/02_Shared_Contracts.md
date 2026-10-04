@@ -491,7 +491,7 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 | Method | Path | Min | Contract |
 |---|---|---|---|
 | POST | `/v1/auth/start` | — | **Sign-up only.** `{contact}` → OTP sent. Uniform response whether or not the account exists. **Never a login factor** (§3.3) |
-| POST | `/v1/auth/verify` | — | **Sign-up only.** `{otp, device_pubkey, attestation}` → onboarding session + device registered. Ban-anchor check runs here for new identities ([03 §8](03_Backend.md#8-admission-control-l1l5)) |
+| POST | `/v1/auth/verify` | — | **Sign-up only.** `{contact, otp, jurisdiction?}` → onboarding session (device binding via DPoP is a P1 hardening item, [D-24](06_Decisions_and_Changes.md#2-decision-log)). Refused with `account_exists_sign_in` if the account already has a passkey: an OTP can never add one. Ban-anchor check runs here for new identities ([03 §8](03_Backend.md#8-admission-control-l1l5)) |
 | POST | `/v1/auth/passkeys/register` (`begin` / `finish`) | V0 | Register B1 (mobile) or F1 (desktop) WebAuthn credential; step-up required after the first one |
 | POST | `/v1/auth/login/begin` | — | `{contact_hint?}` → WebAuthn challenge + `required_factors` (decided by the server, §3.3). Uniform response |
 | POST | `/v1/auth/login/passkey` | — | WebAuthn assertion (B1 or F1) → `login_state = factor1_ok` (no session yet) |
@@ -499,6 +499,11 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 | POST | `/v1/auth/login/cross-device` | — | Desktop: → QR token (60 s); `GET .../{id}` polls status → **session issued only on approval** |
 | POST | `/v1/auth/approvals/{qr_token}` | V1 | Called from the registered mobile app with a fresh B1 assertion; approves or denies the desktop login |
 | POST | `/v1/auth/step-up` | V0 | Same factor flow as login → step-up token (5 min) for §3.3 sensitive actions |
+| POST | `/v1/auth/enrol-device` · `/v1/auth/enrol-device/redeem` | V0 (onboarding) | During onboarding only: one-time 10-minute link that lets the member's phone register its own passkey on the same account. Refused once the account is sealed (device add then needs step-up) |
+| POST | `/v1/auth/login/second-key/begin` · `/v1/auth/login/second-key` | — | Desktop F2 alternative: assertion with a **different** registered security key |
+| POST | `/v1/auth/approvals/{qr_token}/begin` | — | Assertion options restricted to the account's registered **phone** passkeys |
+| GET | `/v1/me` | V0 | Session summary (kind, surface, tier, passkey count). No contact or identity data |
+| POST | `/v1/auth/logout` | V0 | Ends this session |
 | POST | `/v1/auth/recovery/begin` · `/finish` | — | B2 + fresh V2 with matching `anchor_doc` → 24 h hold → new passkey (FR-061) |
 | POST | `/v1/auth/refresh` | V0 | DPoP refresh |
 | GET / DELETE | `/v1/devices` · `/v1/devices/{id}` | V0 | List and revoke devices (**step-up required**, §3.3) |
@@ -610,6 +615,8 @@ RFC 9457 `application/problem+json` with a stable `code`.
 | HTTP | `code` | Meaning |
 |---|---|---|
 | 401 | `auth_required`, `dpop_invalid`, `second_factor_required` (+`factor`), `step_up_required`, `authenticator_invalidated` (biometric enrolment changed) | |
+| 409 | `account_exists_sign_in` | Sign-up attempted for an account that already has a passkey |
+| 503 | `liveness_unavailable` | B2 provider unavailable; login fails closed |
 | 403 | `tier_required` (+`required_tier`), `consent_required` (+`consent_kind`), `jurisdiction_blocked`, `entitlement_required` | |
 | 404 | `not_found` | Uniform for invisible resources |
 | 409 | `idempotency_conflict`, `version_conflict` | |

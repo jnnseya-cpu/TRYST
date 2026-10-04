@@ -1,5 +1,5 @@
 # Run every check CI runs. Requires Go 1.24+, Python 3.11+, Rust stable, Node 22.
-.PHONY: check spec contracts backend agents crypto web
+.PHONY: check spec contracts backend agents crypto web e2e
 
 check: spec contracts backend agents crypto web
 
@@ -21,3 +21,6 @@ crypto:
 
 web:
 	cd web && npm ci --silent && npm run typecheck && npm test && npm run build
+
+e2e:
+	cd web && CHROMIUM_PATH=$${CHROMIUM_PATH:-} npx playwright test

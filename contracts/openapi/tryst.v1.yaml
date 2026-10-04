@@ -72,17 +72,25 @@ paths:
           application/json:
             schema:
               type: object
-              required: [otp, device_pubkey, attestation]
+              required: [contact, otp]
               properties:
+                contact: { type: string }
                 otp: { type: string }
+                jurisdiction: { type: string, minLength: 2, maxLength: 2, description: 'ISO 3166-1 alpha-2; default GB' }
                 device_pubkey: { type: string, contentEncoding: base64 }
                 attestation: { type: string, contentEncoding: base64 }
       responses:
         '200':
-          description: Onboarding session (sign-up device only until V1)
+          description: Existing onboarding session
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Session' }
+        '201':
+          description: New account; onboarding session (sign-up device only until V1)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '409': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
   /auth/passkeys/register/begin:
     post:
@@ -106,6 +114,46 @@ paths:
       responses:
         '201': { description: Authenticator registered }
         '403': { $ref: '#/components/responses/Problem' }
+  /auth/enrol-device:
+    post:
+      tags: [auth]
+      operationId: enrolDeviceBegin
+      summary: Onboarding only. One-time 10-minute link for the member's phone.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '201':
+          description: Enrol link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enrol_token: { type: string }
+                  enrol_path: { type: string }
+                  expires_at: { type: string, format: date-time }
+        '403': { $ref: '#/components/responses/Problem' }
+  /auth/enrol-device/redeem:
+    post:
+      tags: [auth]
+      operationId: enrolDeviceRedeem
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enrol_token]
+              properties:
+                enrol_token: { type: string }
+      responses:
+        '200':
+          description: Onboarding session on the phone (may only register passkeys)
+          content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } }
+        '422': { $ref: '#/components/responses/Problem' }
   /auth/login/begin:
     post:
       tags: [auth]
@@ -183,10 +231,12 @@ paths:
     get:
       tags: [auth]
       operationId: loginCrossDeviceStatus
+      summary: Polled by the desktop. Requires the login id as well, so the QR code alone cannot collect the session.
       security: []
       x-min-tier: none
       parameters:
         - { name: qr_token, in: path, required: true, schema: { type: string } }
+        - { name: X-Login-Id, in: header, required: true, schema: { type: string } }
       responses:
         '200':
           description: Pending, denied, or a Session once approved from the registered phone
@@ -217,6 +267,75 @@ paths:
                 assertion: { type: object }
       responses:
         '204': { description: Recorded }
+  /auth/approvals/{qr_token}/begin:
+    post:
+      tags: [auth]
+      operationId: approveDesktopLoginBegin
+      summary: Assertion options restricted to the account's registered phone passkeys.
+      security: []
+      x-min-tier: none
+      parameters:
+        - { name: qr_token, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: WebAuthn request options, content: { application/json: { schema: { type: object } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /auth/login/second-key/begin:
+    post:
+      tags: [auth]
+      operationId: secondKeyBegin
+      summary: Desktop F2 alternative; allows only a different registered security key.
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/LoginRef' }
+      responses:
+        '200': { description: WebAuthn request options, content: { application/json: { schema: { type: object } } } }
+        '422': { $ref: '#/components/responses/Problem' }
+  /auth/login/second-key:
+    post:
+      tags: [auth]
+      operationId: secondKeyFinish
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login_id, credential]
+              properties:
+                login_id: { type: string }
+                credential: { type: object }
+      responses:
+        '200': { description: Session, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /me:
+    get:
+      tags: [auth]
+      operationId: me
+      x-min-tier: V0
+      responses:
+        '200':
+          description: Session summary; no contact or identity data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_kind: { type: string, enum: [onboarding, full] }
+                  surface: { $ref: '#/components/schemas/Surface' }
+                  tier: { $ref: '#/components/schemas/Tier' }
+                  passkeys: { type: integer }
+                  expires_at: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Problem' }
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      x-min-tier: V0
+      responses: { '204': { description: Session ended } }
   /auth/step-up:
     post:
       tags: [auth]
@@ -1157,6 +1276,15 @@ components:
       required: true
       schema: { type: string, format: uuid }
   requestBodies:
+    LoginRef:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [login_id]
+            properties:
+              login_id: { type: string }
     Target:
       required: true
       content:
@@ -1208,6 +1336,8 @@ components:
             - broadening_requires_confirmation
             - same_device_cosign
             - rate_limited
+            - account_exists_sign_in
+            - liveness_unavailable
         required_tier: { $ref: '#/components/schemas/Tier' }
         factor: { type: string, enum: [B1, B2, F1, F2] }
         consent_kind: { $ref: '#/components/schemas/ConsentKind' }

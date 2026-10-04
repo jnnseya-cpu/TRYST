@@ -12,3 +12,6 @@ web/public/brand/
 web/app/brand-tokens.css
 *.tsbuildinfo
 next-env.d.ts
+.e2e-identity-svc
+test-results/
+playwright-report/
