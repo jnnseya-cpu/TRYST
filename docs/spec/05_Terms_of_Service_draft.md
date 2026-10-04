@@ -1,4 +1,4 @@
-# 05 — TRYST Terms of Service — Draft 0.9.2
+# 05 — TRYST Terms of Service — Draft 0.9.3
 
 Part of the [TRYST v1.1 baseline](00_README.md).
 
@@ -109,6 +109,7 @@ You must not, on TRYST or in any contact that begins on TRYST:
 - record, screenshot or copy another Member's private content or messages;
 - use TRYST for any commercial, promotional or research purpose;
 - scrape, reverse-engineer, or automate access to TRYST;
+- fetishise or harass anyone because of their race, ethnicity, religion, disability, age, sex, gender identity or reassignment, sexual orientation, or any other protected characteristic **[v1.2]**;
 - evade a suspension or removal.
 
 8.1 Exposing a Member's use of TRYST to a third party is one of the most serious things you can do on this platform, and we treat it as grounds for immediate permanent removal.
@@ -330,4 +331,4 @@ You must not, on TRYST or in any contact that begins on TRYST:
 
 ---
 
-*TRYST — Terms of Service · Draft 0.9.2 · 4 October 2026 · Prepared by Product for legal review · Not legal advice · Not for publication.*
+*TRYST — Terms of Service · Draft 0.9.3 · 4 October 2026 · Prepared by Product for legal review · Not legal advice · Not for publication.*

@@ -515,6 +515,7 @@ Penalties reach the greater of £18M or 10% of global turnover, with possible cr
 - **Article 22** — human review path for suspensions.
 - **DSR machinery from sprint one.**
 - **Residency** — UK/EU only; no US sub-processor for Article 9 data without a TIA.
+- **Article 6 lawful bases** (v1.2; counsel to confirm): contract, Art. 6(1)(b), for the core service; legitimate interests, 6(1)(f), for fraud and safety detection, with a documented LIA; legal obligation, 6(1)(c), for mandatory reporting and OSA duties. Each sits alongside the Article 9 condition for any special-category element (explicit consent, or DPA Sch. 1 for safeguarding and ban anchors).
 - **Breach playbook** — 72 h, rehearsed twice a year.
 - **Article 10 conviction data and the ban-anchor lawful basis** — DPA Sch. 1 Pt 2 para 18 assumed; counsel must confirm.
 

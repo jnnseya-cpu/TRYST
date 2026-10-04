@@ -69,7 +69,7 @@ Part of the [TRYST v1.1 baseline](00_README.md). This document is the **single s
 | `desire_tag_level` | `yes`, `curious`, `no` |
 | `consent_kind` | `art9_processing`, `media_view`, `meet`, `couple_link`, `retention`, `conduct_attestation`, `safety_training_use`, `biometric_login` |
 | `reveal_scope` | `alias`, `blurred_gallery`, `photo_set`, `voice`, `video` (the reveal ladder, in order) |
-| `report_category` | `minor`, `ncii`, `sextortion`, `coercion`, `threat_violence`, `stalking`, `romance_fraud`, `commercial_sex`, `harassment`, `impersonation`, `exposure_threat`, `other` |
+| `report_category` | `minor`, `ncii`, `sextortion`, `coercion`, `threat_violence`, `stalking`, `romance_fraud`, `commercial_sex`, `harassment`, `impersonation`, `protected_trait_harassment`, `exposure_threat`, `other` |
 | `enforcement_action` | `warn`, `shadow_limit`, `suspend`, `permanent`, `law_enforcement_referral` |
 | `unsafe_ground` | `g1_self_declared`, `g2_corroborated_reports`, `g3_court_order`, `g4_law_enforcement`, `g5_model_confirmed`, `g6_false_attestation` |
 | `guardian_reason_code` | `m6a_coercive_control`, `m6b_boundary_violation`, `m6c_off_platform_pressure`, `m6d_identity_location_pressure`, `m6e_image_coercion`, `m7_authenticity`, `m7b_ban_evasion`, `payment_solicitation` |
@@ -713,6 +713,7 @@ This table is canonical; 03 and 04 implement it, and the ToS (cl. 15) and Privac
 | Panic-preserved location/evidence | As required by emergency services | — | **Declared exception** (ToS cl. 20; P7) |
 | B2 login face reference (v1.2) | Life of account; held by the provider, not TRYST | — | Deleted at the provider on erasure; deletion receipt included in `completion_proof` |
 | Auth events | 90 d, IP truncated | — | TTL |
+| Backups | 35 d rolling, disclosed in the Privacy Notice | — | Stored under per-member keys, so an erased member's data in backups is undecryptable from the moment of erasure |
 
 **Account deletion:**
 1. Destroy the root key in KMS.
@@ -829,6 +830,10 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-066 | Conversation suggestions (openers, boundary questions, respectful replies) are opt-in, generated on device, draft-only and never sent without the member's own action | FE | P3 | B §5, D-20 |
 | FR-067 | Timing and availability matching use only member-provided windows, never routines inferred from location or activity | BE | P2 | B §5 |
 | FR-068 | Behavioural signals decay over time (default half-life 90 days); members can reset all inferred preferences (FR-024) | BE | P2 | B §6.2 |
+| FR-069 | Encrypted media safety: the sending device accepts only allow-listed image/video formats, re-encodes them (stripping active content) before encryption, and shows a consent/NCII warning before any intimate image is sent; public-tier media is malware-scanned on the server | Both | P1 | B §9, §10 |
+| FR-070 | Role separation: finance and billing staff cannot access profile, intent or safety data; T&S staff cannot see billing identity; enforced in the ABAC policy engine | BE | P1 | B §9 |
+| FR-071 | Viewing reporter-disclosed intimate evidence needs dual approval and a reason code, and is logged immutably | BE | P1 | B §9 |
+| FR-072 | Community Rules and enforcement prohibit fetishisation of, and harassment based on, protected characteristics; reportable as `protected_trait_harassment` | Both | P1 | B §10 |
 
 ### 10.2 Non-functional requirements
 
@@ -851,3 +856,5 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | NFR-15 | Platforms: iOS 17+, Android 10+ (StrongBox where present), evergreen browsers (last 2 versions) | FE |
 | NFR-16 | Login completion p95: mobile < 20 s including liveness; desktop < 30 s including cross-device approval | Both |
 | NFR-17 | B2 provider: ISO/IEC 30107-3 PAD Level 2 certified; face-match FAR ≤ 1:10,000 at FRR ≤ 3%; fairness across demographic groups reported by the provider and audited (D-17) | BE |
+| NFR-18 | Key management: automatic yearly rotation of KMS root keys and HSM peppers (dual-run); every KMS/HSM key use streamed to the SIEM with anomaly alerts | BE |
+| NFR-19 | Assurance: public bug bounty from the end of P1 (closed beta); annual independent privacy audit; quarterly pen test and annual red team (NFR-08) | Both |

@@ -296,6 +296,33 @@ Implements [02 §3.3](02_Shared_Contracts.md#33-login-assurance--account-holder-
 - **Lawful basis:** B2 is biometric processing for unique identification (Art. 9). It uses explicit consent `biometric_login`, recorded in the ledger. The accessible alternative (D-17) keeps the consent freely given (ToS Q14).
 - **Cost:** about 1–2 B2 checks per mobile MAU per month (30 d sessions plus new devices and step-ups). At an assumed £0.10–0.30 per check this is £0.10–0.60 per MAU per month; it is added to the infra line in [01 §12](01_Product.md#12-roadmap-team-budget-and-phase-gates). Replace with the vendor quote in P0.
 
+### 6.8 Source B §9–§10 control coverage (v1.2)
+
+Every control in the founder's Security and privacy doctrine (§9) and Trust, safety and misuse controls (§10) ([07](07_Source_B_Founder_Brief.md)) maps to an implementation.
+
+| Source B control | Implementation |
+|---|---|
+| Article 6 + Article 9 + DPIA + consent records + transfers | [01 §14.2](01_Product.md#142-uk-gdpr--dpa-2018); consent ledger (FR-040); UK/EU residency (NFR-06) |
+| Minimisation | FR-002; age band, not DOB; geohash-5; no contact upload (PSI only) |
+| Separation (identity, profile, media, analytics, billing) | Isolated clusters and peppered join (§6.2); media-svc and ciphertext-only store; ClickHouse pseudonymous; `billing_ref` only in IDENTITY-DB |
+| Encryption, key rotation, access telemetry | §6.2; **NFR-18** |
+| Authorisation (ABAC) | §6.5; FR-005; **FR-070** role separation |
+| Private media | Signed short-lived access + recipient-bound wrapped keys (FR-018); no public CDN; watermarking; revocation < 5 s (NFR-04); **FR-069** format allow-list and re-encode on device, server malware scan for public tier |
+| Payments | Tokenised PSP, neutral truthful descriptor (§10); **FR-070** finance staff cannot browse profiles |
+| Admin | Zero standing access, dual-approved break-glass, WORM log (NFR-10); **FR-071** dual approval for intimate evidence |
+| Deletion | §6.3; backups 35 d disclosed ([02 §7](02_Shared_Contracts.md#7-retention-and-erasure)); legal holds narrowly scoped (`report_case.legal_hold`) |
+| Incident readiness | §6.6 runbooks: outing, sextortion, intimate-media leak, insider abuse, account takeover, mass breach |
+| Assurance | ASVS L3 / MASVS L2+R (NFR-08); threat model (P0); **NFR-19** bug bounty + annual privacy audit |
+| Fake profiles / bots | §8 L1, M7, M7b, fake-profile stack, human review |
+| Blackmail / sextortion | M6e freeze, evidence preservation, victim resources, Action Fraud path (§7.3) |
+| Stalking / doxxing | Coarse location + rotating cells (FR-065); visibility (FR-009); **no free-text member search exists**, and slate size is capped; M6d; targeted network blocks as an enforcement action only (VPNs are scored, never blanket-blocked); M7b repeat-account detection |
+| Non-consensual media | Hash matching where lawful (D-10, StopNCII); **FR-069** upload warning; reveal/revoke controls; 1 h takedown; sanctions |
+| Coercion in threesomes | Independent accounts and VC (FR-006); per-person approval and veto; private withdrawal from group threads (02 §9); either partner dissolves; no "couple owner" |
+| Underage access | V2 gate (FR-001), re-check triggers (02 §3.2), 15 min escalation and mandatory reporting |
+| Commercial sex / trafficking | No member-to-member payments; solicitation detection; specialist review; jurisdictional reporting (FR-037) |
+| Bias / predatory targeting | No advertising at all; exposure audits (M9, fairness audits); **FR-072** protected-trait harassment rule |
+| Retaliatory reports | Reporter-reputation scoring; evidence review; appeal; no permanent ban from one uncorroborated report (§8) |
+
 ## 7. Guardian — safety models (M6a–M6e)
 
 ### 7.1 Central problem
@@ -508,7 +535,7 @@ Detectors are refreshed quarterly; a static detector is a known future failure.
 | Phase | Epics (backend) | Definition of done |
 |---|---|---|
 | **P0** (M0–M2) | Threat model; architecture review; assurance-provider adapters (×2) spike; PSP + backup MID integration spike; IaC landing zone (eu-west-2), KMS/HSM, isolated clusters; contracts repo (OpenAPI + Protobuf) generated from 02 | Threat model signed off; G-P0 legal items done by others |
-| **P1** (M2–M6) | `edge-gateway` (DPoP, gates); `identity-svc` (sign-up OTP, devices, **passkeys + two-factor login, step-up, recovery**, assurance, anchors, join HMAC); `core-svc` modules: profile, couple (VC), intent (Keys, caps), discretion (policy, zones), reveal, threads (MLS DS), meet, consent, deletion, commerce (TRYST+, Keys, deposit, vouchers); Cartographer; Broker P1 (Stage 0 + weighted baseline); Curtain v1; Guardian server (signals intake, escalation, M7, media moderation); Aftercare; `safety-svc` + trust console; Privacy Auditor probes; DSR | FR-001–009, 011–014, 016–023, 026–044, 046–047, 049–051, 054, 056–062 met (backend side); NFR-01/02/05/06/10/11 met; no-go list clear; control cohort running (no Envoy) |
+| **P1** (M2–M6) | `edge-gateway` (DPoP, gates); `identity-svc` (sign-up OTP, devices, **passkeys + two-factor login, step-up, recovery**, assurance, anchors, join HMAC); `core-svc` modules: profile, couple (VC), intent (Keys, caps), discretion (policy, zones), reveal, threads (MLS DS), meet, consent, deletion, commerce (TRYST+, Keys, deposit, vouchers); Cartographer; Broker P1 (Stage 0 + weighted baseline); Curtain v1; Guardian server (signals intake, escalation, M7, media moderation); Aftercare; `safety-svc` + trust console; Privacy Auditor probes; DSR | FR-001–009, 011–014, 016–023, 026–044, 046–047, 049–051, 054, 056–062, 064–065, 069–072 met (backend side); NFR-01/02/05/06/10/11 met; no-go list clear; control cohort running (no Envoy) |
 | **P2** (M6–M10) | Envoy (agent + Briefs); Mirror v1 (M1–M4, α, reset/insights); ExclusionRing PSI; Guardian P2 models (D1/D2); FR-024/025 | **G-P2:** meets per intent sent ≥ +40% vs control |
 | **P3** (M10–M15) | DUO, ENVOY, GHOST billing; ENVOY proposals; travel mode; DBS attestation; transparency report; 24/7 T&S tooling; scale to 25k verified | G-P3 |
 | **P4** (M15–M24) | Multi-market jurisdiction config; localisation; per-language Guardian; consortium interface (if cleared); scale to 150k | G-P4 |

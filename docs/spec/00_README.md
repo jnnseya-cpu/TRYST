@@ -23,7 +23,7 @@ The specification is split by audience. Each document owns its topics; the other
 | 02 | [Shared Contracts](02_Shared_Contracts.md) | Backend **and** frontend | Glossary, enums, verification tiers and gates, data model, API contract, event taxonomy, agent message schemas, retention, error model, requirement catalogue (FR/NFR) with owners |
 | 03 | [Backend](03_Backend.md) | Backend, ML, security, SRE, T&S engineering | Services, stack, agents, learning models, matching pipeline, cryptography, identity split, erasure, PSI server, Guardian server side, admission control, MLOps, commerce, backend backlog |
 | 04 | [Frontend](04_Frontend.md) | iOS, Android, web, design | Two-surface strategy, client stacks, screens and flows, client discretion, client cryptography, on-device Guardian, PSI client, safety UX, copy rules, store compliance, frontend backlog |
-| 05 | [Terms of Service — draft 0.9.2](05_Terms_of_Service_draft.md) | Counsel | Consumer terms for counsel review. **Not for publication.** |
+| 05 | [Terms of Service — draft 0.9.3](05_Terms_of_Service_draft.md) | Counsel | Consumer terms for counsel review. **Not for publication.** |
 | 06 | [Decisions, errata and change log](06_Decisions_and_Changes.md) | Product owner, tech leads | How v1.1 reconciled its sources, resolved and open decisions, errata fixed |
 | 07 | [Source B — founder brief (verbatim) and traceability](07_Source_B_Founder_Brief.md) | Everyone | The founder's 17 Sep 2026 specification word for word, plus where each part is implemented, the agent mapping and the FR-ID crosswalk |
 
