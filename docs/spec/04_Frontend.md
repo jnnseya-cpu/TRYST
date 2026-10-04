@@ -121,6 +121,8 @@ Pause, Vanish, Delete (shows the erasure promise **and** the declared exceptions
 | **Decoy skin** — generic utility (calculator / notes) with a neutral icon and name; the real app needs a distinct PIN or biometric | ✓ | Neutral title/favicon option only | FR-027 |
 | **Duress PIN** — opens a populated, innocuous decoy state; silent | ✓ | — | FR-027 |
 | **Quick exit** — one action hides content and clears the view in < 500 ms (web: replace history and navigate to a neutral page) | ✓ | ✓ | FR-029 |
+| **Emergency lock** — if a phone is lost or taken, the member visits a neutral web page and enters their contact handle + emergency code (shown once at sign-up, to store offline) to freeze everything (FR-064) | — | ✓ | FR-064 |
+| **Location veil** — distance bands only, from rotating cells (FR-065) | ✓ | ✓ | FR-065 |
 | **Burn** — long-press, confirm in < 2 s: wipe local storage, revoke device keys (`POST /v1/burn`), sign out everywhere. **Visually and gesturally distinct from Panic** | ✓ | ✓ | FR-028, E-21 |
 | **Notification masking** — off by default; if on, the payload is content-free ("1 update") and the push contains no name, preview or image | ✓ | ✓ (web push) | FR-026 |
 | **Screenshot protection** — Android `FLAG_SECURE`; iOS capture detection that blurs content and notifies the counterparty; obscured app-switcher snapshot | ✓ | Best-effort blur on visibility change | FR-030 |

@@ -86,7 +86,7 @@ Every agent has a policy file (`policies/<agent>.yaml`), a tool allow-list, a me
    - *intent:* shape compatibility matrix.
    - *structure:* segment pair, veto mode, partner participation.
    - *boundaries:* set intersection of hard limits and desire tags; any `no` × `yes` collision is **blocking**.
-   - *logistics:* overlap of availability windows (tz-aware), intersection of travel radii, notice, hosting.
+   - *logistics:* overlap of availability windows (tz-aware), intersection of travel radii, notice, hosting. Windows come **only** from what the member entered, never from inferred routines (FR-067).
    - *discretion:* zone intersection (must be empty), reveal pace, device risk.
    - *verification:* both sides' `min_counterparty_tier` satisfied.
 4. **Up to 6 turns** in schema form to settle open queries (02 §6.1). Unknown fields → `friction`.
@@ -120,6 +120,8 @@ EffectiveVector = α · Revealed + (1 − α) · project(Intent)
 - **Inputs:** only events in 02 §8. **No message content.** Conversation features are computed on device from metadata.
 - **Pseudonyms:** pseudo-subject IDs rotate every training window. Deleted members are dropped from serving immediately and from the next training run.
 - **Raw events:** kept 180 d, then aggregated features only. Cohort reporting needs k ≥ 50.
+- **Decay:** behavioural signals are time-weighted (default half-life 90 days) so old behaviour fades (FR-068).
+- **Emergency lock** (FR-064) is handled by `identity-svc`: it verifies the emergency-code HMAC, revokes all sessions and authenticators' sessions, sets the profile to `vanished` and destroys all active reveal-grant wrapped keys.
 - **Excluded from training:** protected or sensitive characteristics are never targets or inferred labels. Orientation, kinks and structure are used only as filters or features the member chose.
 
 ### 4.3 Model inventory

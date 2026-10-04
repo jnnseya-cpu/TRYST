@@ -245,6 +245,8 @@ A member may enable several modes, each with its own visibility and filters.
 
 ## 7. Agents (roles)
 
+**The AI agents facilitate matching; members make every decision.** Agents learn, rank, pre-qualify and draft. They never send an intent, open a conversation, reveal a member or act as a member without that member's explicit action (P4, FR-055, FR-066).
+
 Seven agents, each an independently deployable service with its own tool surface, memory scope, policy file and eval suite. They talk over a typed internal bus, never by passing free text. [A §5] Implementation: [03 §3](03_Backend.md#3-agent-services).
 
 | Agent | Role | Autonomy boundary |

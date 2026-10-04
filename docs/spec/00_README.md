@@ -25,8 +25,9 @@ The specification is split by audience. Each document owns its topics; the other
 | 04 | [Frontend](04_Frontend.md) | iOS, Android, web, design | Two-surface strategy, client stacks, screens and flows, client discretion, client cryptography, on-device Guardian, PSI client, safety UX, copy rules, store compliance, frontend backlog |
 | 05 | [Terms of Service — draft 0.9.2](05_Terms_of_Service_draft.md) | Counsel | Consumer terms for counsel review. **Not for publication.** |
 | 06 | [Decisions, errata and change log](06_Decisions_and_Changes.md) | Product owner, tech leads | How v1.1 reconciled its sources, resolved and open decisions, errata fixed |
+| 07 | [Source B — founder brief (verbatim) and traceability](07_Source_B_Founder_Brief.md) | Everyone | The founder's 17 Sep 2026 specification word for word, plus where each part is implemented, the agent mapping and the FR-ID crosswalk |
 
-A combined PDF of 00–06 is at [`TRYST_Spec_v1.2.pdf`](TRYST_Spec_v1.2.pdf). Brand assets (logo exactly as supplied, colour tokens) are in [`assets/brand/`](../../assets/brand/tokens.json).
+A combined PDF of 00–07 is at [`TRYST_Spec_v1.2.pdf`](TRYST_Spec_v1.2.pdf). Brand assets (logo exactly as supplied, colour tokens) are in [`assets/brand/`](../../assets/brand/tokens.json).
 
 ## 2. Sources and precedence
 

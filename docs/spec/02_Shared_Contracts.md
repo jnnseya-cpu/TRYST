@@ -512,6 +512,7 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 |---|---|---|---|
 | GET / POST | `/v1/consents` | V0 | Read the ledger; append grant or withdrawal (never mutate) |
 | POST | `/v1/account/pause` | V0 | Removed from discovery immediately |
+| POST | `/v1/emergency-lock` | — | **No session needed.** `{contact_hint, emergency_code}` → freeze sessions, hide profile, disable media links (FR-064). Uniform response; rate-limited; the code is single-use and reissued after recovery |
 | POST | `/v1/account/vanish` | V0 | Hidden + threads closed; account kept |
 | POST | `/v1/account/export` | V0 | SAR/portability export (encrypted), < 30 days; target < 24 h |
 | DELETE | `/v1/account` | V0 | Cryptographic erasure, **< 60 s p99**. Returns `deletion_job_id` and, later, `completion_proof` |
@@ -785,10 +786,10 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-023 | Private Aftercare prompt 48 h after a meet; never visible to the counterparty | Both | P1 | A §5.7 |
 | FR-024 | Preference transparency: view learned categories, correct, disable personalisation, reset learning | Both | P2 | B FR-010 |
 | FR-025 | Each slate card shows 2–4 non-sensitive reasons and a correction control | Both | P2 | B §6.2 |
-| FR-026 | Notifications off by default; if on, content-free ("1 update") — never a name, image or excerpt | FE | P1 | A §9.4, B FR-013 |
+| FR-026 | Notifications off by default; if enabled, content-free with member-chosen neutral wording (default "You have an update") — never a name, image or excerpt | FE | P1 | A §9.4, B §4 |
 | FR-027 | Decoy skin (neutral icon/name) and silent duress PIN opening a populated innocuous state (native) | FE | P1 | A §9.4 |
 | FR-028 | Burn: wipe local storage, revoke device keys, sign out everywhere; confirmable in < 2 s | Both | P1 | A §9.4 |
-| FR-029 | Quick exit hides content and clears the client view in < 500 ms on all surfaces | FE | P1 | B FR-011 |
+| FR-029 | Quick exit hides content and clears the client view and cache in < 500 ms on all surfaces; onboarding states plainly that it cannot hide network or device history | FE | P1 | B FR-011, B §4 |
 | FR-030 | Screenshot protection (FLAG_SECURE) or detection with counterparty notice (iOS); obscured app switcher; no cloud backup; keys in Secure Enclave/StrongBox | FE | P1 | A §9.4 |
 | FR-031 | Entering a blocked jurisdiction auto-locks to the decoy and hides the profile | Both | P1 | A §9.4, §14.5 |
 | FR-032 | Report and block from every surface; the reporter is never revealed; reporters may disclose decrypted content and separately opt in to training use | Both | P1 | A §21.3, Part B cl. 19 |
@@ -823,6 +824,11 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-061 | Account recovery needs B2 + fresh V2 matching the stored document anchor + 24 h hold cancellable from registered devices; no staff bypass | Both | P1 | D-16 |
 | FR-062 | Session limits: mobile 30 d max with biometric unlock and 2 min idle lock; desktop 12 h max, 15 min idle → full login | Both | P1 | D-16 |
 | FR-063 | Brand: logo used exactly as supplied and palette tokens applied on every branded surface; logo never shown in decoy mode, on lock screens, in notifications, app-switcher snapshots, descriptors or Share My Plan | FE | P1 | D-19 |
+| FR-064 | Emergency lock from a separate path: with only the contact handle and a one-time emergency code issued at sign-up (no login), freeze all sessions, hide the profile and disable all media links; unlocking needs full recovery (FR-061). Uniform response; abuse only locks, never exposes | Both | P1 | B §3, §4 |
+| FR-065 | Location veil: distances shown only as bands, computed from approximate cells whose offset rotates at least daily; never live or exact home/work coordinates | Both | P1 | B §4 |
+| FR-066 | Conversation suggestions (openers, boundary questions, respectful replies) are opt-in, generated on device, draft-only and never sent without the member's own action | FE | P3 | B §5, D-20 |
+| FR-067 | Timing and availability matching use only member-provided windows, never routines inferred from location or activity | BE | P2 | B §5 |
+| FR-068 | Behavioural signals decay over time (default half-life 90 days); members can reset all inferred preferences (FR-024) | BE | P2 | B §6.2 |
 
 ### 10.2 Non-functional requirements
 
