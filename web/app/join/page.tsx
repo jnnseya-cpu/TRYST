@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { startRegistration } from "@simplewebauthn/browser";
 import QRCode from "qrcode";
+import { Shell } from "@/components/Shell";
 import { api, problemTitle, setToken } from "@/lib/api";
 
 type Step = "contact" | "code" | "passkey" | "second" | "done";
@@ -73,9 +74,10 @@ export default function Join() {
   }
 
   return (
-    <main>
-      <h1>Join TRYST</h1>
-      <p className="note">Verified adults only. Only you will ever be able to sign in to your account.</p>
+    <Shell>
+      <p className="eyebrow">Membership</p>
+      <h1>Request an invitation</h1>
+      <p className="lede">Verified adults only. Once you&rsquo;re set up, only you can ever sign in.</p>
 
       {step === "contact" && (
         <section className="card">
@@ -109,14 +111,14 @@ export default function Join() {
           <button type="button" className="button" onClick={linkPhone}>Link my phone</button>
           {enrolLink && (
             <div>
-              {qr && <img src={qr} alt="Scan with your phone to link it" width={220} height={220} />}
+              {qr && <img className="qr" src={qr} alt="Scan with your phone to link it" width={220} height={220} />}
               <p className="note">Or open this one-time link on your phone (valid 10 minutes):</p>
-              <p className="note"><a data-testid="enrol-link" href={enrolLink}>{enrolLink}</a></p>
+              <p className="note"><a className="code-link" data-testid="enrol-link" href={enrolLink}>{enrolLink}</a></p>
               <button type="button" className="button" onClick={finish}>I've linked my phone</button>
             </div>
           )}
           <p className="note">No phone? Use a second security key instead.</p>
-          <button type="button" className="button" onClick={() => addPasskey("cross-platform")}>Add a security key</button>
+          <button type="button" className="button ghost" onClick={() => addPasskey("cross-platform")}>Add a security key</button>
         </section>
       )}
 
@@ -129,6 +131,6 @@ export default function Join() {
       )}
 
       {msg && <p role="alert">{msg}</p>}
-    </main>
+    </Shell>
   );
 }

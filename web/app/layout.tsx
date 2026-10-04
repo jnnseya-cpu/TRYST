@@ -17,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-GB">
       <body>
+        <div className="grain" aria-hidden="true" />
         <QuickExit />
         {children}
       </body>

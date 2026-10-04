@@ -117,6 +117,7 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /v1/auth/login/second-key/begin", s.handleSecondKeyBegin)
 	m.HandleFunc("POST /v1/auth/login/second-key", s.handleSecondKeyFinish)
 	m.HandleFunc("GET /v1/me", s.handleMe)
+	m.HandleFunc("GET /v1/me/security", s.handleSecurity)
 	m.HandleFunc("POST /v1/auth/logout", s.handleLogout)
 	m.HandleFunc("POST /v1/burn", s.handleBurn)
 }
@@ -223,6 +224,7 @@ func (s *Server) issueSession(id *Identity, kind SessionKind, surface auth.Surfa
 }
 
 func (s *Server) recordFailure(id *Identity) {
+	id.record(s.cfg.Now(), "login_failed", "")
 	id.Failures++
 	if id.Failures >= lockoutThreshold {
 		id.LockedUntil = s.cfg.Now().Add(lockoutDuration)
@@ -414,6 +416,7 @@ func (s *Server) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	surface, kind := surfaceForRegistration(r, parsed.AuthenticatorAttachment)
 	id.Credentials = append(id.Credentials, &StoredCredential{Cred: *cred, Surface: surface, Kind: kind, CreatedAt: s.cfg.Now()})
+	id.record(s.cfg.Now(), "passkey_added", string(surface))
 	writeJSON(w, 201, map[string]any{"registered": true, "surface": surface, "kind": kind, "passkeys": len(id.Credentials)})
 }
 
@@ -571,6 +574,7 @@ func (s *Server) finish(w http.ResponseWriter, la *LoginAttempt) {
 	// Tier is not raised here: a full session proves the account holder, not age. V1/V2 come
 	// from the assurance service (02 §3.2).
 	id.Sealed, id.Failures = true, 0
+	id.record(s.cfg.Now(), "login_ok", string(la.Attempt.Surface))
 	writeJSON(w, 200, s.issueSession(id, Full, la.Attempt.Surface))
 }
 
@@ -880,5 +884,75 @@ func (s *Server) handleBurn(w http.ResponseWriter, r *http.Request) {
 			delete(s.store.sessions, th)
 		}
 	}
+	s.store.identities[sess.IdentityID].record(s.cfg.Now(), "burn", "")
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleSecurity returns the member's own sign-in activity as daily counts for the security
+// charts (FR-081). Only full sessions may read it.
+func (s *Server) handleSecurity(w http.ResponseWriter, r *http.Request) {
+	days := 30
+	switch r.URL.Query().Get("days") {
+	case "7":
+		days = 7
+	case "90":
+		days = 90
+	}
+	s.store.mu.Lock()
+	defer s.store.mu.Unlock()
+	sess, _, ok := s.sessionFrom(r)
+	if !ok || sess.Kind != Full {
+		fail(w, 401, "auth_required", "Sign in required")
+		return
+	}
+	id := s.store.identities[sess.IdentityID]
+	now := s.cfg.Now().UTC()
+	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, -(days - 1))
+	type day struct {
+		Date     string `json:"date"`
+		Phone    int    `json:"phone"`
+		Computer int    `json:"computer"`
+		Failed   int    `json:"failed"`
+	}
+	series := make([]day, days)
+	for i := range series {
+		series[i].Date = start.AddDate(0, 0, i).Format("2006-01-02")
+	}
+	totals := map[string]int{}
+	for _, e := range id.Events {
+		at := e.At.UTC()
+		if at.Before(start) {
+			continue
+		}
+		idx := int(at.Sub(start).Hours() / 24)
+		if idx < 0 || idx >= days {
+			continue
+		}
+		switch {
+		case e.Kind == "login_ok" && e.Surface == "desktop":
+			series[idx].Computer++
+		case e.Kind == "login_ok":
+			series[idx].Phone++
+		case e.Kind == "login_failed":
+			series[idx].Failed++
+		}
+		totals[e.Kind]++
+	}
+	active := 0
+	for _, other := range s.store.sessions {
+		if other.IdentityID == id.ID() && other.Kind == Full && now.Before(other.ExpiresAt) {
+			active++
+		}
+	}
+	passkeys := map[string]int{}
+	for _, c := range id.Credentials {
+		if !c.Revoked {
+			passkeys[c.Kind]++
+		}
+	}
+	writeJSON(w, 200, map[string]any{
+		"days": days, "series": series, "totals": totals,
+		"active_sessions": active, "passkeys": passkeys,
+		"locked": s.locked(id),
+	})
 }

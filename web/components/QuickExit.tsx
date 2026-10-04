@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { quickExit } from "@/lib/quickExit";
 
-/** Always-visible exit button; double-tap Escape also exits. */
+/** Always-visible exit; pressing Escape twice also leaves (FR-029). */
 export function QuickExit() {
   const last = useRef(0);
   useEffect(() => {
@@ -18,7 +18,7 @@ export function QuickExit() {
   }, []);
   return (
     <button type="button" className="quick-exit" onClick={() => quickExit(window)} aria-label="Leave this site now">
-      Exit
+      Leave
     </button>
   );
 }

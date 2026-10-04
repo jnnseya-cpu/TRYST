@@ -47,6 +47,30 @@ type Identity struct {
 	Failures     int
 	LockedUntil  time.Time
 	CreatedAt    time.Time
+	Events       []AuthEvent // own security activity, kept 90 days (NFR-11)
+}
+
+// AuthEvent is one security event on the member's own account (02 §4.1 auth_event). It holds
+// no IP, location or device fingerprint: only what the member's own security view needs.
+type AuthEvent struct {
+	At      time.Time
+	Kind    string // login_ok | login_failed | passkey_added | burn
+	Surface string // mobile_pwa | mobile_app | desktop | ""
+}
+
+const eventRetention = 90 * 24 * time.Hour
+
+// record appends an event and drops anything older than the retention window. Caller holds
+// the store lock.
+func (i *Identity) record(now time.Time, kind, surface string) {
+	cut := now.Add(-eventRetention)
+	kept := i.Events[:0]
+	for _, e := range i.Events {
+		if e.At.After(cut) {
+			kept = append(kept, e)
+		}
+	}
+	i.Events = append(kept, AuthEvent{At: now, Kind: kind, Surface: surface})
 }
 
 // ID is the hex form of the handle.

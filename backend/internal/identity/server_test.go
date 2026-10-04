@@ -457,3 +457,42 @@ func TestProdConfigGuards(t *testing.T) {
 		t.Fatal("the OTP must never be exposed outside dev")
 	}
 }
+
+func TestSecurityActivityIsRealAndPrivate(t *testing.T) {
+	h := newHarness(t, failingLiveness{})
+	phone := newSoftAuth(t, "platform")
+	onb := h.signUp("sec@example.com")
+	h.register(onb, uaIPhone, phone)
+	// One failed second factor...
+	loginID, _ := h.firstFactor(phone, uaIPhone)
+	h.mustStatus(h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone), 401)
+	// Onboarding sessions cannot read security activity.
+	h.mustStatus(h.do("GET", "/v1/me/security", nil, onb, ""), 401)
+
+	h2 := newHarness(t, DevLiveness{})
+	p2 := newSoftAuth(t, "platform")
+	h2.register(h2.signUp("sec2@example.com"), uaIPhone, p2)
+	var tok string
+	for i := 0; i < 2; i++ {
+		lid, _ := h2.firstFactor(p2, uaIPhone)
+		tok = h2.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": lid}, "", uaIPhone).json(t)["access_token"].(string)
+	}
+	r := h2.do("GET", "/v1/me/security?days=7", nil, tok, "")
+	h2.mustStatus(r, 200)
+	var sec struct {
+		Days   int `json:"days"`
+		Series []struct {
+			Phone, Computer, Failed int
+		} `json:"series"`
+		ActiveSessions int            `json:"active_sessions"`
+		Passkeys       map[string]int `json:"passkeys"`
+	}
+	_ = json.Unmarshal(r.body, &sec)
+	last := sec.Series[len(sec.Series)-1]
+	if sec.Days != 7 || len(sec.Series) != 7 || last.Phone != 2 || last.Computer != 0 || sec.ActiveSessions != 2 || sec.Passkeys[KindPlatformUV] != 1 {
+		t.Fatalf("unexpected security summary: %s", r.body)
+	}
+	if strings.Contains(string(r.body), "example.com") {
+		t.Fatal("security activity must not contain the contact")
+	}
+}

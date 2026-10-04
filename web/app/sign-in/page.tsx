@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { startAuthentication } from "@simplewebauthn/browser";
 import QRCode from "qrcode";
 import { FACTOR_COPY, GENERIC_FAILURE, type Factor } from "@/lib/login";
+import { Shell } from "@/components/Shell";
 import { api, problemTitle, setToken } from "@/lib/api";
 
 type AssertionOptions = Parameters<typeof startAuthentication>[0]["optionsJSON"];
@@ -94,14 +95,17 @@ export default function SignIn() {
   const next = required.find((f) => !passed.includes(f));
 
   return (
-    <main>
+    <Shell>
+      <p className="eyebrow">Members</p>
       <h1>Sign in</h1>
-      <p className="note">Only the account holder can sign in. Two checks are always required.</p>
+      <p className="lede">Two checks, every time. Only you can open this account.</p>
       {required.length > 0 && (
         <ol className="steps">
           {required.map((f, i) => (
             <li key={f} aria-current={next === f ? "step" : undefined}>
-              {i + 1}. {FACTOR_COPY[f].title} {passed.includes(f) ? "✓" : ""}
+              <span className="num">{["I", "II"][i]}</span>
+              {FACTOR_COPY[f].title}
+              <span className="state">{passed.includes(f) ? "Done" : next === f ? "Now" : ""}</span>
             </li>
           ))}
         </ol>
@@ -130,19 +134,20 @@ export default function SignIn() {
             <button type="button" className="button" onClick={phoneApproval}>Show code for my phone</button>
           ) : (
             <div>
-              <img src={qr.img} alt="Scan with your registered phone" width={220} height={220} />
-              <p className="note">Or open on your phone: <a data-testid="approve-link" href={qr.link}>{qr.link}</a></p>
+              <img className="qr" src={qr.img} alt="Scan with your registered phone" width={220} height={220} />
+              <p className="note">Or open on your phone: <a className="code-link" data-testid="approve-link" href={qr.link}>{qr.link}</a></p>
               <p className="note" role="status">Waiting for approval on your phone…</p>
             </div>
           )}
           <p className="note">No phone?</p>
-          <button type="button" className="button" onClick={secondKey}>Use my second security key</button>
+          <button type="button" className="button ghost" onClick={secondKey}>Use my second security key</button>
         </section>
       )}
 
       {msg && <p role="alert">{msg}</p>}
-      <p className="note">We never sign you in with a text message or email code, and our staff cannot sign in for you.</p>
-      <p className="note">New here? <a href="/join">Join TRYST</a></p>
-    </main>
+      <hr className="rule" />
+      <p className="note">We never sign you in with a text message or an email code, and no one at TRYST can sign in for you.</p>
+      <p className="note">Not a member yet? <a href="/join">Request an invitation</a></p>
+    </Shell>
   );
 }

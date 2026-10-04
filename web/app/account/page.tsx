@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Shell } from "@/components/Shell";
 import { api, getToken, setToken } from "@/lib/api";
 
 type Me = { session_kind: string; surface: string; tier: string; passkeys: number; expires_at: string };
@@ -34,25 +35,26 @@ export default function Account() {
     window.location.replace("/");
   }
 
-  if (!checked) return <main><p>Loading…</p></main>;
+  if (!checked) return <Shell><p>Loading…</p></Shell>;
   if (!me) {
     return (
-      <main>
+      <Shell>
         <h1>Signed out</h1>
         <a className="button" href="/sign-in">Sign in</a>
-      </main>
+      </Shell>
     );
   }
   return (
-    <main>
-      <h1>Your account</h1>
+    <Shell>
+      <p className="eyebrow">Your account</p>
+      <h1>Signed in</h1>
       <section className="card" data-testid="session">
         <p>Signed in with two checks ({me.surface === "desktop" ? "computer" : "phone"}).</p>
         <p className="note">Passkeys registered: {me.passkeys} · Verification: {me.tier}</p>
       </section>
       <button type="button" className="button" onClick={signOut}>Sign out</button>
       <p />
-      <button type="button" className="button" onClick={burn}>Burn — sign out everywhere and wipe this device</button>
-    </main>
+      <button type="button" className="button ghost" onClick={burn}>Burn: sign out everywhere and wipe this device</button>
+    </Shell>
   );
 }

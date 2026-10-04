@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { startRegistration } from "@simplewebauthn/browser";
+import { Shell } from "@/components/Shell";
 import { api, problemTitle } from "@/lib/api";
 
 function EnrolInner() {
@@ -31,7 +32,8 @@ function EnrolInner() {
   }
 
   return (
-    <main>
+    <Shell>
+      <p className="eyebrow">Your second check</p>
       <h1>Link this phone</h1>
       {state === "ready" ? (
         <section className="card">
@@ -45,7 +47,7 @@ function EnrolInner() {
         </section>
       )}
       {msg && <p role="alert">{msg}</p>}
-    </main>
+    </Shell>
   );
 }
 

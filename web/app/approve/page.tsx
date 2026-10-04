@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { startAuthentication } from "@simplewebauthn/browser";
+import { Shell } from "@/components/Shell";
 import { api, problemTitle } from "@/lib/api";
 
 // F2: the registered phone approves a desktop sign-in with its own biometric passkey (B1).
@@ -29,20 +30,21 @@ function ApproveInner() {
   }
 
   return (
-    <main>
-      <h1>Approve sign-in</h1>
+    <Shell>
+      <p className="eyebrow">Approve sign-in</p>
+      <h1>Is this you?</h1>
       {state === "ready" && (
         <section className="card">
           <p>Someone is signing in to your account on a computer. Approve only if it's you.</p>
           <button type="button" className="button" onClick={() => decide("approve")}>Approve</button>
           <p />
-          <button type="button" className="button" onClick={() => decide("deny")}>It wasn't me</button>
+          <button type="button" className="button ghost" onClick={() => decide("deny")}>It wasn't me</button>
         </section>
       )}
       {state === "approved" && <section className="card" role="status"><h2>Approved</h2><p>Return to your computer.</p></section>}
       {state === "denied" && <section className="card" role="status"><h2>Declined</h2><p>That sign-in has been blocked.</p></section>}
       {msg && <p role="alert">{msg}</p>}
-    </main>
+    </Shell>
   );
 }
 

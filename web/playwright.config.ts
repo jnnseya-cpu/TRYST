@@ -6,6 +6,8 @@ const chromium = process.env.CHROMIUM_PATH; // e.g. /opt/pw-browsers/chromium-11
 
 export default defineConfig({
   testDir: "e2e",
+  // Screenshot capture runs only on request: SCREENSHOTS=1 npx playwright test screens
+  testIgnore: process.env.SCREENSHOTS ? [] : ["**/screens.spec.ts"],
   timeout: 60_000,
   retries: 0,
   use: {
