@@ -1,46 +1,49 @@
-// Package launch implements public sign-up across several launch cities with the city
-// density gate and the gender-balance waitlist (docs/spec/01_Product.md §11; FR-089,
-// FR-090, D-35).
+// Package launch implements public sign-up across the launch cities, city-by-city matching
+// and the demand-balance waitlist (docs/spec/01_Product.md §11; FR-089, FR-090, D-35, D-36).
 //
 //   - Sign-up is open to every verified adult in a launch city; no invitation is needed.
 //   - Matching opens one city at a time, in launch order (London first). A city goes live
 //     once it has DensityGate verified members (G-City-1) and the city before it is live;
-//     once live it stays live. Before that, members verify, set up their profile and see
-//     how close the city is. This is the density-first, city-by-city launch pattern.
-//   - Balance (G-City-2): among solo members who declared themselves men or women, the
-//     larger side may not exceed RatioCap times the smaller. A member whose admission would
-//     breach the cap joins a first-come, first-served waitlist for that city and is
-//     admitted as soon as the balance allows. Couples and members of any other gender are
-//     never waitlisted. Pricing and ranking never use gender (D-06; 03 §3).
-//   - While a city is seeding (fewer than SeedFloor balanced solos), nobody is waitlisted.
+//     once live it stays live. Before that, members see how close their city is.
+//   - Balance (G-City-2) is gender-neutral (D-36). Nobody is admitted or held because of who
+//     they are. Every member is a "receiver" in the groups that describe them and a
+//     "seeker" of the groups they asked to meet. A new member waits only if one of the groups
+//     they want to meet is already saturated: more than LoadCap seekers per receiver. The rule
+//     is identical for everyone and protects whichever group is being overwhelmed, whether that
+//     is women in a straight pool, men in a gay pool or singles sought by couples.
+//   - Waiting is first come, first served among people seeking the same groups, and a new
+//     member who joins any group adds supply, which releases waiting members automatically.
+//   - While a city is seeding (fewer than SeedFloor members), nobody waits; departures never
+//     reopen seeding. Price and ranking never use any of this (D-06; 03 §3).
 package launch
 
 import (
 	"errors"
-	"fmt"
 	"sort"
+	"strings"
 	"sync"
 )
 
 // Defaults from 01 §11 and §13.1.
 const (
 	DensityGate = 2000
-	RatioCap    = 2.2
+	LoadCap     = 2.2 // seekers per receiver in any group; 2.0 from P3
 	SeedFloor   = 200
 )
 
-// Cohort is the balance group a member falls into. It is derived from the member's own
-// declaration for this purpose only and is never shown to other members.
-type Cohort int
+// Profile is what the pacing rule sees: the groups a member belongs to and the groups they
+// want to meet, as plain labels from their own profile ("woman", "man", "single", "couple"
+// and so on). The rule never interprets a label; it only counts.
+type Profile struct {
+	Is    []string
+	Seeks []string
+}
 
-const (
-	Men Cohort = iota
-	Women
-	Other  // any other gender identity: never waitlisted
-	Couple // couple profiles: never waitlisted
-)
-
-func (c Cohort) String() string { return [...]string{"men", "women", "other", "couple"}[c] }
+func (p Profile) key() string {
+	s := append([]string(nil), p.Seeks...)
+	sort.Strings(s)
+	return strings.Join(s, "|")
+}
 
 // City is a launch city.
 type City struct {
@@ -56,27 +59,29 @@ var LaunchCities = []City{
 // Status is what a member is told about their place.
 type Status struct {
 	Admitted         bool
-	WaitlistPosition int // 1-based; 0 when admitted
+	WaitlistPosition int      // 1-based among people seeking the same groups; 0 when admitted
+	BusyGroups       []string // the groups that are full right now, so the wait is explained
 	MatchingLive     bool
 	VerifiedInCity   int
-	NeededForLive    int // members still needed before matching opens; 0 when live
+	NeededForLive    int // members still needed before matching can open; 0 once reached
 }
 
 type cityState struct {
-	seeded  bool // set once the seed floor is reached; never reset, so departures cannot reopen seeding
-	counts  [4]int
-	waiting []waiter
-	where   map[string]int // member → index in waiting (rebuilt on release)
-}
-
-type membership struct {
-	city   string
-	cohort Cohort
+	seeded   bool           // set once the seed floor is reached; never reset
+	admitted int            // admitted members
+	supply   map[string]int // group → admitted members who are in it
+	demand   map[string]int // group → admitted members who seek it
+	waiting  []waiter
 }
 
 type waiter struct {
 	member string
-	cohort Cohort
+	p      Profile
+}
+
+type membership struct {
+	city string
+	p    Profile
 }
 
 // Registry tracks admissions per city. Safe for concurrent use.
@@ -95,127 +100,135 @@ var (
 	ErrUnknownCity = errors.New("not a launch city")
 	ErrDuplicate   = errors.New("member already registered")
 	ErrNotFound    = errors.New("member not found")
+	ErrNoSeeks     = errors.New("a member must say who they want to meet")
 )
 
 // New returns a registry for the given cities with the default gates.
 func New(cities []City) *Registry {
-	r := &Registry{cities: map[string]*cityState{}, live: map[string]bool{}, member: map[string]membership{},
-		cap: RatioCap, floor: SeedFloor, gate: DensityGate}
+	r := &Registry{cities: map[string]*cityState{}, live: map[string]bool{},
+		member: map[string]membership{}, cap: LoadCap, floor: SeedFloor, gate: DensityGate}
 	for _, c := range cities {
-		r.cities[c.Code] = &cityState{where: map[string]int{}}
+		r.cities[c.Code] = &cityState{supply: map[string]int{}, demand: map[string]int{}}
 		r.order = append(r.order, c.Code)
 	}
 	return r
 }
 
 // WithGates overrides the gates (tests, per-market configuration).
-func (r *Registry) WithGates(ratioCap float64, seedFloor, densityGate int) *Registry {
-	r.cap, r.floor, r.gate = ratioCap, seedFloor, densityGate
+func (r *Registry) WithGates(loadCap float64, seedFloor, densityGate int) *Registry {
+	r.cap, r.floor, r.gate = loadCap, seedFloor, densityGate
 	return r
 }
 
-func (s *cityState) verified() int {
-	return s.counts[Men] + s.counts[Women] + s.counts[Other] + s.counts[Couple]
-}
-
-// fits reports whether admitting one more of cohort keeps the city within the cap.
-func (r *Registry) fits(s *cityState, c Cohort) bool {
-	if c == Other || c == Couple {
-		return true
-	}
-	m, w := s.counts[Men], s.counts[Women]
-	if !s.seeded && m+w < r.floor {
-		return true
-	}
-	if c == Men {
-		m++
-	} else {
-		w++
-	}
-	big, small := m, w
-	if c == Women {
-		big, small = w, m
-	}
-	if big <= small { // admitting the smaller (or equal) side never worsens balance
-		return true
-	}
-	return float64(big) <= r.cap*float64(small)
-}
-
-// Join registers a newly verified member. It returns their status.
-func (r *Registry) Join(city, member string, c Cohort) (Status, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	s, ok := r.cities[city]
-	if !ok {
-		return Status{}, ErrUnknownCity
-	}
-	if _, dup := r.member[member]; dup {
-		return Status{}, ErrDuplicate
-	}
-	r.member[member] = membership{city, c}
-	if !cohortWaiting(s, c) && r.fits(s, c) {
-		s.counts[c]++
-		r.releaseLocked(s) // a new arrival on the smaller side may free waiting members
-		return r.statusLocked(s, member), nil
-	}
-	// First come, first served: never jump members already waiting in this cohort.
-	s.waiting = append(s.waiting, waiter{member, c})
-	r.reindex(s)
-	r.releaseLocked(s)
-	return r.statusLocked(s, member), nil
-}
-
-// releaseLocked admits waiting members in arrival order while the balance allows.
-// A waiter who still does not fit does not block members of the other cohort behind them.
-func (r *Registry) releaseLocked(s *cityState) {
-	defer r.markSeeded(s)
-	r.markSeeded(s)
-	for {
-		admitted := false
-		blocked := map[Cohort]bool{}
-		for i := 0; i < len(s.waiting); i++ {
-			w := s.waiting[i]
-			if blocked[w.cohort] {
-				continue
-			}
-			if r.fits(s, w.cohort) {
-				s.counts[w.cohort]++
-				r.markSeeded(s)
-				s.waiting = append(s.waiting[:i], s.waiting[i+1:]...)
-				admitted = true
-				break
-			}
-			blocked[w.cohort] = true
-		}
-		if !admitted {
-			break
-		}
-	}
-	r.reindex(s)
-}
-
-func (r *Registry) markSeeded(s *cityState) {
-	if s.counts[Men]+s.counts[Women] >= r.floor {
-		s.seeded = true
-	}
-}
-
-// cohortWaiting reports whether anyone of this cohort is already waiting (first come,
-// first served within a cohort).
-func cohortWaiting(s *cityState, c Cohort) bool {
-	for _, w := range s.waiting {
-		if w.cohort == c {
+func has(list []string, g string) bool {
+	for _, x := range list {
+		if x == g {
 			return true
 		}
 	}
 	return false
 }
 
-func (r *Registry) reindex(s *cityState) {
-	s.where = make(map[string]int, len(s.waiting))
-	for i, w := range s.waiting {
-		s.where[w.member] = i
+// busy returns the sought groups that admitting p would push over the load cap. A group's
+// load counts p's own supply if p belongs to it.
+func (r *Registry) busy(s *cityState, p Profile) []string {
+	if !s.seeded && s.admitted < r.floor {
+		return nil
+	}
+	var out []string
+	for _, g := range p.Seeks {
+		supply := s.supply[g]
+		if has(p.Is, g) {
+			supply++
+		}
+
+		demand := s.demand[g] + 1
+		before := 0.0
+		if s.supply[g] > 0 {
+			before = float64(s.demand[g]) / float64(s.supply[g])
+		}
+		// An empty group is treated as having one member, so at most LoadCap seekers are
+		// admitted before anyone joins it: the first to join never faces more than the cap.
+		after := float64(demand) / float64(max(supply, 1))
+		// Over the cap, and not an improvement on where the group already was.
+		if after > r.cap && !(s.supply[g] > 0 && after <= before) {
+			out = append(out, g)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func (r *Registry) admit(s *cityState, p Profile) {
+	s.admitted++
+	for _, g := range p.Is {
+		s.supply[g]++
+	}
+	for _, g := range p.Seeks {
+		s.demand[g]++
+	}
+	if s.admitted >= r.floor {
+		s.seeded = true
+	}
+}
+
+func keyWaiting(s *cityState, k string) bool {
+	for _, w := range s.waiting {
+		if w.p.key() == k {
+			return true
+		}
+	}
+	return false
+}
+
+// Join registers a newly verified member and returns their status.
+func (r *Registry) Join(city, member string, p Profile) (Status, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	s, ok := r.cities[city]
+	if !ok {
+		return Status{}, ErrUnknownCity
+	}
+	if len(p.Seeks) == 0 {
+		return Status{}, ErrNoSeeks
+	}
+	if _, dup := r.member[member]; dup {
+		return Status{}, ErrDuplicate
+	}
+	r.member[member] = membership{city, p}
+	// First come, first served: never jump people already waiting for the same groups.
+	if !keyWaiting(s, p.key()) && len(r.busy(s, p)) == 0 {
+		r.admit(s, p)
+	} else {
+		s.waiting = append(s.waiting, waiter{member, p})
+	}
+	r.releaseLocked(s)
+	return r.statusLocked(member), nil
+}
+
+// releaseLocked admits waiting members in arrival order while their groups have room.
+// A waiter who still does not fit does not block people seeking other groups.
+func (r *Registry) releaseLocked(s *cityState) {
+	for {
+		admitted := false
+		blocked := map[string]bool{}
+		for i := 0; i < len(s.waiting); i++ {
+			w := s.waiting[i]
+			k := w.p.key()
+			if blocked[k] {
+				continue
+			}
+			if len(r.busy(s, w.p)) == 0 {
+				r.admit(s, w.p)
+				s.waiting = append(s.waiting[:i], s.waiting[i+1:]...)
+				admitted = true
+				break
+			}
+			blocked[k] = true
+		}
+		if !admitted {
+			return
+		}
 	}
 }
 
@@ -226,7 +239,7 @@ func (r *Registry) refreshLiveLocked() {
 		if r.live[code] {
 			continue
 		}
-		if r.cities[code].verified() >= r.gate && (i == 0 || r.live[r.order[i-1]]) {
+		if r.cities[code].admitted >= r.gate && (i == 0 || r.live[r.order[i-1]]) {
 			r.live[code] = true
 			continue
 		}
@@ -234,24 +247,28 @@ func (r *Registry) refreshLiveLocked() {
 	}
 }
 
-func (r *Registry) statusLocked(s *cityState, member string) Status {
+func (r *Registry) statusLocked(member string) Status {
 	r.refreshLiveLocked()
-	v := s.verified()
-	city := r.member[member].city
-	st := Status{Admitted: true, MatchingLive: r.live[city], VerifiedInCity: v}
-	if !st.MatchingLive && v < r.gate {
-		st.NeededForLive = r.gate - v
+	m := r.member[member]
+	s := r.cities[m.city]
+	st := Status{Admitted: true, MatchingLive: r.live[m.city], VerifiedInCity: s.admitted}
+	if s.admitted < r.gate {
+		st.NeededForLive = r.gate - s.admitted
 	}
-	if i, waiting := s.where[member]; waiting {
+	for i, w := range s.waiting {
+		if w.member != member {
+			continue
+		}
 		st.Admitted = false
-		// position counts only members of the same cohort ahead of them
 		pos := 1
-		for _, w := range s.waiting[:i] {
-			if w.cohort == s.waiting[i].cohort {
+		for _, ahead := range s.waiting[:i] {
+			if ahead.p.key() == w.p.key() {
 				pos++
 			}
 		}
 		st.WaitlistPosition = pos
+		st.BusyGroups = r.busy(s, w.p)
+		break
 	}
 	return st
 }
@@ -260,15 +277,14 @@ func (r *Registry) statusLocked(s *cityState, member string) Status {
 func (r *Registry) StatusOf(member string) (Status, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	m, ok := r.member[member]
-	if !ok {
+	if _, ok := r.member[member]; !ok {
 		return Status{}, ErrNotFound
 	}
-	return r.statusLocked(r.cities[m.city], member), nil
+	return r.statusLocked(member), nil
 }
 
 // Leave removes an admitted or waiting member (erasure, account closure) and releases
-// waiting members if the balance now allows.
+// waiting members if their groups now have room.
 func (r *Registry) Leave(member string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -276,50 +292,66 @@ func (r *Registry) Leave(member string) error {
 	if !ok {
 		return ErrNotFound
 	}
-	s, c := r.cities[m.city], m.cohort
+	s := r.cities[m.city]
 	delete(r.member, member)
-	if i, waiting := s.where[member]; waiting {
-		s.waiting = append(s.waiting[:i], s.waiting[i+1:]...)
-		r.reindex(s)
-		return nil
+	for i, w := range s.waiting {
+		if w.member == member {
+			s.waiting = append(s.waiting[:i], s.waiting[i+1:]...)
+			return nil
+		}
 	}
-	if s.counts[c] == 0 {
-		return fmt.Errorf("launch: cohort %s count already zero", c)
+	s.admitted--
+	for _, g := range m.p.Is {
+		s.supply[g]--
 	}
-	s.counts[c]--
+	for _, g := range m.p.Seeks {
+		s.demand[g]--
+	}
 	r.releaseLocked(s)
 	return nil
+}
+
+// GroupLoad is one group's balance in a city.
+type GroupLoad struct {
+	Group          string
+	Supply, Demand int
+	Load           float64 // demand per member of the group; 0 when the group is empty
 }
 
 // CityReport is the operator view (aggregates only, never member-level).
 type CityReport struct {
 	Code         string
 	Verified     int
-	Men, Women   int
 	Waiting      int
-	Ratio        float64 // larger:smaller among men and women; 0 if either is zero
 	MatchingLive bool
+	Groups       []GroupLoad
 }
 
-// Report lists every city, sorted by code.
+// Report lists every city in launch order.
 func (r *Registry) Report() []CityReport {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.refreshLiveLocked()
-	out := make([]CityReport, 0, len(r.cities))
-	for code, s := range r.cities {
-		m, w := s.counts[Men], s.counts[Women]
-		ratio := 0.0
-		if m > 0 && w > 0 {
-			big, small := m, w
-			if w > m {
-				big, small = w, m
-			}
-			ratio = float64(big) / float64(small)
+	out := make([]CityReport, 0, len(r.order))
+	for _, code := range r.order {
+		s := r.cities[code]
+		groups := map[string]bool{}
+		for g := range s.supply {
+			groups[g] = true
 		}
-		out = append(out, CityReport{Code: code, Verified: s.verified(), Men: m, Women: w,
-			Waiting: len(s.waiting), Ratio: ratio, MatchingLive: r.live[code]})
+		for g := range s.demand {
+			groups[g] = true
+		}
+		rep := CityReport{Code: code, Verified: s.admitted, Waiting: len(s.waiting), MatchingLive: r.live[code]}
+		for g := range groups {
+			gl := GroupLoad{Group: g, Supply: s.supply[g], Demand: s.demand[g]}
+			if gl.Supply > 0 {
+				gl.Load = float64(gl.Demand) / float64(gl.Supply)
+			}
+			rep.Groups = append(rep.Groups, gl)
+		}
+		sort.Slice(rep.Groups, func(i, j int) bool { return rep.Groups[i].Group < rep.Groups[j].Group })
+		out = append(out, rep)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Code < out[j].Code })
 	return out
 }

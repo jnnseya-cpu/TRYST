@@ -1065,6 +1065,7 @@ The OS changes 01 §10.3 in three ways (to be measured in beta, not assumed):
 |---|---|---|
 | AI revenue optimisation | Finds revenue leaks: failed renewals (dunning through the processor), processor authorisation drops, refund causes | Raise price for a member individually; obscure costs |
 | Customer lifetime value | Cohort CLV by acquisition channel and segment, for CAC decisions (E-03 thresholds) | Label individual members by value in any staff-facing view |
+| Paid-acquisition brake (FR-091) | Stops paid seeding in a city automatically when cost per verified sign-up is above break-even for 2 weeks (or 1.5× in one week) | Restart without a named approver |
 | Churn prevention | Detects cohort-level churn drivers; fixes product causes (slate quality, liquidity) | Retention flows on cancel (one step, ToS cl. 16); guilt copy; hiding cancel |
 | Upsell | Shows the relevant tier when a member hits a real limit (e.g. the 3 weekly intents) | Engagement paywalls (P8); upsell during a safety flow |
 | Cross-sell | GHOST to members who use discretion features; DUO to linked couples | Selling safety features (core discretion and safety are free, D-05) |
