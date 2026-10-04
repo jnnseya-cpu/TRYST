@@ -1,0 +1,9 @@
+{
+  "name": "TRYST",
+  "short_name": "TRYST",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0607",
+  "theme_color": "#0B0607",
+  "icons": [{ "src": "/brand/tryst-logo.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any" }]
+}

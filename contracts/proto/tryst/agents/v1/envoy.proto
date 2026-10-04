@@ -1,0 +1,80 @@
+// Envoy agent-to-agent handshake (docs/spec/02_Shared_Contracts.md §6.1-6.2, 03 §3.1).
+// Strict schema: no free-text fields. Counterparty turns are untrusted data.
+syntax = "proto3";
+
+package tryst.agents.v1;
+
+option go_package = "github.com/jnnseya-cpu/tryst/backend/gen/tryst/agents/v1;agentsv1";
+
+enum IntentShape {
+  INTENT_SHAPE_UNSPECIFIED = 0;
+  INTENT_SHAPE_ONE_OFF = 1;      // SPARK
+  INTENT_SHAPE_RECURRING = 2;    // EMBER
+  INTENT_SHAPE_ONGOING = 3;      // EMBER
+  INTENT_SHAPE_EXPLORATORY = 4;  // OPEN
+  INTENT_SHAPE_THIRD = 5;        // THIRD
+  INTENT_SHAPE_COUPLE = 6;       // QUAD
+}
+
+enum Tier {
+  TIER_UNSPECIFIED = 0;
+  TIER_V0 = 1;
+  TIER_V1 = 2;
+  TIER_V2 = 3;
+  TIER_V3 = 4;
+}
+
+message AvailabilityWindow {
+  repeated int32 dow = 1;  // 1 = Monday ... 7 = Sunday
+  string start = 2;        // "HH:MM"
+  string end = 3;          // "HH:MM"
+  string tz = 4;           // IANA zone; member-provided only (FR-067)
+}
+
+message Assertion {
+  IntentShape intent_shape = 1;
+  string structure = 2;
+  int32 notice_required_hours = 3;
+  repeated AvailabilityWindow availability = 4;
+  int32 travel_radius_km = 5;
+  repeated string hard_limits = 6;   // controlled vocabulary (contracts/vocab/hard_limits.yaml)
+  Tier verification_tier = 7;
+  Tier min_counterparty_tier = 8;
+  bool hosting_capability = 9;
+}
+
+message NegotiationTurn {
+  int32 turn = 1;                      // 1..6
+  string from_envoy = 2;
+  string to_envoy = 3;
+  Assertion assert = 4;
+  repeated string query = 5;           // field names only
+  repeated string private_fields = 6;  // computable, never emitted in any Brief
+}
+
+message Friction {
+  string field = 1;
+  string detail_code = 2;              // localised on the client
+  string suggested_resolution = 3;
+}
+
+message Brief {
+  string label = 1;                    // always "agent_generated"
+  double compatibility = 2;
+  repeated string aligned = 3;
+  repeated Friction friction = 4;
+  repeated string blocking = 5;
+  string recommended_next = 6;         // open_thread | amend | decline
+  double estimated_meet_probability = 7;
+}
+
+message HandshakeRequested {
+  string handshake_id = 1;
+  string a_profile = 2;
+  string b_profile = 3;
+}
+
+message HandshakeCompleted {
+  string handshake_id = 1;
+  bool safety_hold = 2;                // Guardian veto; no detail disclosed
+}

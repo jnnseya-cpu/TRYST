@@ -1,0 +1,85 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  spec:
+    name: Spec consistency and migration drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python3 scripts/check_spec.py
+      - run: python3 scripts/gen_migrations.py --check
+      - run: pip install pglast && python3 -c "import glob,pglast; [pglast.parse_sql(open(f).read()) for f in glob.glob('backend/migrations/*/*.sql')]; print('SQL parses')"
+
+  contracts:
+    name: OpenAPI and Protobuf contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npx --yes @redocly/cli@1 lint contracts/openapi/tryst.v1.yaml --config contracts/openapi/redocly.yaml
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: |
+          pip install grpcio-tools
+          mkdir -p /tmp/protoout
+          python3 -m grpc_tools.protoc -Icontracts/proto --python_out=/tmp/protoout $(find contracts/proto -name '*.proto')
+
+  backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.24" }
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: go build ./...
+
+  agents:
+    name: Agents (Python)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: agents } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -e '.[dev]'
+      - run: ruff check src tests
+      - run: python -m pytest -q
+
+  crypto-core:
+    name: Crypto core (Rust)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: crypto-core } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { components: "rustfmt, clippy" }
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+
+  web:
+    name: Web PWA (Next.js)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: web } }
+    env: { NEXT_TELEMETRY_DISABLED: "1" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: web/package-lock.json }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

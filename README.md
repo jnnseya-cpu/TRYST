@@ -19,9 +19,26 @@ Start at [`docs/spec/00_README.md`](docs/spec/00_README.md).
 | [05 Terms of Service — draft 0.9.3](docs/spec/05_Terms_of_Service_draft.md) | Counsel (not for publication) |
 | [06 Decisions, errata, change log](docs/spec/06_Decisions_and_Changes.md) | Product owner, tech leads |
 | [07 Source B — founder brief (verbatim)](docs/spec/07_Source_B_Founder_Brief.md) | Everyone — the founder's specification word for word, with traceability |
+| [08 Source A — traceability](docs/spec/08_Source_A_Traceability.md) | Everyone — where each section of the consolidated Spec + ToS lives in the spec and code |
 | [Combined PDF](docs/spec/TRYST_Spec_v1.2.pdf) | Reading and sharing |
 
 Consistency check (runs in CI): `python3 scripts/check_spec.py`
+
+## Code scaffold
+
+> **Scaffold only.** Per the spec (01 §14), production engineering is gated on the written UK legal opinion and the completed DPIA (phase P0). Nothing here holds member data, calls a real provider or is deployed.
+
+| Path | What | Checks |
+|---|---|---|
+| `contracts/openapi/` | Edge API contract (OpenAPI 3.1), generated from spec 02 §5 | Redocly lint |
+| `contracts/proto/` | Agent bus and event schemas (Protobuf) | `protoc` compile |
+| `backend/` | Go: jurisdiction and V2 tier gates, two-factor login state machine, couple co-sign (VC), Keys ledger and inbound cap, cryptographic erasure, ban anchors, Stripe webhook verification; SQL migrations generated from spec 02 §4 | `go vet`, `go test -race`, migration drift check |
+| `agents/` | Python: Broker Stage 0 hard gates (property-tested), slate assembly, Envoy schemas and Briefs, Mirror maths | `ruff`, `pytest` + Hypothesis |
+| `crypto-core/` | Rust: per-media keys, per-recipient wrapping, revoke | `cargo fmt`, `clippy`, `test` |
+| `web/` | Next.js PWA: brand tokens, logo (checksum-verified), two-factor sign-in steps, quick exit, `noindex` | `tsc`, `vitest`, `next build` |
+| `mobile/` | Native iOS/Android requirements (placeholders; no toolchain in the build environment) | — |
+
+Run everything locally with `make check`. CI runs the same checks (`.github/workflows/ci.yml`).
 
 ## Sources and history
 

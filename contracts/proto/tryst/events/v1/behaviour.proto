@@ -1,0 +1,34 @@
+// Behaviour event envelope (docs/spec/02_Shared_Contracts.md §8). Never message content.
+syntax = "proto3";
+
+package tryst.events.v1;
+
+option go_package = "github.com/jnnseya-cpu/tryst/backend/gen/tryst/events/v1;eventsv1";
+
+enum EventClass {
+  EVENT_CLASS_UNSPECIFIED = 0;
+  EVENT_CLASS_ATTENTION = 1;
+  EVENT_CLASS_DECISION = 2;
+  EVENT_CLASS_CONVERSATION = 3;
+  EVENT_CLASS_HANDSHAKE = 4;
+  EVENT_CLASS_RESOLUTION = 5;
+  EVENT_CLASS_DISCRETION = 6;
+  EVENT_CLASS_NEGATIVE = 7;
+}
+
+message Context {
+  string surface = 1;
+  string app_version = 2;
+}
+
+message BehaviourEvent {
+  string event_id = 1;
+  bytes pseudo_subject = 2;      // rotates per training window
+  EventClass event_class = 3;
+  string type = 4;               // e.g. card_impression, intent_sent, meet_confirmed
+  int64 ts_unix_ms = 5;
+  Context context = 6;
+  string consent_basis = 7;
+  int32 ttl_days = 8;            // raw events: 180
+  double value = 9;              // e.g. dwell_ms, msg_len_bucket
+}

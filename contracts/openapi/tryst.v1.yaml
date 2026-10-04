@@ -1,0 +1,1365 @@
+openapi: 3.1.0
+info:
+  title: TRYST Edge API
+  version: 1.2.0
+  summary: Edge contract for the TRYST web PWA and native apps.
+  description: |
+    Generated from docs/spec/02_Shared_Contracts.md §5 (spec v1.2). That section is the
+    source of truth; change it first, then this file (docs/spec/00_README.md §4).
+
+    Cross-cutting rules (02 §5): every request carries a DPoP proof bound to the device key;
+    middleware order is jurisdiction gate → tier gate → Art. 9 consent → rate limit →
+    idempotency. All POST/PUT/DELETE require `Idempotency-Key`. Anything not visible to the
+    caller returns a uniform 404 `not_found` (existence never leaks).
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: https://app.tryst.example/v1
+    description: Placeholder host; real domains per docs/spec/01_Product.md §3.
+security:
+  - dpop: []
+tags:
+  - name: auth
+  - name: assurance
+  - name: account
+  - name: intake
+  - name: discretion
+  - name: couple
+  - name: discovery
+  - name: handshake
+  - name: reveal
+  - name: threads
+  - name: safety
+  - name: commerce
+
+x-tier-gate:
+  description: Minimum verification tier per operation is given by `x-min-tier` (02 §3.2).
+
+paths:
+  # ---------------------------------------------------------------- auth (02 §3.3, §5.1)
+  /auth/start:
+    post:
+      tags: [auth]
+      operationId: authStart
+      summary: Sign-up only. Send OTP to a contact handle. Never a login factor.
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact]
+              properties:
+                contact: { type: string, description: E.164 phone or email }
+      responses:
+        '202': { description: Uniform response whether or not the account exists }
+        '429': { $ref: '#/components/responses/Problem' }
+  /auth/verify:
+    post:
+      tags: [auth]
+      operationId: authVerify
+      summary: Sign-up only. Verify OTP, register device; ban-anchor check for new identities.
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [otp, device_pubkey, attestation]
+              properties:
+                otp: { type: string }
+                device_pubkey: { type: string, contentEncoding: base64 }
+                attestation: { type: string, contentEncoding: base64 }
+      responses:
+        '200':
+          description: Onboarding session (sign-up device only until V1)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /auth/passkeys/register/begin:
+    post:
+      tags: [auth]
+      operationId: passkeyRegisterBegin
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '200':
+          description: WebAuthn PublicKeyCredentialCreationOptions (userVerification=required)
+          content: { application/json: { schema: { type: object } } }
+  /auth/passkeys/register/finish:
+    post:
+      tags: [auth]
+      operationId: passkeyRegisterFinish
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, description: WebAuthn attestation response } } }
+      responses:
+        '201': { description: Authenticator registered }
+        '403': { $ref: '#/components/responses/Problem' }
+  /auth/login/begin:
+    post:
+      tags: [auth]
+      operationId: loginBegin
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                contact_hint: { type: string }
+      responses:
+        '200':
+          description: Challenge plus server-decided required factors. Uniform response.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginChallenge' }
+  /auth/login/passkey:
+    post:
+      tags: [auth]
+      operationId: loginPasskey
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, description: WebAuthn assertion (B1 or F1) } } }
+      responses:
+        '200':
+          description: First factor accepted. No session is issued yet.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginState' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /auth/login/liveness:
+    post:
+      tags: [auth]
+      operationId: loginLiveness
+      summary: Mobile second factor (B2). Session issued only after provider match callback.
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '200':
+          description: Provider hand-off
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  handoff_url: { type: string, format: uri }
+                  login_state: { $ref: '#/components/schemas/LoginState' }
+  /auth/login/cross-device:
+    post:
+      tags: [auth]
+      operationId: loginCrossDeviceBegin
+      summary: Desktop second factor (F2). Returns a 60 s QR token.
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '200':
+          description: QR token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  qr_token: { type: string }
+                  expires_at: { type: string, format: date-time }
+  /auth/login/cross-device/{qr_token}:
+    get:
+      tags: [auth]
+      operationId: loginCrossDeviceStatus
+      security: []
+      x-min-tier: none
+      parameters:
+        - { name: qr_token, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Pending, denied, or a Session once approved from the registered phone
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/LoginState'
+                  - $ref: '#/components/schemas/Session'
+  /auth/approvals/{qr_token}:
+    post:
+      tags: [auth]
+      operationId: approveDesktopLogin
+      summary: Called from the registered mobile app with a fresh B1 assertion.
+      x-min-tier: V1
+      parameters:
+        - { name: qr_token, in: path, required: true, schema: { type: string } }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, assertion]
+              properties:
+                decision: { type: string, enum: [approve, deny] }
+                assertion: { type: object }
+      responses:
+        '204': { description: Recorded }
+  /auth/step-up:
+    post:
+      tags: [auth]
+      operationId: stepUp
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '200':
+          description: Step-up token valid 5 minutes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  step_up_token: { type: string }
+                  expires_at: { type: string, format: date-time }
+  /auth/recovery/begin:
+    post:
+      tags: [auth]
+      operationId: recoveryBegin
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '202': { description: B2 + fresh V2 with matching document anchor required; 24 h hold }
+  /auth/recovery/finish:
+    post:
+      tags: [auth]
+      operationId: recoveryFinish
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '201': { description: New passkey registered after hold }
+        '409': { $ref: '#/components/responses/Problem' }
+  /auth/refresh:
+    post:
+      tags: [auth]
+      operationId: authRefresh
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '200':
+          description: Refreshed session
+          content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } }
+  /devices:
+    get:
+      tags: [auth]
+      operationId: listDevices
+      summary: Requires step-up.
+      x-min-tier: V0
+      responses:
+        '200':
+          description: Devices
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Device' } }
+  /devices/{id}:
+    delete:
+      tags: [auth]
+      operationId: revokeDevice
+      summary: Requires step-up.
+      x-min-tier: V0
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '204': { description: Revoked }
+
+  # ---------------------------------------------------------------- assurance (02 §3, §5.1)
+  /assurance/session:
+    post:
+      tags: [assurance]
+      operationId: assuranceSession
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind: { type: string, enum: [liveness, age] }
+      responses:
+        '200':
+          description: Provider hand-off URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  handoff_url: { type: string, format: uri }
+  /attestations/conduct:
+    post:
+      tags: [assurance]
+      operationId: conductAttestation
+      summary: Conduct declaration (ToS cl. 3.5); required to complete V2.
+      x-min-tier: V1
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [declared]
+              properties:
+                declared: { type: boolean, const: true }
+      responses:
+        '201': { description: Recorded in consent ledger }
+
+  # ---------------------------------------------------------------- account (02 §5.2)
+  /consents:
+    get:
+      tags: [account]
+      operationId: listConsents
+      x-min-tier: V0
+      responses:
+        '200':
+          description: Consent ledger entries
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Consent' } }
+    post:
+      tags: [account]
+      operationId: appendConsent
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, granted]
+              properties:
+                kind: { $ref: '#/components/schemas/ConsentKind' }
+                granted: { type: boolean }
+      responses:
+        '201': { description: Appended (never mutated) }
+  /account/pause:
+    post:
+      tags: [account]
+      operationId: pauseAccount
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '204': { description: Removed from discovery immediately } }
+  /account/vanish:
+    post:
+      tags: [account]
+      operationId: vanishAccount
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '204': { description: Hidden and threads closed } }
+  /account/export:
+    post:
+      tags: [account]
+      operationId: exportAccount
+      summary: Requires step-up.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '202': { description: Encrypted export prepared (< 30 days; target < 24 h) } }
+  /account:
+    delete:
+      tags: [account]
+      operationId: deleteAccount
+      summary: Cryptographic erasure < 60 s p99. Requires B1 only (never a full step-up).
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '202':
+          description: Deletion job started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deletion_job_id: { type: string, format: uuid }
+  /emergency-lock:
+    post:
+      tags: [account]
+      operationId: emergencyLock
+      summary: No session needed (FR-064). Freeze sessions, hide profile, disable media links.
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact_hint, emergency_code]
+              properties:
+                contact_hint: { type: string }
+                emergency_code: { type: string }
+      responses:
+        '202': { description: Uniform response }
+
+  # ---------------------------------------------------------------- intake / profile / discretion
+  /intake/turn:
+    post:
+      tags: [intake]
+      operationId: intakeTurn
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: Cartographer reply and proposed structured fields
+          content: { application/json: { schema: { type: object } } }
+  /intake/vector:
+    get:
+      tags: [intake]
+      operationId: getIntentVector
+      x-min-tier: V0
+      responses:
+        '200':
+          description: Proposed IntentVector
+          content: { application/json: { schema: { $ref: '#/components/schemas/IntentVector' } } }
+  /intake/vector/confirm:
+    post:
+      tags: [intake]
+      operationId: confirmIntentVector
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/IntentVector' } } }
+      responses: { '200': { description: Confirmed; new history version (FR-079) } }
+  /profile:
+    patch:
+      tags: [intake]
+      operationId: patchProfile
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ProfilePatch' } } }
+      responses: { '200': { description: Updated } }
+  /profile/media:
+    post:
+      tags: [intake]
+      operationId: uploadMedia
+      x-min-tier: V1
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tier, ciphertext_upload]
+              properties:
+                tier: { type: string, enum: [profile_public, profile_private, thread] }
+                ciphertext_upload: { type: boolean, const: true }
+      responses:
+        '201':
+          description: Pre-signed upload target for client-encrypted ciphertext
+          content: { application/json: { schema: { type: object } } }
+  /profile/media/{id}:
+    delete:
+      tags: [intake]
+      operationId: deleteMedia
+      x-min-tier: V1
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '204': { description: Key destroyed } }
+  /discretion/policy:
+    put:
+      tags: [discretion]
+      operationId: putDiscretionPolicy
+      summary: New version. Broadening needs confirm_broaden=true from a fresh step-up.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/DiscretionPolicy' } } }
+      responses:
+        '200': { description: New version stored }
+        '422': { $ref: '#/components/responses/Problem' }
+  /discretion/zones:
+    put:
+      tags: [discretion]
+      operationId: putZones
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                home: { type: array, items: { $ref: '#/components/schemas/Geohash6' } }
+                work: { type: array, items: { $ref: '#/components/schemas/Geohash6' } }
+      responses: { '200': { description: Stored } }
+  /exclusion/psi/blind:
+    post:
+      tags: [discretion]
+      operationId: psiBlind
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [blinded]
+              properties:
+                blinded: { type: array, maxItems: 5000, items: { type: string, contentEncoding: base64 } }
+      responses:
+        '200':
+          description: Evaluated points
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  evaluated: { type: array, items: { type: string, contentEncoding: base64 } }
+  /exclusion/psi/commit:
+    post:
+      tags: [discretion]
+      operationId: psiCommit
+      summary: Nothing about the intersection is ever returned.
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prf_outputs]
+              properties:
+                prf_outputs: { type: array, maxItems: 5000, items: { type: string, contentEncoding: base64 } }
+      responses: { '204': { description: Accepted } }
+  /burn:
+    post:
+      tags: [discretion]
+      operationId: burn
+      summary: Revoke device keys and sign out everywhere. Never gated by step-up.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '204': { description: Done } }
+
+  # ---------------------------------------------------------------- couple (02 §5.4)
+  /couple/invite:
+    post:
+      tags: [couple]
+      operationId: coupleInvite
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '201':
+          description: Co-sign token (24 h)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  expires_at: { type: string, format: date-time }
+  /couple/cosign:
+    post:
+      tags: [couple]
+      operationId: coupleCosign
+      summary: Must come from a device distinct from the inviter's (422 same_device_cosign).
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, approved_version]
+              properties:
+                token: { type: string }
+                approved_version: { type: integer, minimum: 1 }
+      responses:
+        '201': { description: Couple link created }
+        '422': { $ref: '#/components/responses/Problem' }
+  /couple/{id}/veto-mode:
+    put:
+      tags: [couple]
+      operationId: setVetoMode
+      x-min-tier: VC
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [veto_mode]
+              properties:
+                veto_mode: { type: string, enum: [either, both] }
+      responses: { '202': { description: Pending the other partner's confirmation } }
+  /couple/{id}:
+    delete:
+      tags: [couple]
+      operationId: dissolveCouple
+      x-min-tier: V2
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '204': { description: Dissolved immediately } }
+
+  # ---------------------------------------------------------------- discovery (02 §5.5)
+  /slate:
+    get:
+      tags: [discovery]
+      operationId: getSlate
+      x-min-tier: V2
+      responses:
+        '200':
+          description: Up to 18 cards including the 15% exploration floor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    maxItems: 18
+                    items: { $ref: '#/components/schemas/SlateCard' }
+  /intent:
+    post:
+      tags: [discovery]
+      operationId: sendIntent
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target]
+              properties:
+                target: { type: string, format: uuid }
+                keys_spent: { type: integer, minimum: 0 }
+      responses:
+        '202':
+          description: Accepted. Inbound-cap overflow is queued and never revealed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  intent_id: { type: string, format: uuid }
+                  state: { type: string, enum: [sent] }
+        '402': { $ref: '#/components/responses/Problem' }
+  /pass:
+    post:
+      tags: [discovery]
+      operationId: pass
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/Target' }
+      responses: { '204': { description: Recorded privately } }
+  /save:
+    post:
+      tags: [discovery]
+      operationId: save
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/Target' }
+      responses: { '204': { description: Saved } }
+  /signals:batch:
+    post:
+      tags: [discovery]
+      operationId: signalsBatch
+      summary: Behaviour events, at most 50 per call. Never message content.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              maxItems: 50
+              items: { $ref: '#/components/schemas/BehaviourEvent' }
+      responses: { '202': { description: Accepted } }
+  /preferences/insights:
+    get:
+      tags: [discovery]
+      operationId: preferenceInsights
+      x-min-tier: V2
+      responses:
+        '200':
+          description: Category-level view of learned preferences (never raw vectors)
+          content: { application/json: { schema: { type: object } } }
+  /preferences/correction:
+    post:
+      tags: [discovery]
+      operationId: preferenceCorrection
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses: { '204': { description: Recorded } }
+  /preferences/reset:
+    post:
+      tags: [discovery]
+      operationId: preferenceReset
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '204': { description: Revealed vector neutralised; alpha = 0.15 } }
+  /preferences/personalisation:
+    put:
+      tags: [discovery]
+      operationId: setPersonalisation
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses: { '204': { description: Updated } }
+
+  # ---------------------------------------------------------------- handshake / envoy / reveal
+  /handshake/{id}/brief:
+    get:
+      tags: [handshake]
+      operationId: getBrief
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: The caller's own asymmetric Brief
+          content: { application/json: { schema: { $ref: '#/components/schemas/Brief' } } }
+  /handshake/{id}/decision:
+    post:
+      tags: [handshake]
+      operationId: postHandshakeDecision
+      summary: A thread opens only when both sides accept (couples per veto_mode).
+      x-min-tier: V2
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [accept, decline, amend] }
+                amend: { type: object }
+      responses: { '204': { description: Recorded } }
+  /envoy/proposals:
+    get:
+      tags: [handshake]
+      operationId: listEnvoyProposals
+      x-min-tier: V2
+      x-entitlement: envoy
+      responses:
+        '200':
+          description: Agent-proposed intents with rationale codes
+          content: { application/json: { schema: { type: array, items: { type: object } } } }
+  /envoy/proposals/{id}/approve:
+    post:
+      tags: [handshake]
+      operationId: approveEnvoyProposal
+      summary: One-tap human approval; no intent exists without it (D-04).
+      x-min-tier: V2
+      x-entitlement: envoy
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '202': { description: Intent created } }
+  /reveal-grants:
+    post:
+      tags: [reveal]
+      operationId: createRevealGrant
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipient, scope, expires_at]
+              properties:
+                recipient: { type: string, format: uuid }
+                scope: { $ref: '#/components/schemas/RevealScope' }
+                media_id: { type: string, format: uuid }
+                expires_at: { type: string, format: date-time }
+      responses: { '201': { description: Grant created } }
+  /reveal-grants/{id}:
+    delete:
+      tags: [reveal]
+      operationId: revokeRevealGrant
+      summary: Destroys the wrapped key; effective < 5 s p95 including CDN.
+      x-min-tier: V2
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '204': { description: Revoked } }
+
+  # ---------------------------------------------------------------- threads (02 §5.7)
+  /threads/{id}/messages:
+    get:
+      tags: [threads]
+      operationId: listMessages
+      x-min-tier: V2
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { name: after_seq, in: query, schema: { type: integer } }
+      responses:
+        '200':
+          description: MLS ciphertext envelopes only
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Envelope' } }
+    post:
+      tags: [threads]
+      operationId: postMessage
+      x-min-tier: V2
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } }
+      responses: { '201': { description: Stored ciphertext } }
+  /threads/{id}/retention:
+    put:
+      tags: [threads]
+      operationId: setRetention
+      x-min-tier: V2
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [days]
+              properties:
+                days: { type: integer, enum: [7, 30, 90] }
+      responses: { '204': { description: Shortest elected value applies } }
+  /threads/{id}/meet:
+    post:
+      tags: [threads]
+      operationId: meetAction
+      x-min-tier: V2
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [propose, confirm, cancel] }
+                window_start: { type: string, format: date-time }
+      responses: { '204': { description: Recorded } }
+  /threads/{id}/checkin:
+    post:
+      tags: [threads]
+      operationId: meetCheckin
+      x-min-tier: V2
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '204': { description: Checked in } }
+  /threads/{id}/burn:
+    post:
+      tags: [threads]
+      operationId: burnThread
+      x-min-tier: V2
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '204': { description: Keys revoked on both sides } }
+  /aftercare/{id}:
+    post:
+      tags: [threads]
+      operationId: postAftercare
+      x-min-tier: V2
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [occurred]
+              properties:
+                occurred: { type: boolean }
+                as_represented: { type: integer, minimum: 1, maximum: 5 }
+                would_repeat: { type: boolean }
+                safety_flag: { type: boolean }
+      responses: { '204': { description: Recorded privately; never shown to the counterparty } }
+
+  # ---------------------------------------------------------------- safety (02 §5.8)
+  /report:
+    post:
+      tags: [safety]
+      operationId: report
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subject, category]
+              properties:
+                subject: { type: string, format: uuid }
+                category: { $ref: '#/components/schemas/ReportCategory' }
+                disclosed_content: { type: string, description: 'Reporter-decrypted content, explicitly disclosed' }
+                training_consent: { type: boolean, default: false }
+      responses: { '202': { description: Routed by SLA; reporter never revealed } }
+  /block:
+    post:
+      tags: [safety]
+      operationId: block
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/Target' }
+      responses: { '204': { description: Bidirectional and immediate } }
+  /guardian/signals:
+    post:
+      tags: [safety]
+      operationId: guardianSignal
+      summary: On-device Guardian score and reason code. Never content.
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [thread_id, model_id, version, score, reason_code]
+              properties:
+                thread_id: { type: string, format: uuid }
+                model_id: { type: string, pattern: '^M(6[a-e]|7b?)$' }
+                version: { type: string }
+                score: { type: number, minimum: 0, maximum: 1 }
+                reason_code: { $ref: '#/components/schemas/GuardianReasonCode' }
+      responses: { '202': { description: Accepted } }
+  /safety/panic:
+    post:
+      tags: [safety]
+      operationId: panic
+      summary: Emergency escalation with live location. Overrides retention (P7). Never gated.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lon]
+              properties:
+                lat: { type: number }
+                lon: { type: number }
+                thread_id: { type: string, format: uuid }
+      responses: { '202': { description: Escalated } }
+  /safety/share-plan:
+    post:
+      tags: [safety]
+      operationId: sharePlan
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '201':
+          description: Encrypted, unbranded, auto-deleting share link
+          content: { application/json: { schema: { type: object } } }
+  /appeals:
+    post:
+      tags: [safety]
+      operationId: appeal
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enforcement_id]
+              properties:
+                enforcement_id: { type: string, format: uuid }
+                statement: { type: string, maxLength: 4000 }
+      responses: { '202': { description: Different reviewer; 10 working days } }
+  /attestations/dbs:
+    post:
+      tags: [safety]
+      operationId: dbsAttestation
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '202': { description: Verified through the issuing route; shown as a dated fact } }
+
+  # ---------------------------------------------------------------- commerce (02 §5.9, D-22)
+  /entitlements:
+    get:
+      tags: [commerce]
+      operationId: getEntitlements
+      x-min-tier: V0
+      responses:
+        '200':
+          description: Entitlements
+          content: { application/json: { schema: { $ref: '#/components/schemas/Entitlements' } } }
+  /deposit:
+    post:
+      tags: [commerce]
+      operationId: deposit
+      x-min-tier: V1
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '200': { $ref: '#/components/responses/Checkout' } }
+  /keys/purchase:
+    post:
+      tags: [commerce]
+      operationId: purchaseKeys
+      x-min-tier: V1
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pack]
+              properties:
+                pack: { type: string, enum: [keys_60] }
+      responses: { '200': { $ref: '#/components/responses/Checkout' } }
+  /vouchers/redeem:
+    post:
+      tags: [commerce]
+      operationId: redeemVoucher
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses: { '200': { description: Redeemed } }
+  /subscription:
+    post:
+      tags: [commerce]
+      operationId: subscribe
+      x-min-tier: V1
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tier]
+              properties:
+                tier: { type: string, enum: [tryst_plus, tryst_plus_annual, envoy, duo] }
+                addon_ghost: { type: boolean, default: false }
+      responses: { '200': { $ref: '#/components/responses/Checkout' } }
+  /subscription/cancel:
+    post:
+      tags: [commerce]
+      operationId: cancelSubscription
+      summary: One step; no retention flow; never gated by step-up.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '204': { description: Cancels at period end } }
+  /billing/stripe/webhook:
+    post:
+      tags: [commerce]
+      operationId: stripeWebhook
+      summary: Server-to-server; Stripe-Signature verified; idempotent on event id.
+      security: []
+      x-min-tier: sys
+      parameters:
+        - { name: Stripe-Signature, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        '200': { description: Processed }
+        '400': { $ref: '#/components/responses/Problem' }
+
+components:
+  securitySchemes:
+    dpop:
+      type: http
+      scheme: DPoP
+      description: OAuth2 access token bound to the device key with a DPoP proof (RFC 9449).
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 128 }
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  requestBodies:
+    Target:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [target]
+            properties:
+              target: { type: string, format: uuid }
+  responses:
+    Problem:
+      description: RFC 9457 problem
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Checkout:
+      description: Hosted checkout (Stripe primary, D-22)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              checkout_url: { type: string, format: uri }
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        code:
+          type: string
+          enum:
+            - auth_required
+            - dpop_invalid
+            - second_factor_required
+            - step_up_required
+            - authenticator_invalidated
+            - tier_required
+            - consent_required
+            - jurisdiction_blocked
+            - entitlement_required
+            - not_found
+            - idempotency_conflict
+            - version_conflict
+            - keys_insufficient
+            - validation_failed
+            - broadening_requires_confirmation
+            - same_device_cosign
+            - rate_limited
+        required_tier: { $ref: '#/components/schemas/Tier' }
+        factor: { type: string, enum: [B1, B2, F1, F2] }
+        consent_kind: { $ref: '#/components/schemas/ConsentKind' }
+        retry_after: { type: integer }
+    Tier: { type: string, enum: [V0, V1, V2, V3] }
+    Surface: { type: string, enum: [mobile_app, mobile_pwa, desktop] }
+    Session:
+      type: object
+      required: [access_token, expires_at, surface]
+      properties:
+        access_token: { type: string }
+        expires_at: { type: string, format: date-time }
+        surface: { $ref: '#/components/schemas/Surface' }
+        tier: { $ref: '#/components/schemas/Tier' }
+    LoginChallenge:
+      type: object
+      required: [challenge, required_factors]
+      properties:
+        challenge: { type: string }
+        required_factors:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items: { type: string, enum: [B1, B2, F1, F2] }
+    LoginState:
+      type: object
+      required: [state]
+      properties:
+        state: { type: string, enum: [factor1_ok, liveness_pending, approval_pending, denied] }
+    Device:
+      type: object
+      properties:
+        device_id: { type: string, format: uuid }
+        platform: { type: string, enum: [ios, android, web] }
+        surface: { $ref: '#/components/schemas/Surface' }
+        revoked_at: { type: [string, 'null'], format: date-time }
+    ConsentKind:
+      type: string
+      enum: [art9_processing, media_view, meet, couple_link, retention, conduct_attestation, safety_training_use, biometric_login]
+    Consent:
+      type: object
+      properties:
+        consent_id: { type: string, format: uuid }
+        kind: { $ref: '#/components/schemas/ConsentKind' }
+        granted: { type: boolean }
+        created_at: { type: string, format: date-time }
+    IntentShape: { type: string, enum: [one_off, recurring, ongoing, exploratory, third, couple] }
+    IntentVector:
+      type: object
+      required: [intent_shape, hard_limits]
+      properties:
+        intent_shape: { type: array, items: { $ref: '#/components/schemas/IntentShape' } }
+        structure:
+          type: string
+          enum: [attached_undisclosed, attached_disclosed, open_relationship, unattached, couple_seeking_third, couple_seeking_couple, prefer_not_to_say]
+        desire_tags:
+          type: object
+          additionalProperties: { type: string, enum: ['yes', curious, 'no'] }
+        hard_limits: { type: array, items: { type: string } }
+        logistics: { type: object }
+        min_counterparty_tier: { type: string, enum: [V2, V3], default: V2 }
+    ProfilePatch:
+      type: object
+      additionalProperties: false
+      properties:
+        display_name: { type: string, maxLength: 40 }
+        pronouns: { type: string, maxLength: 40 }
+        gender_identity: { type: string, maxLength: 60 }
+        seeking: { type: array, items: { type: string } }
+        modes: { type: array, items: { $ref: '#/components/schemas/IntentShape' } }
+        visibility: { type: string, enum: [public, matched, incognito] }
+    Geohash6: { type: string, pattern: '^[0-9b-hjkmnp-z]{6}$' }
+    DiscretionPolicy:
+      type: object
+      required: [version]
+      properties:
+        version: { type: integer, minimum: 1 }
+        visibility: { type: string, enum: [public, matched, incognito] }
+        distance_band_km: { type: integer, enum: [5, 10, 25, 50] }
+        reveal_rules: { type: object }
+        notifications:
+          type: object
+          properties:
+            enabled: { type: boolean, default: false }
+            text: { type: string, default: You have an update, maxLength: 40 }
+        device_risk: { type: string, enum: [low, medium, high] }
+        min_counterparty_tier: { type: string, enum: [V2, V3] }
+        confirm_broaden: { type: boolean, default: false }
+    RevealScope: { type: string, enum: [alias, blurred_gallery, photo_set, voice, video] }
+    SlateCard:
+      type: object
+      required: [candidate_id, explanation_codes, paid_label, exploration]
+      properties:
+        candidate_id: { type: string, format: uuid }
+        display_name: { type: string }
+        age_band: { type: string }
+        distance_band_km: { type: integer }
+        modes: { type: array, items: { $ref: '#/components/schemas/IntentShape' } }
+        tier: { $ref: '#/components/schemas/Tier' }
+        explanation_codes: { type: array, minItems: 2, maxItems: 4, items: { type: string } }
+        paid_label: { type: boolean }
+        exploration: { type: boolean }
+    Brief:
+      type: object
+      required: [label, compatibility, aligned, friction, blocking, recommended_next]
+      properties:
+        label: { type: string, const: agent_generated }
+        compatibility: { type: number, minimum: 0, maximum: 1 }
+        aligned: { type: array, items: { type: string } }
+        friction:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              detail_code: { type: string }
+              suggested_resolution: { type: string }
+        blocking: { type: array, items: { type: string } }
+        recommended_next: { type: string, enum: [open_thread, amend, decline] }
+        meet_probability_band: { type: string, enum: [low, medium, high] }
+    Envelope:
+      type: object
+      required: [ciphertext]
+      properties:
+        seq: { type: integer }
+        sender_device: { type: string, format: uuid }
+        ciphertext: { type: string, contentEncoding: base64 }
+        expires_at: { type: string, format: date-time }
+    BehaviourEvent:
+      type: object
+      additionalProperties: false
+      required: [event_id, type, ts]
+      properties:
+        event_id: { type: string, format: uuid }
+        type: { type: string }
+        ts: { type: string, format: date-time }
+        context:
+          type: object
+          properties:
+            surface: { type: string }
+            app_version: { type: string }
+        value: { type: number }
+    ReportCategory:
+      type: string
+      enum: [minor, ncii, sextortion, coercion, threat_violence, stalking, romance_fraud, commercial_sex, harassment, impersonation, protected_trait_harassment, exposure_threat, other]
+    GuardianReasonCode:
+      type: string
+      enum: [m6a_coercive_control, m6b_boundary_violation, m6c_off_platform_pressure, m6d_identity_location_pressure, m6e_image_coercion, m7_authenticity, m7b_ban_evasion, payment_solicitation]
+    Entitlements:
+      type: object
+      properties:
+        tier: { type: string, enum: [verified_free, tryst_plus, envoy, duo] }
+        addon_ghost: { type: boolean }
+        keys_balance: { type: integer, minimum: 0 }
+        renews_at: { type: [string, 'null'], format: date-time }

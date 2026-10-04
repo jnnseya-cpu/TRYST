@@ -1,0 +1,24 @@
+# Controlled vocabulary for IntentVector.hard_limits (02 §6.3). Hard limits are
+# pre-retrieval filters and are never overridden by ranking (FR-014).
+# Starter set; Product owns additions. IDs are never reused.
+hard_limits:
+  - id: no_photos_exchanged
+    label: No photo exchange
+  - id: no_home_visit
+    label: No meeting at either home
+  - id: no_overnight
+    label: No overnight stays
+  - id: no_alcohol
+    label: No alcohol
+  - id: public_first_meet_only
+    label: First meeting in public only
+  - id: no_couples
+    label: Not interested in couples
+  - id: no_solo_third
+    label: Not seeking a third
+  - id: no_video_calls
+    label: No video calls
+  - id: no_voice_calls
+    label: No voice calls
+  - id: no_contact_outside_app
+    label: No contact outside TRYST
