@@ -1,12 +1,12 @@
 <p align="center"><img src="../../assets/brand/tryst-logo.png" alt="TRYST logo" width="220"></p>
 
-# TRYST Specification v1.2 — Baseline
+# TRYST Specification v1.3 — Baseline
 
 **Private chemistry. Intelligent discretion.** · *Discretion is the product.*
 
 | | |
 |---|---|
-| Version | **1.2 — Baseline (stable)**. v1.2 adds the brand identity and account-holder-only login ([06 §4](06_Decisions_and_Changes.md#4-change-log)) |
+| Version | **1.3 — Baseline (stable)**. v1.2 added the brand identity and account-holder-only login; v1.3 adds the AI Operating System ([09](09_AI_Operating_System.md); [06 §4](06_Decisions_and_Changes.md#4-change-log)) |
 | Date | 4 October 2026 |
 | Status | Stable for engineering planning and estimation. **Build start remains gated** on the written UK legal opinion and completed DPIA (Phase P0; see [01 §14](01_Product.md#14-compliance-envelope)). |
 | Owner | Office of the Group Chief Executive → TRYST SPV (pre-incorporation) |
@@ -27,8 +27,9 @@ The specification is split by audience. Each document owns its topics; the other
 | 06 | [Decisions, errata and change log](06_Decisions_and_Changes.md) | Product owner, tech leads | How v1.1 reconciled its sources, resolved and open decisions, errata fixed |
 | 07 | [Source B — founder brief (verbatim) and traceability](07_Source_B_Founder_Brief.md) | Everyone | The founder's 17 Sep 2026 specification word for word, plus where each part is implemented, the agent mapping and the FR-ID crosswalk |
 | 08 | [Source A — traceability](08_Source_A_Traceability.md) | Everyone | Where each section of the consolidated Spec + ToS lives in the spec and the code |
+| 09 | [AI Operating System](09_AI_Operating_System.md) | Leadership, engineering, security, payments, operations | Agent workforce and governance (autonomy levels, always-human actions, kill switch, audit chain), command centres for every user type, self-managing platform layer, BitriPay API door, connector register, ops and partner schemas and APIs, B2B licensing and ACU, Admin Super Control Centre, AI-OS roadmap |
 
-A combined PDF of 00–08 is at [`TRYST_Spec_v1.2.pdf`](TRYST_Spec_v1.2.pdf). Brand assets (logo exactly as supplied, colour tokens) are in [`assets/brand/`](../../assets/brand/tokens.json).
+A combined PDF of 00–09 is at [`TRYST_Spec_v1.3.pdf`](TRYST_Spec_v1.3.pdf). Brand assets (logo exactly as supplied, colour tokens) are in [`assets/brand/`](../../assets/brand/tokens.json).
 
 ## 2. Sources and precedence
 
@@ -53,6 +54,7 @@ Both A and B call themselves "v1.0", so v1.1 refers to them as **Source A** and 
 | `L1`–`L5` | Admission-control layers | 03 §8 |
 | `FR-nnn`, `NFR-nn` | Functional and non-functional requirements | 02 §10 |
 | `D-nn` | Decisions | 06 §2 |
+| `L0`–`L3` (agents) | Agent autonomy levels | 09 §5.2 |
 | `E-nn` | Errata fixed in v1.1 | 06 §3 |
 | `G-xx` | Phase exit gates and no-go conditions | 01 §12–13 |
 
@@ -82,3 +84,5 @@ Policies, prices and legal requirements must be revalidated before launch, and a
 | Passkeys / WebAuthn | https://www.w3.org/TR/webauthn-3/ and https://fidoalliance.org/passkeys/ | D-16: login factors |
 | Liveness PAD certification | ISO/IEC 30107-3; the provider's iBeta (or equivalent) Level 2 report | NFR-17 |
 | Biometric data | ICO biometric data guidance | D-17, D-18, ToS Q14 |
+| BitriPay API and webhook formats | The BitriPay API reference and OpenAPI document (supplied developer docs, 4 Oct 2026) | D-26: refund field names and the `BitriPay-Signature` layout are marked ASSUMED in the adapter |
+| EU AI Act obligations for P4 markets | Regulation (EU) 2024/1689 and Commission guidance | 09 §13.4 |

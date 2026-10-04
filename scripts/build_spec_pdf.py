@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build docs/spec/TRYST_Spec_v1.2.pdf: python3 scripts/build_spec_pdf.py out.html, then print with headless Chromium (see README)."""
+"""Build docs/spec/TRYST_Spec_v1.3.pdf: python3 scripts/build_spec_pdf.py out.html, then print with headless Chromium (see README)."""
 import markdown, re, sys
 from pathlib import Path
 root=Path.cwd(); logo=(root/'assets/brand/tryst-logo.png').as_uri()
@@ -37,4 +37,4 @@ pre{background:#FBF6EE;padding:5pt;white-space:pre-wrap;page-break-inside:avoid}
 blockquote{border-left:3px solid #CB944F;margin:5pt 0;padding:2pt 9pt;background:#FCF2DD}
 a{color:#560001;text-decoration:none}hr{display:none}
 .doc img{display:block;margin:4pt 0;background:#0B0607;padding:6pt;border-radius:4pt}"""
-Path(sys.argv[1]).write_text(f"<!doctype html><html><head><meta charset=utf-8><title>TRYST Specification v1.2</title><style>{css}</style></head><body>{''.join(parts)}</body></html>")
+Path(sys.argv[1]).write_text(f"<!doctype html><html><head><meta charset=utf-8><title>TRYST Specification v1.3</title><style>{css}</style></head><body>{''.join(parts)}</body></html>")
