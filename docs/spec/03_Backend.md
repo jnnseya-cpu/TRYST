@@ -41,7 +41,7 @@ Source A requires each agent to be independently deployable. Core domain service
 | Deployable | Language | Owns | Store |
 |---|---|---|---|
 | `edge-gateway` | Go | AuthN (OAuth2 + DPoP), jurisdiction gate, tier gate, consent gate, rate limits, idempotency | Redis |
-| `identity-svc` | Go | Identity, devices, assurance adapters, anchor candidates, ban-anchor check, join-key HMAC, root keys | IDENTITY-DB, BAN-DB, KMS/HSM |
+| `identity-svc` | Go | Identity, devices, **authenticators and login/step-up/recovery flows (§6.7)**, assurance adapters, anchor candidates, ban-anchor check, join-key HMAC, root keys | IDENTITY-DB, BAN-DB, KMS/HSM |
 | `core-svc` (modular monolith) | Go | Modules: `profile`, `couple`, `intent`, `discretion`, `discovery-api`, `reveal`, `threads` (MLS delivery service), `meet`, `consent`, `deletion`, `commerce` | PROFILE-DB |
 | `agent-cartographer`, `agent-mirror`, `agent-broker`, `agent-envoy`, `agent-curtain`, `agent-guardian`, `agent-aftercare` | Python | One agent each (§3) | Own schemas / Feast / Qdrant |
 | `llm-gateway` | Python | vLLM pool, prompt/policy registry, PII redaction, injection filters | — |
@@ -246,7 +246,7 @@ Stage 0 is implemented as a pure function with **property-based tests**: for ran
 3. **Destroy the root key** (KMS schedule-deletion with the minimum window, plus immediate disable; the HSM-wrapped data key is zeroised).
 4. Delete rows and object keys (best effort; they are already undecryptable).
 5. Drop features from Feast online and mark the pseudo-subject for training exclusion.
-6. If no ban applies, delete `anchor_candidate`.
+6. If no ban applies, delete `anchor_candidate`. Revoke all authenticators and request deletion of the provider-held B2 login reference; the provider's deletion receipt is attached to the proof (it may arrive after the 60 s on-platform erasure).
 7. Write a signed `completion_proof` (key-destruction receipt + purge summary).
 
 **Exceptions** (02 §7): ban anchors, legal hold, Panic preservation. Each is written to the job record.
@@ -277,6 +277,22 @@ Every read evaluates `(requester, resource, reveal_grant, block graph, Exclusion
 - 72-hour breach playbook, rehearsed twice a year, with specific runbooks for outing, sextortion, intimate-media leak, insider abuse, account takeover and mass breach [B §9].
 
 ---
+
+### 6.7 Authentication — account holder only (v1.2)
+
+Implements [02 §3.3](02_Shared_Contracts.md#33-login-assurance--account-holder-only) (FR-056–FR-062, [D-16](06_Decisions_and_Changes.md#2-decision-log)).
+
+- **WebAuthn relying party** in `identity-svc`. `userVerification=required`. Attestation is verified for native authenticators; the AAGUID allow-list is maintained.
+    - B1 credentials must be platform authenticators flagged `bio_enrolment_bound`. The native apps send an App Attest / Play Integrity statement that the key was created with biometric-only access control and invalidation on enrolment change.
+    - On the mobile PWA the browser cannot prove biometric-only verification. The server therefore requires B2 on **every** PWA login and on every step-up, while native B1 attestation lets step-ups inside an existing session use B1 alone, except for device add and recovery.
+- **Login state machine** (Redis, 5 min TTL): `begin → factor1_ok → (liveness_pending | approval_pending) → session`. **No session token exists until both factors pass.** Partial states are bound to the DPoP key that started them.
+- **Surface decision** is made on the server: native attestation → `mobile_app`; a registered platform authenticator on a mobile UA with no attestation → `mobile_pwa` (B1 + B2); anything else → `desktop` (F1 + F2). An unrecognised authenticator falls back to the strictest path available.
+- **B2 provider adapter:** shares its interface with the two age-assurance providers ([02 §3.1](02_Shared_Contracts.md#31-tiers)). Uses a randomised challenge and a 1:1 match against `login_reference`. Only `{match: bool, score, pad_pass: bool}` comes back to TRYST; no image or template. **Fail closed:** a provider outage blocks new logins, not existing sessions. An in-session unlock never needs B2.
+- **Cross-device approval (F2):** the QR code carries a single-use 60 s token bound to the desktop's DPoP key and coarse location. The approving app shows the desktop's browser, approximate city and time, and needs a fresh B1 assertion. No push notification is sent.
+- **Risk controls:** rate limits per contact hint, device and IP; lockout escalation (5 failures → 15 min; 10 → recovery only). Every success and failure writes `auth_event`. A new-device login sends a masked in-app notice to the other registered devices. Impossible-travel and new-AAGUID signals force recovery-grade checks.
+- **Recovery:** B2 + fresh V2 whose HMAC `anchor_doc` must equal the stored candidate (02 §4.1), then a 24 h hold. The hold is cancellable from any registered device and is never bypassable by staff (no break-glass path exists for authentication).
+- **Lawful basis:** B2 is biometric processing for unique identification (Art. 9). It uses explicit consent `biometric_login`, recorded in the ledger. The accessible alternative (D-17) keeps the consent freely given (ToS Q14).
+- **Cost:** about 1–2 B2 checks per mobile MAU per month (30 d sessions plus new devices and step-ups). At an assumed £0.10–0.30 per check this is £0.10–0.60 per MAU per month; it is added to the infra line in [01 §12](01_Product.md#12-roadmap-team-budget-and-phase-gates). Replace with the vendor quote in P0.
 
 ## 7. Guardian — safety models (M6a–M6e)
 
@@ -490,7 +506,7 @@ Detectors are refreshed quarterly; a static detector is a known future failure.
 | Phase | Epics (backend) | Definition of done |
 |---|---|---|
 | **P0** (M0–M2) | Threat model; architecture review; assurance-provider adapters (×2) spike; PSP + backup MID integration spike; IaC landing zone (eu-west-2), KMS/HSM, isolated clusters; contracts repo (OpenAPI + Protobuf) generated from 02 | Threat model signed off; G-P0 legal items done by others |
-| **P1** (M2–M6) | `edge-gateway` (DPoP, gates); `identity-svc` (OTP, devices, assurance, anchors, join HMAC); `core-svc` modules: profile, couple (VC), intent (Keys, caps), discretion (policy, zones), reveal, threads (MLS DS), meet, consent, deletion, commerce (TRYST+, Keys, deposit, vouchers); Cartographer; Broker P1 (Stage 0 + weighted baseline); Curtain v1; Guardian server (signals intake, escalation, M7, media moderation); Aftercare; `safety-svc` + trust console; Privacy Auditor probes; DSR | FR-001–009, 011–014, 016–023, 026–044, 046–047, 049–051, 054 met (backend side); NFR-01/02/05/06/10/11 met; no-go list clear; control cohort running (no Envoy) |
+| **P1** (M2–M6) | `edge-gateway` (DPoP, gates); `identity-svc` (sign-up OTP, devices, **passkeys + two-factor login, step-up, recovery**, assurance, anchors, join HMAC); `core-svc` modules: profile, couple (VC), intent (Keys, caps), discretion (policy, zones), reveal, threads (MLS DS), meet, consent, deletion, commerce (TRYST+, Keys, deposit, vouchers); Cartographer; Broker P1 (Stage 0 + weighted baseline); Curtain v1; Guardian server (signals intake, escalation, M7, media moderation); Aftercare; `safety-svc` + trust console; Privacy Auditor probes; DSR | FR-001–009, 011–014, 016–023, 026–044, 046–047, 049–051, 054, 056–062 met (backend side); NFR-01/02/05/06/10/11 met; no-go list clear; control cohort running (no Envoy) |
 | **P2** (M6–M10) | Envoy (agent + Briefs); Mirror v1 (M1–M4, α, reset/insights); ExclusionRing PSI; Guardian P2 models (D1/D2); FR-024/025 | **G-P2:** meets per intent sent ≥ +40% vs control |
 | **P3** (M10–M15) | DUO, ENVOY, GHOST billing; ENVOY proposals; travel mode; DBS attestation; transparency report; 24/7 T&S tooling; scale to 25k verified | G-P3 |
 | **P4** (M15–M24) | Multi-market jurisdiction config; localisation; per-language Guardian; consortium interface (if cleared); scale to 150k | G-P4 |

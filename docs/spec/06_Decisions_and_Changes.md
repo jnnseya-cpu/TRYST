@@ -15,7 +15,7 @@ Part of the [TRYST v1.1 baseline](00_README.md).
 
 | ID | Decision | Status | Resolution / default | Owner · deadline |
 |---|---|---|---|---|
-| D-01 | Are unattached singles allowed? | **Resolved** (A §3) | Yes. Solo segments S4 and S6 accept unattached members; S1/S2 are attached. Partner awareness is self-declared and never verified or displayed. | — |
+| D-01 | Are unattached singles allowed? | **Open** (v1.2) | The founder scope statement ([01 §1](01_Product.md#1-executive-summary)) says TRYST is designed for adults already in a relationship, while Source A §3 includes solos open to couples (S4) and the curious (S6), who may be unattached. **Default:** the product and marketing target partnered adults and couples; unattached solos are *accepted* as S4 (needed for THIRD liquidity) and S6, but not targeted. Partner awareness is self-declared and never verified or displayed. | Founder · before P1 beta invites |
 | D-02 | Chat encryption vs server-side scanning | **Resolved** (A §9.2, §21.6) | Full E2EE (MLS). Guardian runs on device and sends score + reason code only. Content reaches the server only through member-disclosed reports or Panic. Source B FR-009's "media scanning in real time" is met on device. | — |
 | D-03 | Financial base case | **Resolved** (A §15.3) | A's illustrative model is the base case (CAC £38, 11% payer rate, 19% churn). B's targets (< 7% churn, > 3× LTV:CAC) are superseded. Thresholds corrected in E-03. | — |
 | D-04 | What does the ENVOY tier's "runs outreach" mean? | **Default** | Envoy *proposes* intents with rationale; every outbound intent needs a one-tap human approval. Envoy never sends anything to a human as the member (P4; ToS cl. 7.3). | Head of Product · before P3 |
@@ -30,6 +30,10 @@ Part of the [TRYST v1.1 baseline](00_README.md).
 | D-13 | Launch markets | **Resolved** (A §14.5) | UK + IE, then EU wave 2, then CA/AU/NZ. US out of scope; never Africa or MENA. | — |
 | D-14 | Mode naming | **Default** | B's SPARK/EMBER/THIRD/QUAD/OPEN as UI labels; A's intent shapes as data values ([02 §2.3](02_Shared_Contracts.md#23-intent-shapes-and-modes)). | Design · P1 |
 | D-15 | Concierge tier (B, C) | **Default** | Deferred beyond P4. A's tiers are canonical. | CEO · P4 review |
+| D-16 | Who can sign in, and with what | **Resolved** (founder, v1.2) | Only the account holder. App and mobile PWA: two biometric factors (device-bound biometric passkey + liveness face match). Desktop: two factors (passkey + registered-phone approval or a second security key). No passwords, SMS or email codes, or staff overrides ([02 §3.3](02_Shared_Contracts.md#33-login-assurance--account-holder-only)). | — |
+| D-17 | Members who cannot use face or fingerprint biometrics (disability, device) | **Open** (counsel) | Default alternative: two registered FIDO2 security keys with PIN, plus a provider video liveness check with assisted human review in place of B2. Required so biometric consent is freely given and to meet the Equality Act (ToS Q14, Q15). | DPO/Counsel · before P1 beta |
+| D-18 | Where the B2 face reference is held | **Open** (counsel + vendor) | Default: held by the liveness provider under contract (TRYST stores only a token); deleted at the provider on erasure. Alternative rejected by default: TRYST-held encrypted template (contradicts A §8.1 "no biometric template"). | DPO/Counsel · P0 |
+| D-19 | Brand identity | **Resolved** (founder, v1.2) | Founder-supplied logo used exactly as supplied; palette sampled from it (oxblood and gold on night, cream replacing "bone"). Discretion rules still keep the logo off decoy, lock-screen and notification surfaces ([01 §3](01_Product.md#3-name-and-brand)). | — |
 
 ## 3. Errata fixed in v1.1
 
@@ -51,6 +55,7 @@ Part of the [TRYST v1.1 baseline](00_README.md).
 | E-26 | Slate size given as "12–18" (A §4) and "18" (A §11). | "Up to 18" cards including a 15% exploration floor. | 02 §5.5 |
 | E-29 | A §11 lists `POST /v1/handshake` as client-callable, but handshakes must start only on mutual intent. | System-initiated only; clients read Briefs and post decisions. | 02 §5.6 |
 | E-30 | A's §17 budget (£5.9M) excludes the £85–140k/yr insurance from A §20.5. | Called out as an addition in 01 §12. | 01 §12 |
+| E-32 | Ashley Madison membership cited as 91M+ (B §1) and 80M+ (A §1). | Both kept as attributed, unaudited claims; external materials must use a current, dated figure. | 01 §2 |
 | E-31 | B places THIRD/QUAD in delivery Phase 4; A treats S3/S5 as first-class and ships VC in P1. | THIRD/QUAD matching in P1 (A); DUO **billing** in P3. | FR-049 |
 
 (Gaps in the E-numbering are intentional; IDs are never reused.)
@@ -62,4 +67,5 @@ Part of the [TRYST v1.1 baseline](00_README.md).
 | 1.0 (Source B) | 17 Sep 2026 | Developer Specification | Founder |
 | 0.1 (Source C) | 4 Oct 2026 | PRD & business plan draft | Claude Code (draft) |
 | 1.0 (Source A) | 4 Oct 2026 | Consolidated Spec + ToS draft 0.9 | Office of the Group CEO |
-| **1.1** | **4 Oct 2026** | Merged A + B + C; split into Product / Shared Contracts / Backend / Frontend / ToS; decisions D-01–D-15; errata E-01–E-31; baseline and change control established | Claude Code, for founder review |
+| 1.1 | 4 Oct 2026 | Merged A + B + C; split into Product / Shared Contracts / Backend / Frontend / ToS; decisions D-01–D-15; errata E-01–E-31; baseline and change control established | Claude Code, for founder review |
+| **1.2** | **4 Oct 2026** | Founder logo added exactly as supplied (`assets/brand/`); brand palette and tokens from the logo; account-holder-only login: two biometric factors on app/mobile PWA, two factors on desktop (D-16–D-18, FR-056–FR-063, NFR-16/17, ToS 0.9.2 cl. 6.5, Q14–Q15); founder product-scope statement, executive product decision, one-sentence pitch and market thesis added verbatim (01 §1–§2), D-01 reopened, E-32; spec folder renamed `docs/spec` | Claude Code, for founder review |

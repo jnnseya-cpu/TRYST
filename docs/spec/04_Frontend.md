@@ -52,6 +52,26 @@ Explicit media sent from the web is delivered to native clients as a placeholder
 
 ## 4. Screens and flows (by loop)
 
+### 4.0 Sign-in — account holder only (v1.2)
+
+Implements [02 §3.3](02_Shared_Contracts.md#33-login-assurance--account-holder-only) (FR-056–FR-062).
+
+**Native app and mobile PWA — two biometric factors:**
+1. **B1:** a system biometric prompt (Face ID / Touch ID / BiometricPrompt `BIOMETRIC_STRONG`) unlocks the device-bound passkey. Device-passcode fallback is **disabled** for login.
+2. **B2:** an in-app liveness capture with a randomised challenge (turn your head, read a short phrase) from the provider SDK (native) or web flow (PWA). The camera view uses brand colours with the `night` background. No logo is shown if a decoy skin is active.
+3. The session is issued only after both succeed. Failure copy never says which factor failed.
+
+**Desktop browser / desktop PWA — two factors:**
+1. **F1:** the browser passkey prompt (Windows Hello / Touch ID / security key).
+2. **F2:** a QR code appears on screen. The member opens TRYST on their phone, goes to **Approve sign-in**, scans it, and confirms with B1. The phone shows the desktop's browser, approximate city and time. Nothing is pushed to the phone's lock screen. Alternative: tap a second registered security key.
+
+**Other screens:**
+- **Biometric change detected:** "Your phone's fingerprints or face settings changed, so we've signed you out to protect your account." Then a full B1 re-registration + B2 login.
+- **Unlock** (existing session): biometric or PIN per FR-027. The duress PIN opens the decoy.
+- **Step-up sheet** for sensitive actions (02 §3.3). **Burn, Panic, report, block, cancel and delete never show a step-up.**
+- **Recovery:** liveness → age/ID check with the same document → a 24 h countdown that any registered device can cancel → new passkey. The copy explains that support cannot bypass this.
+- **Consent:** a separate `biometric_login` explicit-consent screen before V1, alongside the Article 9 consent, with a link to the accessible alternative (D-17).
+
 ### 4.1 Loop A — Quiet entry and intake
 
 1. **Neutral landing / first launch.** On native, the member picks a decoy skin and neutral name at first launch.
@@ -120,9 +140,9 @@ Location never leaves the device at better than geohash-5, except in the Panic f
 - **Media:** a per-media AES-256-GCM key; ciphertext uploaded through a pre-signed URL; the key is wrapped per recipient (MLS exporter secret) and sent in band. **Revocation** asks the server to destroy the wrapped key, and the recipient client purges any cached plaintext.
 - **PSI client:** normalise contacts (E.164 / lowercased email) → hash → blind with a random `r` → server evaluates → unblind → upload the PRF set. Raw contacts never leave the device; nothing is shown to the member about matches.
 - **Guardian on device (FR-033):** M6a–e run on each thread turn over a rolling window (< 80 ms p95). Only `{model_id, version, score, reason_code}` is posted. Local UI responses:
-  - M6d auto-redacts addresses and phone numbers in outgoing text and asks the sender to confirm;
-  - M6c shows a caution banner to the counterparty;
-  - M6e locks the thread pending review.
+    - M6d auto-redacts addresses and phone numbers in outgoing text and asks the sender to confirm;
+    - M6c shows a caution banner to the counterparty;
+    - M6e locks the thread pending review.
 - **Pre-send media check:** on-device nudity classifier (explicit media only to V2 web, with the counterparty's media-view consent), plus licensed hash matching where permitted ([D-10](06_Decisions_and_Changes.md#2-decision-log)).
 - **Conversation features** for M5 and Mirror (length bucket, latency, question ratio) are computed on device. **No content leaves the device.**
 - **Reporting:** the reporter may choose to attach decrypted messages or media. This is an explicit, separately confirmed disclosure, with a separate opt-in for safety-model training (never a condition of action).
@@ -152,13 +172,29 @@ Location never leaves the device at better than geohash-5, except in the Panic f
 | "Undetectable", "No trace" | "We minimise what we store, and here's what we can't control" |
 | "Cheat better" or any affair-shaming or affair-glamorising copy in the store build | "Discreet dating"; "Discretion is the product" (web) |
 
-Brand codes: oxblood and bone, serif display, no pink, hearts or silhouettes [A §2].
+### 7.2 Brand application (v1.2)
+
+**Logo.** Use [`assets/brand/tryst-logo.png`](../../assets/brand/tryst-logo.png) **exactly as supplied**: no redraws, recolours, crops or effects. Place it on `night`, `oxblood-deep` or `oxblood` only. Never show it in decoy mode, on lock screens, in notifications, app-switcher snapshots or Share My Plan (FR-063; [01 §3.1](01_Product.md#31-logo)). For small sizes (favicon, ≤ 48 px) use the PNG scaled down. If it is illegible at that size, the web favicon defaults to the neutral option (FR-027) rather than a modified logo.
+
+**Colour.** Import [`assets/brand/tokens.css`](../../assets/brand/tokens.css) (web) or generate native colour assets from [`tokens.json`](../../assets/brand/tokens.json). Defaults:
+
+| Element | Token |
+|---|---|
+| Background | `night` |
+| Cards | `oxblood-deep` |
+| Body text | `cream` |
+| Headings and accents | `gold` |
+| Primary button | `oxblood` with `champagne` text |
+| Borders | `oxblood-light` |
+| Disabled | `bronze` |
+
+**Type:** serif display with tight tracking for headings, matching the wordmark; a clean sans for body text. **Never** pink, hearts or silhouettes [A §2]. The decoy skins use their own neutral system palettes, never brand tokens.
 
 ---
 
 ## 8. Accessibility, localisation, performance
 
-- **Accessibility:** WCAG 2.2 AA on web; VoiceOver/TalkBack labels on native; Dynamic Type; reduced motion. The decoy and quick-exit controls must be operable by assistive technologies **without announcing "TRYST"** (NFR-07).
+- **Accessibility:** WCAG 2.2 AA on web (brand text pairs pass AA, [01 §3.2](01_Product.md#32-colour-palette)); VoiceOver/TalkBack labels on native; Dynamic Type; reduced motion. The decoy and quick-exit controls must be operable by assistive technologies **without announcing "TRYST"** (NFR-07). Members who cannot use face or fingerprint biometrics get the accessible sign-in alternative ([D-17](06_Decisions_and_Changes.md#2-decision-log)).
 - **Localisation:** EN-GB/EN-IE at P1; NL, DE, SV, DA, ES, PT at P4 (NFR-14). Brief and Guardian copy is code-based for localisation.
 - **Performance:** cold start < 2 s on mid-tier devices; slate first paint < 1 s after the API response; quick exit < 500 ms; Burn confirmable < 2 s (NFR-04).
 - **Platforms:** iOS 17+, Android 10+, evergreen browsers (NFR-15).
@@ -179,7 +215,7 @@ Brand codes: oxblood and bone, serif display, no pink, hearts or silhouettes [A 
 | Phase | Epics (frontend) | Definition of done |
 |---|---|---|
 | **P0** (M0–M2) | Design system (oxblood/bone); discretion UX prototypes (decoy, duress, quick exit, Burn vs Panic) usability-tested; Rust crypto core spike on three targets; store pre-review consultation | Prototypes validated; crypto core builds on iOS, Android and WASM |
-| **P1** (M2–M6) | Web PWA (full product) + native apps (TestFlight / internal track): onboarding V0–V2, conduct and Article 9 consent, Cartographer UI, profile/media with client encryption, couple co-sign, slate, intents/Keys, threads (MLS), reveal ladder, meet/Safe Meet/Share My Plan/Panic, Aftercare, discretion suite, on-device Guardian baseline, report/block, account/DSR, web billing (TRYST+, Keys, deposit, vouchers) | FR-001–009, 011–013, 016–023, 026–033, 037–039, 041–042, 044, 046–047, 049, 051, 054 met (client side); NFR-03/04/07/09/15 met |
+| **P1** (M2–M6) | Web PWA (full product) + native apps (TestFlight / internal track): onboarding V0–V2, conduct and Article 9 consent, Cartographer UI, profile/media with client encryption, couple co-sign, slate, intents/Keys, threads (MLS), reveal ladder, meet/Safe Meet/Share My Plan/Panic, Aftercare, discretion suite, on-device Guardian baseline, report/block, account/DSR, web billing (TRYST+, Keys, deposit, vouchers) | FR-001–009, 011–013, 016–023, 026–033, 037–039, 041–042, 044, 046–047, 049, 051, 054, 056–063 met (client side); NFR-03/04/07/09/15 met |
 | **P2** (M6–M10) | Brief screens + decisions; My Signals; ExclusionRing enrolment (PSI client); reason chips | FR-010, 015, 024, 025 |
 | **P3** (M10–M15) | DUO, ENVOY (proposal inbox), GHOST UI; travel mode; DBS attestation and Clare's Law explainer; store submissions approved on both platforms | G-P3 store approval; FR-045, 048, 053 |
 | **P4** (M15–M24) | Localisation (6 languages); market-specific copy and assurance flows | NFR-14 |

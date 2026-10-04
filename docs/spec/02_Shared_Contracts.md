@@ -67,7 +67,7 @@ Part of the [TRYST v1.1 baseline](00_README.md). This document is the **single s
 | `handshake_decision` | `pending`, `accept`, `decline`, `amend` |
 | `intent_state` | `sent`, `queued_inbound_cap`, `delivered`, `replied`, `declined`, `expired`, `refunded` |
 | `desire_tag_level` | `yes`, `curious`, `no` |
-| `consent_kind` | `art9_processing`, `media_view`, `meet`, `couple_link`, `retention`, `conduct_attestation`, `safety_training_use` |
+| `consent_kind` | `art9_processing`, `media_view`, `meet`, `couple_link`, `retention`, `conduct_attestation`, `safety_training_use`, `biometric_login` |
 | `reveal_scope` | `alias`, `blurred_gallery`, `photo_set`, `voice`, `video` (the reveal ladder, in order) |
 | `report_category` | `minor`, `ncii`, `sextortion`, `coercion`, `threat_violence`, `stalking`, `romance_fraud`, `commercial_sex`, `harassment`, `impersonation`, `exposure_threat`, `other` |
 | `enforcement_action` | `warn`, `shadow_limit`, `suspend`, `permanent`, `law_enforcement_referral` |
@@ -110,6 +110,60 @@ Part of the [TRYST v1.1 baseline](00_README.md). This document is the **single s
 - `min_counterparty_tier` (default `V2`, option `V3`) is a Stage 0 hard gate in both directions.
 - Re-verification triggers: a Guardian `minor` signal, a change of device plus a profile-photo change, a credible report, or a 12-month expiry.
 
+### 3.3 Login assurance — account holder only
+
+**v1.2, founder requirement ([D-16](06_Decisions_and_Changes.md#2-decision-log)).** Only the account holder can sign in. The rules depend on the surface:
+
+| Surface | Factors required at **every login** | Both required? |
+|---|---|---|
+| **Native app** (iOS, Android) and **PWA on a mobile device** | **B1** device-bound biometric passkey **+ B2** liveness face match to the account holder | Yes — two biometric factors |
+| **Desktop** (web browser or installed PWA on a computer) | **F1** passkey (platform authenticator with user verification, or FIDO2 security key) **+ F2** approval from the member's registered mobile device, which itself requires B1 (or a second registered FIDO2 security key) | Yes — two factors |
+
+**Factor definitions:**
+- **B1 — Device biometric passkey.** A WebAuthn/FIDO2 credential bound to the device's secure element. `userVerification = required` and must be satisfied by **biometrics only** for login:
+    - iOS: `biometryCurrentSet`;
+    - Android: `BIOMETRIC_STRONG`, key invalidated on biometric enrolment change;
+    - mobile PWA: platform authenticator.
+  The biometric never leaves the device. **If anyone adds or changes a fingerprint or face on the device, the credential is invalidated** and the member must log in again with B1 re-registration + B2 (FR-059). This defeats the partner who enrols their own fingerprint (A1).
+- **B2 — Liveness face match.** A randomised challenge-response liveness check (ISO 30107-3 PAD Level 2 certified provider), matched 1:1 against the account holder's reference enrolled at V1. The reference is held by the provider under a deletion obligation, never by TRYST ([D-18](06_Decisions_and_Changes.md#2-decision-log)). Requires the explicit `biometric_login` consent.
+- **F1 — Desktop passkey.** Windows Hello, Touch ID or a roaming FIDO2 key with PIN or biometric. Phishing-resistant, origin-bound.
+- **F2 — Registered-device approval.** The desktop shows a QR code; the member scans it **in the TRYST app** on a registered mobile device and approves with B1. No push notification is sent, so nothing appears on a lock screen. Alternative: a second registered FIDO2 security key.
+
+**Never accepted as a login factor:** passwords (TRYST has none), SMS or email OTP, magic links, security questions, or support-desk overrides. Contact OTP is used **only** at sign-up to prove ownership of the contact handle (V0).
+
+**Login vs unlock:**
+- **Login** creates a session on a device: first use on a device, after sign-out or Burn, after session expiry, after a biometric-enrolment change, or on a risk step-up.
+- **Unlock** reopens the app within a live session: device biometric (or the duress PIN, which opens the decoy) per FR-027.
+
+| Session rule | Mobile (app / PWA) | Desktop |
+|---|---|---|
+| Maximum session | 30 days | 12 hours |
+| Idle lock | 2 min default (member-adjustable 1–15) | 15 min → full re-login |
+| Token binding | DPoP to the device key | DPoP to a non-extractable WebCrypto key |
+
+**Step-up** (repeat both factors for the surface, valid 5 min) is required to:
+- add or revoke a device;
+- broaden the Discretion Policy;
+- change contact handle or payment method;
+- co-sign or change a couple link or veto mode;
+- export data;
+- view the device list;
+- start account recovery.
+
+It is **never** required for Burn, Panic, report, block, subscription cancel or account deletion. Deletion requires B1 only, so it stays one step (ToS cl. 16.3, 25.1).
+
+**Before V1:** a V0 member has no B2 reference, so they can only continue onboarding on the device they signed up on. Login on any other device is unavailable until V1 is complete.
+
+**Downgrade resistance:** the server decides the surface from attestation (native) and from the registered authenticator's properties. It does not trust a client claim. The desktop path still requires a second, separately registered authenticator, so claiming "desktop" from a phone gains nothing.
+
+**Account recovery** (lost or replaced device, FR-061):
+1. B2 liveness match.
+2. Fresh V2 age assurance with an ID match, whose document anchor must equal the account's stored `anchor_doc` (same document).
+3. A 24-hour hold, cancellable from any still-registered device.
+4. New passkey registration.
+
+No staff member can bypass recovery.
+
 ---
 
 ## 4. Data model
@@ -150,7 +204,35 @@ CREATE TABLE device (
   device_pubkey    BYTEA NOT NULL,          -- DPoP + MLS credential binding
   device_hash      BYTEA NOT NULL,          -- HMAC(attestation_id, pepper_device)
   platform         TEXT CHECK (platform IN ('ios','android','web')),
+  surface          TEXT CHECK (surface IN ('mobile_app','mobile_pwa','desktop')), -- v1.2
   revoked_at       TIMESTAMPTZ
+);
+
+-- v1.2 addition (D-16): login authenticators. No biometric data is stored by TRYST.
+CREATE TABLE authenticator (
+  credential_id    BYTEA PRIMARY KEY,       -- WebAuthn credential id
+  identity_id      UUID NOT NULL REFERENCES identity,
+  device_id        UUID REFERENCES device,  -- NULL for roaming security keys
+  public_key       BYTEA NOT NULL,
+  aaguid           UUID,
+  kind             TEXT CHECK (kind IN ('platform_biometric','platform_uv','roaming_key')),
+  bio_enrolment_bound BOOLEAN NOT NULL,     -- invalidated on biometric enrolment change
+  sign_count       BIGINT DEFAULT 0,
+  created_at       TIMESTAMPTZ DEFAULT now(),
+  revoked_at       TIMESTAMPTZ
+);
+
+CREATE TABLE login_reference (              -- pointer to the provider-held B2 face reference
+  identity_id      UUID PRIMARY KEY REFERENCES identity,
+  provider         TEXT NOT NULL,
+  reference_token  TEXT NOT NULL,           -- provider ref only; deleted at provider on erasure
+  enrolled_at      TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE auth_event (                   -- 90-day retention, IP truncated (NFR-11)
+  event_id UUID PRIMARY KEY, identity_id UUID, device_id UUID,
+  kind TEXT,                                -- login_ok|login_fail|step_up|recovery_*|bio_change
+  factors TEXT[], surface TEXT, created_at TIMESTAMPTZ DEFAULT now()
 );
 ```
 
@@ -408,10 +490,18 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 
 | Method | Path | Min | Contract |
 |---|---|---|---|
-| POST | `/v1/auth/start` | — | `{contact}` → OTP sent. Uniform response whether or not the account exists |
-| POST | `/v1/auth/verify` | — | `{otp, device_pubkey, attestation}` → session + device registered. Ban-anchor check runs here for new identities ([03 §8](03_Backend.md#8-admission-control-l1l5)) |
+| POST | `/v1/auth/start` | — | **Sign-up only.** `{contact}` → OTP sent. Uniform response whether or not the account exists. **Never a login factor** (§3.3) |
+| POST | `/v1/auth/verify` | — | **Sign-up only.** `{otp, device_pubkey, attestation}` → onboarding session + device registered. Ban-anchor check runs here for new identities ([03 §8](03_Backend.md#8-admission-control-l1l5)) |
+| POST | `/v1/auth/passkeys/register` (`begin` / `finish`) | V0 | Register B1 (mobile) or F1 (desktop) WebAuthn credential; step-up required after the first one |
+| POST | `/v1/auth/login/begin` | — | `{contact_hint?}` → WebAuthn challenge + `required_factors` (decided by the server, §3.3). Uniform response |
+| POST | `/v1/auth/login/passkey` | — | WebAuthn assertion (B1 or F1) → `login_state = factor1_ok` (no session yet) |
+| POST | `/v1/auth/login/liveness` | — | Mobile: start B2 provider session → provider callback (`sys`) → **session issued only on match** |
+| POST | `/v1/auth/login/cross-device` | — | Desktop: → QR token (60 s); `GET .../{id}` polls status → **session issued only on approval** |
+| POST | `/v1/auth/approvals/{qr_token}` | V1 | Called from the registered mobile app with a fresh B1 assertion; approves or denies the desktop login |
+| POST | `/v1/auth/step-up` | V0 | Same factor flow as login → step-up token (5 min) for §3.3 sensitive actions |
+| POST | `/v1/auth/recovery/begin` · `/finish` | — | B2 + fresh V2 with matching `anchor_doc` → 24 h hold → new passkey (FR-061) |
 | POST | `/v1/auth/refresh` | V0 | DPoP refresh |
-| GET / DELETE | `/v1/devices` · `/v1/devices/{id}` | V0 | List and revoke devices |
+| GET / DELETE | `/v1/devices` · `/v1/devices/{id}` | V0 | List and revoke devices (**step-up required**, §3.3) |
 | POST | `/v1/assurance/session` | V0 | `{kind: liveness|age}` → provider hand-off URL |
 | POST | `/v1/assurance/callback` | sys | Signed provider token → `is_adult` boolean + anchor candidates. Raw document and biometric never stored |
 | POST | `/v1/attestations/conduct` | V1 | Conduct declaration (ToS cl. 3.5) → consent ledger. Required to complete V2 |
@@ -517,7 +607,7 @@ RFC 9457 `application/problem+json` with a stable `code`.
 
 | HTTP | `code` | Meaning |
 |---|---|---|
-| 401 | `auth_required`, `dpop_invalid` | |
+| 401 | `auth_required`, `dpop_invalid`, `second_factor_required` (+`factor`), `step_up_required`, `authenticator_invalidated` (biometric enrolment changed) | |
 | 403 | `tier_required` (+`required_tier`), `consent_required` (+`consent_kind`), `jurisdiction_blocked`, `entitlement_required` | |
 | 404 | `not_found` | Uniform for invisible resources |
 | 409 | `idempotency_conflict`, `version_conflict` | |
@@ -620,6 +710,8 @@ This table is canonical; 03 and 04 implement it, and the ToS (cl. 15) and Privac
 | Ban anchors | Permanent (or until a successful appeal) | Appeal | **Declared exception** (ToS cl. 15.3) |
 | Evidence under legal hold | Duration of hold | — | **Declared exception** (ToS cl. 17.4); narrowly scoped |
 | Panic-preserved location/evidence | As required by emergency services | — | **Declared exception** (ToS cl. 20; P7) |
+| B2 login face reference (v1.2) | Life of account; held by the provider, not TRYST | — | Deleted at the provider on erasure; deletion receipt included in `completion_proof` |
+| Auth events | 90 d, IP truncated | — | TTL |
 
 **Account deletion:**
 1. Destroy the root key in KMS.
@@ -723,6 +815,14 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-053 | Travel mode: set a planned location for discovery (premium) | Both | P3 | A §15.2 |
 | FR-054 | In-product safety notice at intake and before a first meet ([04 §7](04_Frontend.md#7-safety-ux)) | FE | P1 | A §20.3 |
 | FR-055 | Envoy and other agents never send messages to a human as the member | BE | P2 | A §5.4 |
+| FR-056 | Passkey-only authentication: no passwords; SMS/email OTP, magic links and support overrides are never login factors (contact OTP only at sign-up) | Both | P1 | D-16 |
+| FR-057 | Native app and mobile PWA login requires two biometric factors: B1 device-bound biometric passkey **and** B2 liveness face match to the account holder (§3.3) | Both | P1 | D-16 |
+| FR-058 | Desktop login (browser or desktop PWA) requires two factors: F1 passkey **and** F2 approval from a registered mobile device via B1 (or a second FIDO2 key) (§3.3) | Both | P1 | D-16 |
+| FR-059 | A change to the device's biometric enrolment invalidates its passkey and forces a full login (B1 re-registration + B2) | Both | P1 | D-16 |
+| FR-060 | Step-up re-authentication for sensitive actions (§3.3); never for Burn, Panic, report, block, cancel or deletion | Both | P1 | D-16 |
+| FR-061 | Account recovery needs B2 + fresh V2 matching the stored document anchor + 24 h hold cancellable from registered devices; no staff bypass | Both | P1 | D-16 |
+| FR-062 | Session limits: mobile 30 d max with biometric unlock and 2 min idle lock; desktop 12 h max, 15 min idle → full login | Both | P1 | D-16 |
+| FR-063 | Brand: logo used exactly as supplied and palette tokens applied on every branded surface; logo never shown in decoy mode, on lock screens, in notifications, app-switcher snapshots, descriptors or Share My Plan | FE | P1 | D-19 |
 
 ### 10.2 Non-functional requirements
 
@@ -743,3 +843,5 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | NFR-13 | RPO ≤ 5 min, RTO ≤ 1 h; backups stay under per-member keys | BE |
 | NFR-14 | Localisation: EN-GB/EN-IE at P1; NL, DE, SV, DA, ES, PT at P4 (Guardian per-language evaluation) | Both |
 | NFR-15 | Platforms: iOS 17+, Android 10+ (StrongBox where present), evergreen browsers (last 2 versions) | FE |
+| NFR-16 | Login completion p95: mobile < 20 s including liveness; desktop < 30 s including cross-device approval | Both |
+| NFR-17 | B2 provider: ISO/IEC 30107-3 PAD Level 2 certified; face-match FAR ≤ 1:10,000 at FRR ≤ 3%; fairness across demographic groups reported by the provider and audited (D-17) | BE |

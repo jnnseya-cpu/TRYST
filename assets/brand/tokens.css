@@ -1,0 +1,20 @@
+/* TRYST brand tokens — sampled from tryst-logo.png. Rules: docs/spec/01_Product.md §3 */
+:root {
+  --tryst-night: #0B0607;
+  --tryst-oxblood-deep: #3F0000;
+  --tryst-oxblood: #560001;
+  --tryst-oxblood-light: #702A2E;
+  --tryst-bronze: #836042;
+  --tryst-gold: #CB944F;
+  --tryst-champagne: #F5D3AC;
+  --tryst-cream: #FCF2DD;
+
+  --tryst-bg: var(--tryst-night);
+  --tryst-surface: var(--tryst-oxblood-deep);
+  --tryst-text: var(--tryst-cream);
+  --tryst-text-strong: var(--tryst-champagne);
+  --tryst-accent: var(--tryst-gold);
+  --tryst-border: var(--tryst-oxblood-light);
+  --tryst-button-bg: var(--tryst-oxblood);
+  --tryst-button-text: var(--tryst-champagne);
+}

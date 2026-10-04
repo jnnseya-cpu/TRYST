@@ -1,4 +1,4 @@
-# 05 — TRYST Terms of Service — Draft 0.9.1
+# 05 — TRYST Terms of Service — Draft 0.9.2
 
 Part of the [TRYST v1.1 baseline](00_README.md).
 
@@ -74,6 +74,10 @@ Part of the [TRYST v1.1 baseline](00_README.md).
 6.1 Everything you tell us about yourself must be accurate, and your photographs must be current and of you. Profiles that misrepresent who you are will be removed.
 
 6.2 Keep your access credentials, PIN and device secure. Tell us immediately if you think someone else has access to your account.
+
+6.5 **[v1.2]** Only you may sign in to your account. Signing in needs two checks. On a phone (app or website), these are your phone's fingerprint or face unlock **and** a live face check matched to you. On a computer, they are a passkey **and** approval from your registered phone. We never let anyone sign in by text message or email code, and our staff cannot sign in for you or bypass these checks. If you cannot use face or fingerprint checks, we offer an alternative (see our Accessibility page at [URL]).
+
+> **IN PLAIN ENGLISH** — Even someone holding your unlocked phone cannot get into your account. If anyone adds their fingerprint or face to your phone, we sign you out.
 
 6.3 You are responsible for everything done through your account, unless someone gained access through our failure to take reasonable care.
 
@@ -320,8 +324,10 @@ You must not, on TRYST or in any contact that begins on TRYST:
 | Q10 | Review the Community Rules and Safety Policy as incorporated documents for consistency with these terms. | 1.4 |
 | Q11 **[v1.1]** | Is scarce-side seeding that offers free paid features to women-identifying members lawful under the Equality Act 2010 (services), or must it be segment-based? (Spec D-06.) | 16 |
 | Q12 **[v1.1]** | Does gating all discovery, Intents, conversations and media at age assurance (V2), with no other members' content visible before then, satisfy Ofcom's highly-effective-age-assurance expectations for dating services, including the May 2026 dating guidance? | 3.1, 5.1 |
+| Q14 **[v1.2]** | Biometric login (clause 6.5) processes biometric data to identify the account holder. Is explicit consent valid (freely given) when login requires it, given the accessible alternative? Is a provider-held face reference compatible with clause 15's erasure promise if the provider's deletion completes after our 60-second erasure? | 6.5, 15 |
+| Q15 **[v1.2]** | Does requiring biometrics to sign in, with the alternative path, meet the Equality Act 2010 reasonable-adjustment duty for disabled members? | 6.5 |
 | Q13 **[v1.1]** | Is creating Exclusion Identifier codes for **every** verified member at verification (destroyed on deletion unless the member is removed) proportionate, and does it need its own Art. 9/10 and Sch. 1 analysis separate from post-removal retention? Should a biometric code ever be used (spec D-08)? | 15.3 |
 
 ---
 
-*TRYST — Terms of Service · Draft 0.9.1 · 4 October 2026 · Prepared by Product for legal review · Not legal advice · Not for publication.*
+*TRYST — Terms of Service · Draft 0.9.2 · 4 October 2026 · Prepared by Product for legal review · Not legal advice · Not for publication.*

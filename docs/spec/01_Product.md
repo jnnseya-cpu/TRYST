@@ -6,6 +6,12 @@ Part of the [TRYST v1.1 baseline](00_README.md). Contracts live in [02](02_Share
 
 ## 1. Executive summary
 
+> **PRODUCT SCOPE**
+>
+> TRYST is designed specifically for adults who are already in a relationship and want a discreet one-off affair, a continuing extramarital connection, another couple, or a threesome. Existing-partner permission is not a condition of membership. Every person using TRYST must nevertheless be an independently consenting adult; the platform prohibits coercion, stalking, blackmail, impersonation, minors, non-consensual imagery and commercial sexual services.
+>
+> *Founder scope statement, verbatim (Source B; re-confirmed 4 Oct 2026). Applied through [§4](#4-operating-stance-and-principles), [§5](#5-segments-modes-and-intent-shapes) and [D-01](06_Decisions_and_Changes.md#2-decision-log).*
+
 TRYST is a discretion-first connection platform for attached adults, solo adults open to couples, and couples. It covers one-off encounters, ongoing extramarital connections, couples seeking a third, and couple-to-couple connections, for all genders and orientations.
 
 Two things make it different:
@@ -17,11 +23,55 @@ Two things make it different:
 
 **Gating.** No engineering build starts before a written UK legal opinion and a completed DPIA ([§14](#14-compliance-envelope)).
 
+### 1.1 Executive product decision
+
+*Founder text, verbatim (Source B; re-confirmed 4 Oct 2026).*
+
+Build TRYST as a privacy-first, affair-specific connection platform rather than a generic dating app. Its strategic advantage is an AI relationship-intelligence layer that learns attraction, discretion requirements, availability, risk tolerance and interaction quality while deliberately collecting less identifying data than incumbents.
+
+| Decision | Specification | Why it wins |
+|---|---|---|
+| Name | TRYST | One sharp word meaning a private romantic meeting; instantly communicates the category. |
+| Audience | Partnered adults of any gender/orientation; couples seeking a third or another couple | Clear, high-intent niche rather than mass-market dating. |
+| Promise | Private chemistry. Intelligent discretion. | Combines emotional benefit with the functional moat. |
+| Core modes | One-off, Ongoing, Couple+, Threesome, Couple-to-Couple | Intent is explicit before matching. |
+| Moat | Discretion Graph + Behavioural Compatibility Engine | Learns fit without exposing identity or partner data. |
+| Revenue | Subscription-led with credits and premium privacy | Predictable recurring revenue plus high-margin intent transactions. |
+| Launch | Web/PWA first, then native apps subject to store review | Reduces store dependency and permits rapid privacy iteration. |
+
+> **ONE-SENTENCE PITCH**
+>
+> TRYST is the intelligent private network where attached adults and couples find precisely matched affairs, extra-relationship connections and threesome partners without exposing more of their identity than necessary.
+
+**How this decision maps onto the rest of v1.2:**
+
+| Decision row | Implemented as |
+|---|---|
+| Core modes | One-off → SPARK; Ongoing → EMBER; Couple+ and Threesome → THIRD (Couple+ = a couple seeking a third; Threesome = a solo joining a couple); Couple-to-Couple → QUAD; plus OPEN for exploration ([§5.2](#52-modes-member-facing--intent-shapes-data)) |
+| Moat | Discretion Graph = Discretion Policy + ExclusionRing + zones enforced on every read (Curtain); Behavioural Compatibility Engine = Mirror + Broker + Envoy ([§7](#7-agents-roles)) |
+| Revenue | "Credits" = Keys; "premium privacy" = the GHOST add-on, subject to [D-05](06_Decisions_and_Changes.md#2-decision-log) ([§10](#10-business-model-and-unit-economics)) |
+| Launch | Web PWA is the full product and the revenue surface; native apps follow store review, approved by G-P3 ([§12](#12-roadmap-team-budget-and-phase-gates), [§14.3](#143-distribution--two-surface-strategy)) |
+| Audience | See [D-01](06_Decisions_and_Changes.md#2-decision-log) on unattached solos |
+
 ---
 
 ## 2. Thesis and market gap
 
 The discreet-connection market is large, proven and badly served. The incumbents monetise frustration; TRYST monetises resolution. [A §1]
+
+**Founder market thesis, verbatim (Source B §1; re-confirmed 4 Oct 2026):**
+
+> The category is already validated. Ashley Madison markets private, anonymous connections and claims more than 91 million members. Gleeden uses a credit economy for extramarital connections; Victoria Milan markets a rapid-exit "panic button." The opportunity is not to prove demand but to rebuild the category around modern privacy engineering, verified authenticity, gender-neutral pricing, transparent AI and higher-quality matching.
+
+| Incumbent pattern | Observed weakness | TRYST response |
+|---|---|---|
+| Large anonymous inventory | Fake profiles, low trust and expensive dead-end messaging | Liveness, authenticity confidence and conversation-quality scoring. |
+| Credit-heavy messaging | Revenue can conflict with real connection outcomes | Subscription provides core value; credits enhance but do not manufacture access. |
+| Basic privacy theatre | A panic button cannot protect server-side data | Pseudonymity, data minimisation, isolated vaults, short retention and discreet billing. |
+| Pairwise matching | Poor fit for couples and threesomes | Native multi-person matching and room consent. |
+| Swipe engagement | High noise and fatigue | Small daily set of high-confidence, intent-aligned introductions. |
+
+*Membership figures differ between sources: Source B cites Ashley Madison's claim of 91M+ members, Source A cites 80M+. Both are the company's own unaudited claims; use the current figure from Ashley Madison's site, with an access date, in any external material ([E-32](06_Decisions_and_Changes.md#3-errata-fixed-in-v11)). "Gender-neutral pricing" supports the default in [D-06](06_Decisions_and_Changes.md#2-decision-log).*
 
 ### 2.1 Market
 
@@ -54,9 +104,52 @@ The discreet-connection market is large, proven and badly served. The incumbents
 
 **TRYST** — *a private, prearranged meeting between lovers.* One syllable, five letters, no explanation needed, and deniable on a lock screen. Tagline: **Private chemistry. Intelligent discretion.** Internal line: **Discretion is the product.**
 
-- **Brand codes:** oxblood and bone; serif display, tight tracking. No pink, hearts, silhouettes or lipstick. Reference: a private members' club, not a nightclub.
+- **Brand codes:** oxblood and gold on night; serif display, tight tracking. No pink, hearts, silhouettes or lipstick. Reference: a private members' club, not a nightclub.
 - **Fallback names** if trademark clearance fails: ASIDE, DUPLEX.
 - **Domains:** tryst.app / tryst.co / trystapp.com plus defensive registrations before any UKIPO Class 9/45 filing becomes public.
+
+### 3.1 Logo
+
+<img src="../../assets/brand/tryst-logo.png" alt="TRYST logo: gold and oxblood interlocking crescents above the TRYST serif wordmark" width="260">
+
+The master logo is [`assets/brand/tryst-logo.png`](../../assets/brand/tryst-logo.png) (1254 × 1254 px, transparent background), supplied by the founder ([D-19](06_Decisions_and_Changes.md#2-decision-log)).
+
+- **Use it exactly as supplied.** Do not redraw, recolour, crop, stretch, re-shadow or separate the mark from the wordmark. The repository keeps the original file byte-for-byte (SHA-256 `5f2ceb55…eae2761`).
+- **Background:** the logo is designed for the dark `night` ground (§3.2), and is only placed on `night`, `oxblood-deep` or `oxblood`.
+- **Never shown where it would expose a member (P3, P9):**
+    - on a device in decoy mode;
+    - on the lock screen or in notifications;
+    - in the app-switcher snapshot;
+    - in billing descriptors;
+    - in the home-screen icon of a member who has chosen a decoy skin;
+    - in Share My Plan messages.
+- **Where it appears:**
+    - the web PWA (landing page, sign-in, header);
+    - inside the native apps after unlock;
+    - store listings, subject to the sanitised-store rules ([§14.3](#143-distribution--two-surface-strategy));
+    - investor and press materials.
+
+### 3.2 Colour palette
+
+The palette is sampled from the logo. Tokens live in [`assets/brand/tokens.json`](../../assets/brand/tokens.json) and [`assets/brand/tokens.css`](../../assets/brand/tokens.css).
+
+| Token | Hex | Role | Contrast on `night` |
+|---|---|---|---|
+| `night` | `#0B0607` | Primary background | — |
+| `oxblood-deep` | `#3F0000` | Deep surfaces, pressed states | — |
+| `oxblood` | `#560001` | Brand surface, primary buttons | 1.34 (surfaces only) |
+| `oxblood-light` | `#702A2E` | Hover, borders, dividers | 1.97 (never text) |
+| `bronze` | `#836042` | Secondary lines, disabled states | 3.56 (large text only) |
+| `gold` | `#CB944F` | Accent, links, icons, headings | 7.56 AA/AAA |
+| `champagne` | `#F5D3AC` | Highlight text, active states | 14.18 |
+| `cream` | `#FCF2DD` | Body text; light surface (replaces "bone") | 18.1 |
+
+**Text pairs that pass WCAG 2.2 AA (NFR-07):**
+- cream, champagne or gold on `night`;
+- cream (13.5), champagne (10.6) or gold (5.65) on `oxblood`;
+- oxblood on cream (13.5).
+
+Oxblood and oxblood-light are never used for text on dark grounds.
 
 ---
 
@@ -331,7 +424,7 @@ Source B's phase-level exit criteria are folded into the gates above and into th
 | PSP reserves & fees | £220k |
 | Contingency (15%) | £780k |
 
-**Plus insurance of £85–140k a year at P3 scale** ([§15.3](#153-insurance-and-structure)), which is not in Source A's total.
+**Plus insurance of £85–140k a year at P3 scale** ([§15.3](#153-insurance-and-structure)), which is not in Source A's total. **Plus biometric login checks** (v1.2): an estimated £0.10–0.60 per mobile MAU per month, pending the vendor quote ([03 §6.7](03_Backend.md#67-authentication--account-holder-only-v12)).
 
 ---
 
@@ -373,6 +466,7 @@ Do not launch or scale if any of these hold. Each is backed by an automated or a
 | G-NG-7 | Ranking violates any hard limit, exclusion zone or ExclusionRing pair |
 | G-NG-8 | Any third-party analytics, advertising or attribution SDK is present in a client |
 | G-NG-9 | Staff can read message content |
+| G-NG-10 | Any login or recovery path issues a session with fewer factors than [02 §3.3](02_Shared_Contracts.md#33-login-assurance--account-holder-only) requires, or allows SMS/email/staff-assisted sign-in |
 
 ### 13.3 Risk register
 
@@ -389,6 +483,7 @@ Do not launch or scale if any of these hold. Each is backed by an automated or a
 | CAC model unviable | High | §10.3 thresholds; invite loop; weekly tracking |
 | Reputational contagion to parent group | Medium | Ring-fenced SPV, brand, counsel, cap table and PR |
 | Feeld or Match Group ships an agent layer | Medium | Speed to P2; the moat is discretion architecture plus the aftercare dataset |
+| Two-factor biometric login hurts conversion or excludes disabled members | Medium | Fast provider flow (NFR-16); 30-day sessions; accessible alternative (D-17); measure login drop-off weekly |
 | Guardian false positives on consensual kink | High | Trajectory-not-vocabulary design; matched-pair ship gate ([03 §7](03_Backend.md#7-guardian--safety-models-m6am6e)) |
 
 ---

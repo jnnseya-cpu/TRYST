@@ -1,10 +1,12 @@
-# TRYST Specification v1.1 — Baseline
+<p align="center"><img src="../../assets/brand/tryst-logo.png" alt="TRYST logo" width="220"></p>
+
+# TRYST Specification v1.2 — Baseline
 
 **Private chemistry. Intelligent discretion.** · *Discretion is the product.*
 
 | | |
 |---|---|
-| Version | **1.1 — Baseline (stable)** |
+| Version | **1.2 — Baseline (stable)**. v1.2 adds the brand identity and account-holder-only login ([06 §4](06_Decisions_and_Changes.md#4-change-log)) |
 | Date | 4 October 2026 |
 | Status | Stable for engineering planning and estimation. **Build start remains gated** on the written UK legal opinion and completed DPIA (Phase P0; see [01 §14](01_Product.md#14-compliance-envelope)). |
 | Owner | Office of the Group Chief Executive → TRYST SPV (pre-incorporation) |
@@ -12,7 +14,7 @@
 
 ## 1. Document set
 
-v1.1 splits the specification by audience. Each document owns its topics; the others link to it rather than restating it.
+The specification is split by audience. Each document owns its topics; the others link to it rather than restating it.
 
 | # | Document | Audience | Owns |
 |---|---|---|---|
@@ -21,10 +23,10 @@ v1.1 splits the specification by audience. Each document owns its topics; the ot
 | 02 | [Shared Contracts](02_Shared_Contracts.md) | Backend **and** frontend | Glossary, enums, verification tiers and gates, data model, API contract, event taxonomy, agent message schemas, retention, error model, requirement catalogue (FR/NFR) with owners |
 | 03 | [Backend](03_Backend.md) | Backend, ML, security, SRE, T&S engineering | Services, stack, agents, learning models, matching pipeline, cryptography, identity split, erasure, PSI server, Guardian server side, admission control, MLOps, commerce, backend backlog |
 | 04 | [Frontend](04_Frontend.md) | iOS, Android, web, design | Two-surface strategy, client stacks, screens and flows, client discretion, client cryptography, on-device Guardian, PSI client, safety UX, copy rules, store compliance, frontend backlog |
-| 05 | [Terms of Service — draft 0.9.1](05_Terms_of_Service_draft.md) | Counsel | Consumer terms for counsel review. **Not for publication.** |
+| 05 | [Terms of Service — draft 0.9.2](05_Terms_of_Service_draft.md) | Counsel | Consumer terms for counsel review. **Not for publication.** |
 | 06 | [Decisions, errata and change log](06_Decisions_and_Changes.md) | Product owner, tech leads | How v1.1 reconciled its sources, resolved and open decisions, errata fixed |
 
-A combined PDF of 00–06 is at [`TRYST_Spec_v1.1.pdf`](TRYST_Spec_v1.1.pdf).
+A combined PDF of 00–06 is at [`TRYST_Spec_v1.2.pdf`](TRYST_Spec_v1.2.pdf). Brand assets (logo exactly as supplied, colour tokens) are in [`assets/brand/`](../../assets/brand/tokens.json).
 
 ## 2. Sources and precedence
 

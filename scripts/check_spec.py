@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SPEC = ROOT / "docs" / "v1.1"
+SPEC = ROOT / "docs" / "spec"
 
 ID_PATTERNS = {
     "FR": r"\bFR-\d{3}\b",
