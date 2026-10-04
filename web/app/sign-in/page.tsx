@@ -147,7 +147,7 @@ export default function SignIn() {
       {msg && <p role="alert">{msg}</p>}
       <hr className="rule" />
       <p className="note">We never sign you in with a text message or an email code, and no one at TRYST can sign in for you.</p>
-      <p className="note">Not a member yet? <a href="/join">Request an invitation</a></p>
+      <p className="note">Not a member yet? <a href="/join">Become a member</a></p>
     </Shell>
   );
 }

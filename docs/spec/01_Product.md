@@ -384,7 +384,7 @@ Source B's Black / Duo £34.99 / Signals / Vault+ / Concierge Black tiers are su
 
 Source A's "< £12" target is only viable at a payer rate of about 16% or more. Two levers decide the business; track both weekly from beta day one:
 1. Raise verified → payer toward 18% (ENVOY is the instrument).
-2. Drive blended CAC down through invitations and organic channels.
+2. Drive blended CAC down through member referrals and organic channels.
 
 Treat paid acquisition as a seeding cost, never a growth engine.
 
@@ -394,14 +394,16 @@ Treat paid acquisition as a seeding cost, never a growth engine.
 
 *Source: A §16*
 
-1. **Density gate (G-City-1).** No city opens below 2,000 verified profiles; a waitlist beats an empty grid.
-2. **Balance gate (G-City-2).** Throttle the oversupplied side to keep the ratio at or below 2.2:1 per city, with a genuine, moving waitlist.
-3. **Seed the scarce side first.** Invite waves and founding-member status for S4 (and, subject to [D-06](06_Decisions_and_Changes.md#2-decision-log), under-represented cohorts) with free ENVOY for 6 months.
-4. **Invite-only for 9 months.** 3 invites per member, refreshed monthly for members in good standing. Referral rewards never reveal the referrer to the invitee [B].
-5. **Cities:** London → Manchester → Birmingham → Brighton → Dublin. Not nationwide.
+*Changed by the founder in v1.3 ([D-35](06_Decisions_and_Changes.md#2-decision-log)): public sign-up in four UK cities at once, replacing Source A's invite-only, London-first plan. The balance waitlist is kept.*
+
+1. **Density gate (G-City-1).** Sign-up is open from day one, but **matching in a city switches on at 2,000 verified members**. Until then, members verify, set up their profile and discretion settings, and see how close their city is. An empty grid is never shown.
+2. **Balance gate (G-City-2) — the gender-balance waitlist.** Among solo members who declare themselves men or women, the larger side may not exceed 2.2:1 per city (2.0:1 by P3). A member whose admission would breach it joins a genuine, moving, first-come-first-served waitlist for their city, sees their position, and is admitted automatically when the balance allows. Couples and members of any other gender are never waitlisted. No city is balanced through pricing or ranking (D-06; 03 §3). Implemented and tested in `backend/internal/launch` (FR-090).
+3. **Seed the scarce side first.** Outreach waves and founding-member status for S4 (and, subject to [D-06](06_Decisions_and_Changes.md#2-decision-log), under-represented cohorts) with free ENVOY for 6 months.
+4. **Public sign-up, no invitation needed** (founder, v1.3). Member referrals stay as a growth channel: 3 per member, refreshed monthly for members in good standing. Referral rewards never reveal the referrer to the invitee [B].
+5. **Cities:** **London, Manchester, Birmingham and Brighton open together at launch**; Dublin opens with the Irish launch in P3. Adults elsewhere in the UK can register interest, and a new city opens when its sign-ups approach the density gate.
 6. **Channels:** assume Meta and Google reject the ad account. Use podcast host-reads in adjacent verticals, ENM and relationship creators, technology-led PR (agent handshake, breach-proof architecture), and an editorial presence. Never synthetic personas or staff posing as members [B].
 7. **Positioning:** "Discretion is the product." Never "cheat better."
-8. **Organic search as the growth engine (v1.2).** Paid social is closed and paid CAC is fatal ([§10.3](#103-unit-economics-illustrative-replace-with-beta-cohorts)), so search is the main scalable low-CAC channel alongside invitations. The Herald agent runs it:
+8. **Organic search as the growth engine (v1.2).** Paid social is closed and paid CAC is fatal ([§10.3](#103-unit-economics-illustrative-replace-with-beta-cohorts)), so search is the main scalable low-CAC channel alongside referrals. The Herald agent runs it:
     - **Dynamic content:** topic clusters on privacy, discretion, safety (Safe Meet, Clare's Law), ethical non-monogamy and couples, plus genuinely useful launch-city pages (no doorway pages). Pages are refreshed from search-performance data. Source B §11.2's "privacy-led content" channel is delivered here.
     - **Hyperlinks:** automated internal-link graph across the topic clusters (hub and spoke), with no orphan pages and descriptive anchors.
     - **Backlinks, earned and never bought:** digital PR on the technology story (agent handshake, breach-proof architecture, transparency reports); open-sourcing the audited crypto core; expert contributions; podcast and creator partnerships marked `rel="sponsored"` where paid; relationship and lifestyle publishers.
@@ -419,9 +421,9 @@ Treat paid acquisition as a seeding cost, never a growth engine.
 | Phase | Window | Scope | Exit gate |
 |---|---|---|---|
 | **P0 Legal & foundation** | M0–M2 | SPV, counsel, DPIA, OSA assessments, PSP + backup MID, two age-assurance providers, threat model | **G-P0:** SPV incorporated · written counsel opinion · DPIA complete · OSA risk assessments drafted · high-risk PSP + backup MID approved · two assurance providers contracted · threat model signed off |
-| **P1 Core MVP** | M2–M6 | Loops A, B, D; E2EE; V2 gating; VC co-sign; Guardian baseline (on-device); deletion and DSR machinery; web PWA + native shells. **No Envoy** — this is the control cohort | **G-P1:** closed beta in London with 2,000 verified · erasure < 60 s p99 · no-go list ([§13.2](#132-no-go-conditions)) clear |
+| **P1 Core MVP** | M2–M6 | Public web beta (open sign-up) in four UK cities; Loops A, B, D; E2EE; V2 gating; VC co-sign; Guardian baseline (on-device); deletion and DSR machinery; web PWA + native shells. **No Envoy** — this is the control cohort | **G-P1:** public beta open in London, Manchester, Birmingham and Brighton; matching live (≥ 2,000 verified) in at least two of them · erasure < 60 s p99 · no-go list ([§13.2](#132-no-go-conditions)) clear |
 | **P2 Differentiator** | M6–M10 | Envoy, Mirror v1, ExclusionRing PSI | **G-P2:** meets per intent sent up ≥ 40% vs the P1 control. If not met, **stop and rethink** |
-| **P3 Public UK + IE** | M10–M15 | Invite-only public launch; DUO + GHOST; native apps approved on both stores; 24/7 T&S | **G-P3:** 25,000 verified · payer rate ≥ 11% · both stores approved |
+| **P3 Public UK + IE** | M10–M15 | Full public launch, Dublin added; DUO + GHOST; native apps approved on both stores; 24/7 T&S | **G-P3:** 25,000 verified · payer rate ≥ 11% · both stores approved |
 | **P4 EU wave 2** | M15–M24 | NL/BE/DE/SE/DK/ES/PT; per-market opinions; localised assurance and Guardian | **G-P4:** 150,000 verified · contribution-positive |
 
 Source B's phase-level exit criteria are folded into the gates above and into the phase backlogs in [03 §12](03_Backend.md#12-backend-backlog-by-phase) and [04 §10](04_Frontend.md#10-frontend-backlog-by-phase).
@@ -499,11 +501,11 @@ Do not launch or scale if any of these hold. Each is backed by an automated or a
 | App-store rejection or removal (Apple 1.1.4) | High | Sanitised store build; explicit media web-only; matched-only messaging; web-first revenue |
 | Merchant account loss | High | Backup MID from day one; alert at 0.5% chargebacks; Ethoca/Verifi; one-click cancel; pre-renewal notice; voucher path |
 | Ofcom enforcement | High | Two assurance providers; inbox-level gating; documented assessments; named accountable manager; quarterly compliance review |
-| Liquidity failure in month 4 | High | Density and balance gates; scarce side first; invite-only |
+| Liquidity failure in month 4 | High | Density gate per city (matching opens at 2,000 verified); balance waitlist; scarce side first. Higher with four cities at once (D-35) |
 | Envoy does not move meets per intent | High | P1 control cohort; G-P2 at +40%; kill the thesis honestly |
 | Agent seen as a bot / impersonation scandal | High | P4; labelled Briefs; publish the design |
 | Harm incident attributed to the platform | High | T&S in P0; 24/7 from P3; published SLAs; Safe Meet; transparency reporting |
-| CAC model unviable | High | §10.3 thresholds; invite loop; weekly tracking |
+| CAC model unviable | High | §10.3 thresholds; referral loop; organic search; weekly tracking per city |
 | Reputational contagion to parent group | Medium | Ring-fenced SPV, brand, counsel, cap table and PR |
 | Feeld or Match Group ships an agent layer | Medium | Speed to P2; the moat is discretion architecture plus the aftercare dataset |
 | Search penalty or deindexing of the marketing domain | Medium | White-hat only (D-21); human editorial approval; no bought links; monthly link-profile audit; marketing site on its own host, separate from the app |

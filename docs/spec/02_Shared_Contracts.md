@@ -858,6 +858,8 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-086 | Admin Super Control Centre on an internal origin: redacted by default; member-level access only via a case-scoped just-in-time grant approved by a second person (max 8 h); break-glass needs two people; every view and action logged | Both | P1 | founder OS brief |
 | FR-087 | Connector register: every third-party connector records purpose, module, data sent and received, lawful basis, DPA, region, health, kill switch and owner; no member data to CRM, messaging-app, enrichment or advertising platforms; live mode needs a named approver | BE | P1 | founder OS brief, D-29 |
 | FR-088 | Partner API (licensing): scoped `tk_` keys shown once and stored hashed, ACU metering with idempotent usage records, signed outbound webhooks with retries and replay; no TRYST member data is reachable from any partner scope | BE | P4 | founder OS brief, D-27 |
+| FR-089 | Public sign-up in the launch cities (London, Manchester, Birmingham, Brighton) with no invitation required; matching in a city switches on at 2,000 verified members, and members see how many more are needed | Both | P1 | Founder v1.3, D-35 |
+| FR-090 | Gender-balance waitlist per city: among solo men and women the larger side may not exceed the cap (2.2:1 in P1, 2.0:1 from P3); breaching members wait first come, first served, see their position and are admitted automatically when balance allows; couples and other genders never wait; departures never reopen seeding; gender never affects price or ranking | BE | P1 | A §16, D-35 |
 
 ### 10.2 Non-functional requirements
 
@@ -881,5 +883,5 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | NFR-16 | Login completion p95: mobile < 20 s including liveness; desktop < 30 s including cross-device approval | Both |
 | NFR-17 | B2 provider: ISO/IEC 30107-3 PAD Level 2 certified; face-match FAR ≤ 1:10,000 at FRR ≤ 3%; fairness across demographic groups reported by the provider and audited (D-17) | BE |
 | NFR-18 | Key management: automatic yearly rotation of KMS root keys and HSM peppers (dual-run); every KMS/HSM key use streamed to the SIEM with anomaly alerts | BE |
-| NFR-19 | Assurance: public bug bounty from the end of P1 (closed beta); annual independent privacy audit; quarterly pen test and annual red team (NFR-08) | Both |
+| NFR-19 | Assurance: public bug bounty from the end of P1 (public beta); annual independent privacy audit; quarterly pen test and annual red team (NFR-08) | Both |
 | NFR-20 | Marketing site Core Web Vitals at p75: LCP < 2.5 s, INP < 200 ms, CLS < 0.1; WCAG 2.2 AA; no third-party tracking scripts (cookieless, self-hosted analytics only) | FE |

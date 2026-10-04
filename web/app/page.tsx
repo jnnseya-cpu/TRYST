@@ -104,10 +104,10 @@ export default async function Home() {
             built to forget.
           </p>
           <div className="lp-ctas reveal d4">
-            <Link className="button" href="/join">Request an invitation</Link>
+            <Link className="button" href="/join">Become a member</Link>
             <Link className="button ghost" href="/sign-in">Sign in</Link>
           </div>
-          <p className="lp-scrollcue reveal d4">Invitation-only in London</p>
+          <p className="lp-scrollcue reveal d4">Now open in London, Manchester, Birmingham and Brighton</p>
         </div>
       </section>
 
@@ -278,9 +278,9 @@ export default async function Home() {
       <section className="lp-section lp-final">
         <div className="lp-wrap lp-narrow">
           <h2>Your evening,<br /><em>on your terms.</em></h2>
-          <p className="lede" style={{ margin: "0 auto 2.4rem" }}>Invitation-only in London. Manchester, Birmingham, Brighton and Dublin follow.</p>
+          <p className="lede" style={{ margin: "0 auto 2.4rem" }}>Open now in London, Manchester, Birmingham and Brighton. Dublin follows.</p>
           <div className="lp-ctas">
-            <Link className="button" href="/join">Request an invitation</Link>
+            <Link className="button" href="/join">Become a member</Link>
           </div>
         </div>
       </section>

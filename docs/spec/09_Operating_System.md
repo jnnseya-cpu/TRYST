@@ -469,7 +469,7 @@ Runs declared workflows (§5.7) step by step, with retries, compensation and the
 
 #### Predictive Growth Agent
 
-Purpose: forecast liquidity per city, segment and mode (S4 scarcity, gender ratio ≤ 2.2:1). Inputs: aggregates. Outputs: invite pacing and seeding recommendations (01 §11). Permissions: L1. Escalation: a forecast breach of a no-go condition → CEO. Value: avoids launching cities that cannot work.
+Purpose: forecast liquidity per city, segment and mode (S4 scarcity, gender ratio ≤ 2.2:1). Inputs: aggregates. Outputs: waitlist release forecasts, city-opening and seeding recommendations (01 §11). Permissions: L1. Escalation: a forecast breach of a no-go condition → CEO. Value: avoids launching cities that cannot work.
 
 #### Admin Control Agent
 
@@ -1172,7 +1172,7 @@ Internal origin, staff SSO + hardware key, redacted by default, every view and a
 
 ## 15. Developer build roadmap
 
-The OS phases align with TRYST's phases and gates (01 §12). The brief's five phases map as: **MVP = P1**, **Beta = P1 closed beta → P2**, **Commercial launch = P3**, **Enterprise version = P4**, **Global scale version = post-P4**.
+The OS phases align with TRYST's phases and gates (01 §12). The brief's five phases map as: **MVP = P1**, **Beta = P1 public beta → P2**, **Commercial launch = P3**, **Enterprise version = P4**, **Global scale version = post-P4**.
 
 ### 15.1 MVP (P1, M2–M6)
 
@@ -1183,7 +1183,7 @@ The OS phases align with TRYST's phases and gates (01 §12). The brief's five ph
 | User flows | J1 (basic), J3, J4, J5, J7, J8 |
 | AI agents | Cartographer, Broker (P1 baseline ranker), Curtain, Guardian, Aftercare, Onboarding, Risk, Fraud, Support, Compliance, Payment, Herald, System Health, Bug Detection, Auto-Repair, Release Manager, Threat Hunter, Vulnerability, SOC triage, executive copilots |
 | Technical milestones | PostgreSQL IDENTITY-DB; DPoP; real liveness provider; gate as a central service with WORM anchoring; SLOs live; erasure < 60 s p99 |
-| Commercial objectives | G-P1: 2,000 verified in the London closed beta; no-go list clear |
+| Commercial objectives | G-P1: public beta in London, Manchester, Birmingham and Brighton; matching live in at least two; no-go list clear |
 
 ### 15.2 Beta (P2, M6–M10)
 
