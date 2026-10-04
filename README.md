@@ -32,7 +32,7 @@ Consistency check (runs in CI): `python3 scripts/check_spec.py`
 |---|---|---|
 | `contracts/openapi/` | Edge API contract (OpenAPI 3.1), generated from spec 02 §5 | Redocly lint |
 | `contracts/proto/` | Agent bus and event schemas (Protobuf) | `protoc` compile |
-| `backend/` | Go: jurisdiction and V2 tier gates, two-factor login state machine, couple co-sign (VC), Keys ledger and inbound cap, cryptographic erasure, ban anchors, Stripe webhook verification; SQL migrations generated from spec 02 §4 | `go vet`, `go test -race`, migration drift check |
+| `backend/` | Go: jurisdiction and V2 tier gates, two-factor login state machine, couple co-sign (VC), Keys ledger and inbound cap, cryptographic erasure, ban anchors, enforcement ladder and appeals (ToS 17–18), Stripe webhook verification; SQL migrations generated from spec 02 §4 | `go vet`, `go test -race`, migration drift check |
 | `agents/` | Python: Broker Stage 0 hard gates (property-tested), slate assembly, Envoy schemas and Briefs, Mirror maths | `ruff`, `pytest` + Hypothesis |
 | `crypto-core/` | Rust: per-media keys, per-recipient wrapping, revoke | `cargo fmt`, `clippy`, `test` |
 | `web/` | Next.js PWA: brand tokens, logo (checksum-verified), two-factor sign-in steps, quick exit, `noindex` | `tsc`, `vitest`, `next build` |
