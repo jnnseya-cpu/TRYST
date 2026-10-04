@@ -77,7 +77,7 @@ export default function Join() {
     <Shell>
       <p className="eyebrow">Membership</p>
       <h1>Become a member</h1>
-      <p className="lede">Open to verified adults in London, Manchester, Birmingham and Brighton. Once you&rsquo;re set up, only you can ever sign in.</p>
+      <p className="lede">Open to verified adults in London, Manchester, Birmingham and Brighton. Matching opens city by city, starting with London; we&rsquo;ll show you how close yours is. Once you&rsquo;re set up, only you can ever sign in.</p>
       <p className="note">To keep every city balanced, we sometimes hold places on a short, first-come waitlist. You&rsquo;ll see your position, and you&rsquo;re let in automatically. Couples are never kept waiting.</p>
 
       {step === "contact" && (

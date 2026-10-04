@@ -394,13 +394,13 @@ Treat paid acquisition as a seeding cost, never a growth engine.
 
 *Source: A §16*
 
-*Changed by the founder in v1.3 ([D-35](06_Decisions_and_Changes.md#2-decision-log)): public sign-up in four UK cities at once, replacing Source A's invite-only, London-first plan. The balance waitlist is kept.*
+*Changed by the founder in v1.3 ([D-35](06_Decisions_and_Changes.md#2-decision-log)): public sign-up replaces Source A's 9-month invite-only period. The proven density-first sequence is kept: matching opens one city at a time, London first, and the balance waitlist stays.*
 
-1. **Density gate (G-City-1).** Sign-up is open from day one, but **matching in a city switches on at 2,000 verified members**. Until then, members verify, set up their profile and discretion settings, and see how close their city is. An empty grid is never shown.
+1. **Density gate (G-City-1).** Sign-up is open from day one in all four launch cities, but **matching opens one city at a time, in launch order**: a city goes live at 2,000 verified members once the city before it is live, and stays live. Until then, members verify, set up their profile and discretion settings, and see how close their city is. An empty grid is never shown.
 2. **Balance gate (G-City-2) — the gender-balance waitlist.** Among solo members who declare themselves men or women, the larger side may not exceed 2.2:1 per city (2.0:1 by P3). A member whose admission would breach it joins a genuine, moving, first-come-first-served waitlist for their city, sees their position, and is admitted automatically when the balance allows. Couples and members of any other gender are never waitlisted. No city is balanced through pricing or ranking (D-06; 03 §3). Implemented and tested in `backend/internal/launch` (FR-090).
 3. **Seed the scarce side first.** Outreach waves and founding-member status for S4 (and, subject to [D-06](06_Decisions_and_Changes.md#2-decision-log), under-represented cohorts) with free ENVOY for 6 months.
 4. **Public sign-up, no invitation needed** (founder, v1.3). Member referrals stay as a growth channel: 3 per member, refreshed monthly for members in good standing. Referral rewards never reveal the referrer to the invitee [B].
-5. **Cities:** **London, Manchester, Birmingham and Brighton open together at launch**; Dublin opens with the Irish launch in P3. Adults elsewhere in the UK can register interest, and a new city opens when its sign-ups approach the density gate.
+5. **Cities:** sign-up open in **London, Manchester, Birmingham and Brighton** from launch; matching opens **London → Manchester → Birmingham → Brighton**, and seeding spend is focused on the next city to open, not spread across all four. Dublin opens with the Irish launch in P3. Adults elsewhere in the UK can register interest, and a new city opens when its sign-ups approach the density gate.
 6. **Channels:** assume Meta and Google reject the ad account. Use podcast host-reads in adjacent verticals, ENM and relationship creators, technology-led PR (agent handshake, breach-proof architecture), and an editorial presence. Never synthetic personas or staff posing as members [B].
 7. **Positioning:** "Discretion is the product." Never "cheat better."
 8. **Organic search as the growth engine (v1.2).** Paid social is closed and paid CAC is fatal ([§10.3](#103-unit-economics-illustrative-replace-with-beta-cohorts)), so search is the main scalable low-CAC channel alongside referrals. The Herald agent runs it:
@@ -421,7 +421,7 @@ Treat paid acquisition as a seeding cost, never a growth engine.
 | Phase | Window | Scope | Exit gate |
 |---|---|---|---|
 | **P0 Legal & foundation** | M0–M2 | SPV, counsel, DPIA, OSA assessments, PSP + backup MID, two age-assurance providers, threat model | **G-P0:** SPV incorporated · written counsel opinion · DPIA complete · OSA risk assessments drafted · high-risk PSP + backup MID approved · two assurance providers contracted · threat model signed off |
-| **P1 Core MVP** | M2–M6 | Public web beta (open sign-up) in four UK cities; Loops A, B, D; E2EE; V2 gating; VC co-sign; Guardian baseline (on-device); deletion and DSR machinery; web PWA + native shells. **No Envoy** — this is the control cohort | **G-P1:** public beta open in London, Manchester, Birmingham and Brighton; matching live (≥ 2,000 verified) in at least two of them · erasure < 60 s p99 · no-go list ([§13.2](#132-no-go-conditions)) clear |
+| **P1 Core MVP** | M2–M6 | Public web beta: open sign-up in four UK cities, matching live in London first; Loops A, B, D; E2EE; V2 gating; VC co-sign; Guardian baseline (on-device); deletion and DSR machinery; web PWA + native shells. **No Envoy** — this is the control cohort | **G-P1:** matching live in London with ≥ 2,000 verified; sign-up open in all four launch cities · erasure < 60 s p99 · no-go list ([§13.2](#132-no-go-conditions)) clear |
 | **P2 Differentiator** | M6–M10 | Envoy, Mirror v1, ExclusionRing PSI | **G-P2:** meets per intent sent up ≥ 40% vs the P1 control. If not met, **stop and rethink** |
 | **P3 Public UK + IE** | M10–M15 | Full public launch, Dublin added; DUO + GHOST; native apps approved on both stores; 24/7 T&S | **G-P3:** 25,000 verified · payer rate ≥ 11% · both stores approved |
 | **P4 EU wave 2** | M15–M24 | NL/BE/DE/SE/DK/ES/PT; per-market opinions; localised assurance and Guardian | **G-P4:** 150,000 verified · contribution-positive |
@@ -501,7 +501,7 @@ Do not launch or scale if any of these hold. Each is backed by an automated or a
 | App-store rejection or removal (Apple 1.1.4) | High | Sanitised store build; explicit media web-only; matched-only messaging; web-first revenue |
 | Merchant account loss | High | Backup MID from day one; alert at 0.5% chargebacks; Ethoca/Verifi; one-click cancel; pre-renewal notice; voucher path |
 | Ofcom enforcement | High | Two assurance providers; inbox-level gating; documented assessments; named accountable manager; quarterly compliance review |
-| Liquidity failure in month 4 | High | Density gate per city (matching opens at 2,000 verified); balance waitlist; scarce side first. Higher with four cities at once (D-35) |
+| Liquidity failure in month 4 | High | Density gate per city, opened in order (London first); balance waitlist; scarce side first; seeding focused on one city at a time (D-35) |
 | Envoy does not move meets per intent | High | P1 control cohort; G-P2 at +40%; kill the thesis honestly |
 | Agent seen as a bot / impersonation scandal | High | P4; labelled Briefs; publish the design |
 | Harm incident attributed to the platform | High | T&S in P0; 24/7 from P3; published SLAs; Safe Meet; transparency reporting |

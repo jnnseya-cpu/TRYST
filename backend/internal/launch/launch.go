@@ -3,8 +3,10 @@
 // FR-090, D-35).
 //
 //   - Sign-up is open to every verified adult in a launch city; no invitation is needed.
-//   - Matching in a city switches on once it has DensityGate verified members (G-City-1).
-//     Before that, members verify and set up their profile and see how close the city is.
+//   - Matching opens one city at a time, in launch order (London first). A city goes live
+//     once it has DensityGate verified members (G-City-1) and the city before it is live;
+//     once live it stays live. Before that, members verify, set up their profile and see
+//     how close the city is. This is the density-first, city-by-city launch pattern.
 //   - Balance (G-City-2): among solo members who declared themselves men or women, the
 //     larger side may not exceed RatioCap times the smaller. A member whose admission would
 //     breach the cap joins a first-come, first-served waitlist for that city and is
@@ -45,8 +47,8 @@ type City struct {
 	Code, Name string
 }
 
-// LaunchCities opens together at launch (founder, v1.3). Dublin follows with the Irish
-// launch in P3.
+// LaunchCities are open for sign-up from launch (founder, v1.3); matching opens in this
+// order. Dublin follows with the Irish launch in P3.
 var LaunchCities = []City{
 	{"LON", "London"}, {"MAN", "Manchester"}, {"BHM", "Birmingham"}, {"BTN", "Brighton"},
 }
@@ -81,6 +83,8 @@ type waiter struct {
 type Registry struct {
 	mu     sync.Mutex
 	cities map[string]*cityState
+	order  []string        // launch order
+	live   map[string]bool // sticky: once matching opens in a city it stays open
 	member map[string]membership
 	cap    float64
 	floor  int
@@ -95,10 +99,11 @@ var (
 
 // New returns a registry for the given cities with the default gates.
 func New(cities []City) *Registry {
-	r := &Registry{cities: map[string]*cityState{}, member: map[string]membership{},
+	r := &Registry{cities: map[string]*cityState{}, live: map[string]bool{}, member: map[string]membership{},
 		cap: RatioCap, floor: SeedFloor, gate: DensityGate}
 	for _, c := range cities {
 		r.cities[c.Code] = &cityState{where: map[string]int{}}
+		r.order = append(r.order, c.Code)
 	}
 	return r
 }
@@ -214,10 +219,27 @@ func (r *Registry) reindex(s *cityState) {
 	}
 }
 
+// refreshLiveLocked opens cities in launch order: each needs the density gate and a live
+// predecessor. Live is never revoked.
+func (r *Registry) refreshLiveLocked() {
+	for i, code := range r.order {
+		if r.live[code] {
+			continue
+		}
+		if r.cities[code].verified() >= r.gate && (i == 0 || r.live[r.order[i-1]]) {
+			r.live[code] = true
+			continue
+		}
+		return // later cities wait for this one
+	}
+}
+
 func (r *Registry) statusLocked(s *cityState, member string) Status {
+	r.refreshLiveLocked()
 	v := s.verified()
-	st := Status{Admitted: true, MatchingLive: v >= r.gate, VerifiedInCity: v}
-	if !st.MatchingLive {
+	city := r.member[member].city
+	st := Status{Admitted: true, MatchingLive: r.live[city], VerifiedInCity: v}
+	if !st.MatchingLive && v < r.gate {
 		st.NeededForLive = r.gate - v
 	}
 	if i, waiting := s.where[member]; waiting {
@@ -283,6 +305,7 @@ type CityReport struct {
 func (r *Registry) Report() []CityReport {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.refreshLiveLocked()
 	out := make([]CityReport, 0, len(r.cities))
 	for code, s := range r.cities {
 		m, w := s.counts[Men], s.counts[Women]
@@ -295,7 +318,7 @@ func (r *Registry) Report() []CityReport {
 			ratio = float64(big) / float64(small)
 		}
 		out = append(out, CityReport{Code: code, Verified: s.verified(), Men: m, Women: w,
-			Waiting: len(s.waiting), Ratio: ratio, MatchingLive: s.verified() >= r.gate})
+			Waiting: len(s.waiting), Ratio: ratio, MatchingLive: r.live[code]})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Code < out[j].Code })
 	return out

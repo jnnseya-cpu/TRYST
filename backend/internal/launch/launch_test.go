@@ -113,12 +113,12 @@ func TestNoQueueJumping(t *testing.T) {
 
 func TestDensityGate(t *testing.T) {
 	r := small()
-	st, _ := r.Join("BHM", "a", Couple)
+	st, _ := r.Join("LON", "a", Couple)
 	if st.MatchingLive || st.NeededForLive != 49 {
 		t.Fatalf("before gate: %+v", st)
 	}
 	for i := 0; i < 49; i++ {
-		r.Join("BHM", fmt.Sprint("c", i), Couple)
+		r.Join("LON", fmt.Sprint("c", i), Couple)
 	}
 	if st, _ := r.StatusOf("a"); !st.MatchingLive || st.NeededForLive != 0 {
 		t.Fatalf("after gate: %+v", st)
@@ -199,5 +199,46 @@ func TestSeedingNeverReopens(t *testing.T) {
 	r.Leave("m1") // 6 men + 2 women = 8 < floor
 	if st, _ := r.StatusOf("late"); st.Admitted {
 		t.Fatal("departures reopened seeding and released the oversupplied side")
+	}
+}
+
+// Matching opens one city at a time, London first, and never closes again.
+func TestCitiesGoLiveInOrder(t *testing.T) {
+	r := small() // gate 50
+	for i := 0; i < 50; i++ {
+		r.Join("MAN", fmt.Sprint("man", i), Couple)
+	}
+	if st, _ := r.StatusOf("man0"); st.MatchingLive || st.NeededForLive != 0 {
+		t.Fatalf("Manchester is full but must wait for London: %+v", st)
+	}
+	for i := 0; i < 50; i++ {
+		r.Join("LON", fmt.Sprint("lon", i), Couple)
+	}
+	if st, _ := r.StatusOf("lon0"); !st.MatchingLive {
+		t.Fatal("London should be live")
+	}
+	if st, _ := r.StatusOf("man0"); !st.MatchingLive {
+		t.Fatal("Manchester should follow London")
+	}
+	if st, _ := r.StatusOf("x"); st.MatchingLive {
+		t.Fatal("unknown member")
+	}
+	r.Join("BHM", "b", Couple)
+	if st, _ := r.StatusOf("b"); st.MatchingLive || st.NeededForLive != 49 {
+		t.Fatalf("Birmingham not yet: %+v", st)
+	}
+	for i := 0; i < 5; i++ {
+		r.Leave(fmt.Sprint("lon", i))
+	}
+	if st, _ := r.StatusOf("lon10"); !st.MatchingLive {
+		t.Fatal("a live city must not close when members leave")
+	}
+	rep := r.Report()
+	live := map[string]bool{}
+	for _, c := range rep {
+		live[c.Code] = c.MatchingLive
+	}
+	if !live["LON"] || !live["MAN"] || live["BHM"] || live["BTN"] {
+		t.Fatalf("report: %+v", live)
 	}
 }
