@@ -598,6 +598,7 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 | POST | `/v1/keys/purchase` | V1 | Keys packs |
 | POST | `/v1/vouchers/redeem` | V0 | Offline voucher/gift code |
 | POST | `/v1/subscription` | V1 | Neutral, truthful descriptor enforced at the PSP; pre-contract and cooling-off notices |
+| POST | `/v1/billing/stripe/webhook` | sys | Stripe events (signature-verified, idempotent) → entitlement and Keys-ledger updates (v1.2, D-22) |
 | POST | `/v1/subscription/cancel` | V0 | One step; no retention flow |
 
 ### 5.10 Error model
@@ -834,6 +835,13 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-070 | Role separation: finance and billing staff cannot access profile, intent or safety data; T&S staff cannot see billing identity; enforced in the ABAC policy engine | BE | P1 | B §9 |
 | FR-071 | Viewing reporter-disclosed intimate evidence needs dual approval and a reason code, and is logged immutably | BE | P1 | B §9 |
 | FR-072 | Community Rules and enforcement prohibit fetishisation of, and harassment based on, protected characteristics; reportable as `protected_trait_harassment` | Both | P1 | B §10 |
+| FR-073 | Public marketing site built for search: server-rendered/static pages, XML sitemaps, canonical tags, hreflang (en-GB, en-IE, later wave-2 locales), schema.org markup (Organization, WebSite, Article, FAQPage, BreadcrumbList), descriptive internal links, a quick-exit button and a neutral-favicon option | FE | P1 | v1.2 |
+| FR-074 | Herald SEO agent: keyword and topic research, content briefs and drafts, on-page optimisation, internal-link graph maintenance, content refresh from performance data, rank tracking, broken-link repair, and link-earning outreach drafts; **every publication and outreach message is approved by a human editor** | BE | P1 | v1.2, D-21 |
+| FR-075 | Herald is isolated from member data: separate cloud account and network, no credentials for any member store, inputs limited to public web data, Search Console and cookieless aggregate site analytics; no member content, profiles or stories (unless separately consented and anonymised) are ever published | BE | P1 | v1.2 |
+| FR-076 | No member surface is indexable: the app origin serves `noindex, nofollow` and robots disallow; there are no public profile URLs; shared links never reveal a member | Both | P1 | v1.2 |
+| FR-077 | White-hat link policy: paid links, PBNs, link exchanges, spam, cloaking, doorway pages, unreviewed scaled AI content and fake reviews are prohibited; any paid or sponsored link carries `rel="sponsored"`; the link profile is audited monthly | BE | P1 | v1.2, D-21 |
+| FR-078 | Payments run through a processor-agnostic `PaymentProvider` layer with **Stripe as primary** (Checkout, Billing, Customer Portal one-step cancel, Radar, Tax) and a high-risk acquirer as the live backup; Stripe receives only the opaque billing reference and payment data; the neutral descriptor never names TRYST | Both | P1 | v1.2, D-22 |
+| FR-079 | Every IntentVector change (member edit or Cartographer re-run) is kept as an append-only, member-viewable version history with audit records | BE | P1 | B §13 |
 
 ### 10.2 Non-functional requirements
 
@@ -858,3 +866,4 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | NFR-17 | B2 provider: ISO/IEC 30107-3 PAD Level 2 certified; face-match FAR ≤ 1:10,000 at FRR ≤ 3%; fairness across demographic groups reported by the provider and audited (D-17) | BE |
 | NFR-18 | Key management: automatic yearly rotation of KMS root keys and HSM peppers (dual-run); every KMS/HSM key use streamed to the SIEM with anomaly alerts | BE |
 | NFR-19 | Assurance: public bug bounty from the end of P1 (closed beta); annual independent privacy audit; quarterly pen test and annual red team (NFR-08) | Both |
+| NFR-20 | Marketing site Core Web Vitals at p75: LCP < 2.5 s, INP < 200 ms, CLS < 0.1; WCAG 2.2 AA; no third-party tracking scripts (cookieless, self-hosted analytics only) | FE |

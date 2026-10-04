@@ -98,6 +98,21 @@ Every agent has a policy file (`policies/<agent>.yaml`), a tool allow-list, a me
 
 ---
 
+### 3.2 Herald — dynamic SEO and growth agent (v1.2)
+
+Herald is a growth agent that sits **outside the member platform** (FR-074, FR-075, FR-077; [D-21](06_Decisions_and_Changes.md#2-decision-log)).
+
+| Aspect | Specification |
+|---|---|
+| Deployment | Separate cloud account and VPC; no network route or credentials to IDENTITY-, PROFILE-, SAFETY- or BAN-DB, the event bus or Feast. Python typed state machines, like the other agents, with their own policy file and eval set |
+| Inputs | Public web and SERP data (licensed SEO data provider), Google Search Console / Bing Webmaster, cookieless aggregate site analytics, the editorial style guide and claims-discipline rules ([01 §15.1](01_Product.md#151-claims-discipline)) |
+| Tools | Keyword and topic clustering; content-brief generation; draft writing through the hosted frontier LLM (no personal data involved, so allowed per §2.1); on-page optimiser (titles, meta, headings, schema.org); internal-link graph builder; rank tracker; broken-link and redirect checker; outreach-draft generator; link-profile auditor |
+| Dynamic loop | Weekly: pull rankings and Search Console data → find decaying or near-miss pages (positions 4–15) → propose refreshes, internal-link changes and new briefs → **editor approves** → publish through the CMS → re-measure. Monthly: link-profile audit and disavow review |
+| Hyperlinks | Maintains the internal-link graph: hub and spoke per topic cluster, no orphans, ≤ 3 clicks from home, descriptive anchors, automatic repair of broken internal links |
+| Backlinks | Finds link-earning opportunities (journalists covering privacy or security, relationship publishers, podcasts, unlinked brand mentions) and drafts pitches. A human sends every message. **It never buys links or automates outreach volume** |
+| Guardrails | Claims discipline and "never cheat better" checks on every draft; a factual-claim checklist with sources; no fabricated statistics, testimonials or reviews; AI-assisted content is human-edited and adds original value (search-engine helpful-content and spam policies); it never targets or mentions real individuals |
+| Outputs | Draft pages and refresh proposals in the CMS (state `awaiting_editor`); rank and visibility dashboards; an outreach queue. **Nothing is published without approval** |
+
 ## 4. Behaviour learning (Mirror)
 
 ### 4.1 Vectors
@@ -506,7 +521,12 @@ Detectors are refreshed quarterly; a static detector is a known future failure.
 
 ## 10. Commerce
 
-- **PSP:** dedicated high-risk acquirer (MCC 7273, Visa IRP Tier 1 registration) plus a **backup MID from day one**. Card data is tokenised and never touches TRYST.
+- **PSP (v1.2):** **Stripe** is the primary processor, subject to Stripe's written approval in P0 ([D-22](06_Decisions_and_Changes.md#2-decision-log)). A dedicated high-risk acquirer (MCC 7273, Visa IRP Tier 1) is integrated as the **backup MID from day one**. Card data is tokenised and never touches TRYST.
+  - **Payment abstraction:** `commerce` talks to a `PaymentProvider` interface (`create_checkout`, `create_subscription`, `cancel`, `refund`, `webhook_verify`, `descriptor`). The Stripe adapter is implemented first and the high-risk acquirer adapter second. Entitlements live in `commerce.entitlement` and never depend on a single processor, so switching is a configuration change with token migration where the processors support it.
+  - **Stripe usage:** Checkout Sessions / Payment Element (web only; native follows D-11); Billing (Products/Prices for TRYST+, ENVOY, DUO, GHOST; one-off Prices for Keys packs and the £9.99 deposit); Customer Portal configured for one-step cancel with no retention flow; Radar rules for card testing and burner patterns (feeding L1); Stripe Tax for UK/IE VAT; refunds through the API to the original method within 14 days (ToS 16.7).
+  - **Statement descriptor:** neutral, truthful prefix with a customer-service URL, set per account and per charge suffix; it never includes "TRYST" (ToS 16.2).
+  - **Webhooks:** `POST /v1/billing/stripe/webhook` (sys), with signature verification, idempotent processing of event IDs, and entitlement updates only from verified events. Stripe metadata carries **only** the opaque `billing_ref`: no profile ID, segment, intent or anything that reveals the nature of the service beyond the product name.
+  - **Data minimisation at Stripe:** the Stripe Customer is created with the billing email chosen by the member (it may differ from the contact handle) and no name unless the card network requires it. Stripe is a processor for payment data only and receives no Article 9 data.
 - **Descriptor:** neutral and truthful, with a customer-service URL; enforced per MID.
 - **Vouchers:** offline codes redeemed through `/v1/vouchers/redeem`, single-use, with rate limits and fraud scoring.
 - **Subscriptions** (TRYST+, ENVOY, DUO, GHOST add-on): state machine with pre-contract information, cooling-off notice (CCR 2013), pre-renewal email (≥ 7 days), one-step cancel and end-of-contract notices. Built to the full DMCC regime now.

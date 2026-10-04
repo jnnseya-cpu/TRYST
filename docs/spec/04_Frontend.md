@@ -29,6 +29,13 @@ Explicit media sent from the web is delivered to native clients as a placeholder
 
 ---
 
+### 2.1 Public marketing site and SEO surface (v1.2)
+
+- **Separate host** from the app (e.g., `www.` marketing vs `app.` product) so search indexing, caching and analytics never touch member surfaces (FR-076).
+- **Next.js SSG/ISR** with a headless CMS fed by Herald drafts after editor approval (FR-073, FR-074). XML sitemaps, canonical tags, hreflang, schema.org, clean URLs and breadcrumb navigation. City pages exist only for launched or waitlisted cities and carry real local content (waitlist status, safety resources), never doorway pages.
+- **Performance and accessibility:** Core Web Vitals and WCAG targets in NFR-20. Brand tokens and the logo per [§7.2](#72-brand-application-v12).
+- **Discretion on a public site:** quick exit, a neutral-favicon option, no third-party trackers or pixels, and cookieless analytics. "Join" leads to the app origin, which is `noindex`.
+
 ## 3. Client stacks
 
 *Source: A §12*

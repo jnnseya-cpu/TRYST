@@ -261,6 +261,8 @@ Seven agents, each an independently deployable service with its own tool surface
 
 Two release-gate functions that are not agents: **Privacy Auditor** (continuous access, retention and model-leakage tests; can block a release) [B] and the **agent eval harness** ([03 §9](03_Backend.md#9-mlops-and-release-gates)).
 
+**Growth agent (outside the member platform):** **Herald**, the dynamic AI SEO agent (v1.2). It researches topics, drafts and optimises content for the public marketing site, manages internal linking, tracks rankings and drafts link-earning outreach. It has **no access to any member data**, and a human editor approves everything before it is published ([03 §3.2](03_Backend.md#32-herald--dynamic-seo-and-growth-agent-v12), [D-21](06_Decisions_and_Changes.md#2-decision-log)).
+
 ---
 
 ## 8. Trust, verification and admission policy
@@ -390,6 +392,12 @@ Treat paid acquisition as a seeding cost, never a growth engine.
 5. **Cities:** London → Manchester → Birmingham → Brighton → Dublin. Not nationwide.
 6. **Channels:** assume Meta and Google reject the ad account. Use podcast host-reads in adjacent verticals, ENM and relationship creators, technology-led PR (agent handshake, breach-proof architecture), and an editorial presence. Never synthetic personas or staff posing as members [B].
 7. **Positioning:** "Discretion is the product." Never "cheat better."
+8. **Organic search as the growth engine (v1.2).** Paid social is closed and paid CAC is fatal ([§10.3](#103-unit-economics-illustrative-replace-with-beta-cohorts)), so search is the main scalable low-CAC channel alongside invitations. The Herald agent runs it:
+    - **Dynamic content:** topic clusters on privacy, discretion, safety (Safe Meet, Clare's Law), ethical non-monogamy and couples, plus genuinely useful launch-city pages (no doorway pages). Pages are refreshed from search-performance data. Source B §11.2's "privacy-led content" channel is delivered here.
+    - **Hyperlinks:** automated internal-link graph across the topic clusters (hub and spoke), with no orphan pages and descriptive anchors.
+    - **Backlinks, earned and never bought:** digital PR on the technology story (agent handshake, breach-proof architecture, transparency reports); open-sourcing the audited crypto core; expert contributions; podcast and creator partnerships marked `rel="sponsored"` where paid; relationship and lifestyle publishers.
+    - **Top ranking:** target top-3 positions for the priority keyword set in each launch market (e.g., "discreet dating app UK", "couples looking for a third", "ethical non-monogamy app"), tracked weekly. Rankings can be targeted and measured, never guaranteed.
+    - **Never:** paid links, private blog networks, link exchanges, comment or forum spam, expired-domain or parasite-SEO abuse, cloaking, doorway pages, unreviewed mass AI content, or fake reviews. Each breaches search-engine spam policies and risks the domain, which is the channel the business depends on.
 
 **Markets:** launch UK + IE · wave 2 NL, BE, DE, SE, DK, ES, PT · wave 3 CA, AU, NZ. The US is out of scope ([E-16](06_Decisions_and_Changes.md#3-errata-fixed-in-v11)). Every market needs its own written legal opinion.
 
@@ -453,6 +461,10 @@ Source B's phase-level exit criteria are folded into the gates above and into th
 
 Secondary (Source B): qualified reciprocal conversations per 1,000 verified weekly active members; exposure incidents; location-inference success in red-team tests; notification leakage; calibration and hard-boundary violations (target 0).
 
+**Source B KPI dimensions** (verbatim in [07](07_Source_B_Founder_Brief.md)) are kept as the secondary dashboard set. Match quality, discretion, authenticity, safety, AI, commercial and reliability are each reported weekly from P1. B's north star (qualified reciprocal conversations per 1,000 verified weekly active members) is the leading indicator for QCAM. v1.2 adds emergency-lock latency (FR-064; target < 5 s p95) and login factor failures (FR-057/058) to reliability.
+
+Growth/SEO (v1.2): organic sign-ups and organic CAC; share of priority keywords ranking top 3 and top 10; quality referring domains earned; marketing-site Core Web Vitals pass rate (NFR-20); spam-policy incidents (target 0).
+
 ### 13.2 No-go conditions
 
 Do not launch or scale if any of these hold. Each is backed by an automated or audited test ([03 §9](03_Backend.md#9-mlops-and-release-gates)). [B §14, A]
@@ -485,6 +497,7 @@ Do not launch or scale if any of these hold. Each is backed by an automated or a
 | CAC model unviable | High | §10.3 thresholds; invite loop; weekly tracking |
 | Reputational contagion to parent group | Medium | Ring-fenced SPV, brand, counsel, cap table and PR |
 | Feeld or Match Group ships an agent layer | Medium | Speed to P2; the moat is discretion architecture plus the aftercare dataset |
+| Search penalty or deindexing of the marketing domain | Medium | White-hat only (D-21); human editorial approval; no bought links; monthly link-profile audit; marketing site on its own host, separate from the app |
 | Two-factor biometric login hurts conversion or excludes disabled members | Medium | Fast provider flow (NFR-16); 30-day sessions; accessible alternative (D-17); measure login drop-off weekly |
 | Guardian false positives on consensual kink | High | Trajectory-not-vocabulary design; matched-pair ship gate ([03 §7](03_Backend.md#7-guardian--safety-models-m6am6e)) |
 
@@ -528,7 +541,8 @@ Native store builds are therefore **sanitised**: no nudity or explicit copy, mat
 
 ### 14.4 Payments
 
-- MCC 7273, high-risk; Visa Integrity Risk Program Tier 1 registration; dedicated high-risk acquirer (3–7%); Stripe, Square and PayPal are not usable.
+- MCC 7273, high-risk; Visa Integrity Risk Program Tier 1 registration.
+- **Stripe is the chosen payment processor (founder decision, v1.2; [D-22](06_Decisions_and_Changes.md#2-decision-log))**: Stripe Checkout / Payment Element on the web, Stripe Billing for subscriptions, the Customer Portal for one-step cancellation, Radar for fraud screening, and Stripe Tax for VAT. **Condition:** Source A states that Stripe, Square and PayPal prohibit adult content, and TRYST's web surface carries explicit media behind V2. Before any build commitment, P0 must obtain **Stripe's written approval of TRYST's exact business model** (affair-positioned dating, couples, explicit media on web). A dedicated high-risk acquirer (3–7%) is contracted in parallel as the backup MID from day one, and becomes primary if Stripe declines or later restricts the account.
 - **Spousal chargebacks** are the category-specific risk. Mitigations: neutral but truthful descriptor with a customer-service URL, offline voucher/gift-code path, pre-renewal email, one-click cancel, Ethoca/Verifi alerts, backup MID, correct MCC.
 - **DMCC Act 2024 subscription regime:** commencement has moved repeatedly; build to the full regime now.
 
