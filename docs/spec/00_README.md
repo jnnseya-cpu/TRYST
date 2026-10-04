@@ -64,3 +64,20 @@ IDs are never reused or renumbered. A retired requirement keeps its ID with stat
 3. **Open decisions** (`D-nn`, status *Open*) carry a stated default. Engineering may build against the default, and the owner must close the decision before the phase gate shown.
 4. **Consistency check.** `python3 scripts/check_spec.py` checks that every `FR`/`NFR`/`D`/`E` ID referenced anywhere is defined exactly once, every FR has an owner, and relative links resolve. It must pass before merge.
 5. **Version bumps:** editorial → 1.1.x; new or changed requirement → 1.2; change to a principle in 01 §4 → 2.0 (requires sign-off from the Group CEO).
+
+## 5. Source register (revalidate before launch)
+
+Policies, prices and legal requirements must be revalidated before launch, and again at each phase gate.
+
+- **Source B's register** (accessed 17 Sep 2026) is reproduced verbatim in [07 §3](07_Source_B_Founder_Brief.md#3-source-b--full-text-verbatim): Ashley Madison, Gleeden, Victoria Milan, the FTC Ashley Madison settlement, ICO special-category guidance, UK GDPR Art. 9, Apple App Review Guidelines, Google Play inappropriate-content policy, NIST AI RMF and OWASP MAS.
+- **Source A's citations** (Ofcom OSA and dating guidance, CRA 2015, CCR 2013, DMCC Act 2024, DPA 2018, card-scheme rules) are in the [consolidated PDF](../source/TRYST_Spec_and_ToS_Consolidated_2026-10-04.pdf).
+
+**Added for v1.2 — not yet checked, verify in P0:**
+
+| Topic | Source to check | Why |
+|---|---|---|
+| Stripe acceptance | https://stripe.com/legal/restricted-businesses and a written confirmation from Stripe | D-22: Stripe as primary processor (could not be fetched from the build environment) |
+| Search-engine spam and AI-content policies | https://developers.google.com/search/docs/essentials/spam-policies | D-21: Herald link and content rules |
+| Passkeys / WebAuthn | https://www.w3.org/TR/webauthn-3/ and https://fidoalliance.org/passkeys/ | D-16: login factors |
+| Liveness PAD certification | ISO/IEC 30107-3; the provider's iBeta (or equivalent) Level 2 report | NFR-17 |
+| Biometric data | ICO biometric data guidance | D-17, D-18, ToS Q14 |

@@ -31,7 +31,7 @@ This appendix reproduces **Source B** — *TRYST AI Discreet Relationship Platfo
 | 13. MVP backlog and acceptance | [03 §12](03_Backend.md#12-backend-backlog-by-phase), [04 §10](04_Frontend.md#10-frontend-backlog-by-phase) | |
 | 14. KPIs, governance, no-go | [01 §13](01_Product.md#13-kpis-no-go-conditions-and-risk-register) (G-NG-1 to G-NG-7 come from B) | |
 | 15. Source register | §3 below (verbatim) | Revalidate before launch |
-| Final directive | [01 §4](01_Product.md#4-operating-stance-and-principles), [01 §12](01_Product.md#12-roadmap-team-budget-and-phase-gates) | |
+| Final directive | [01 §4](01_Product.md#4-operating-stance-and-principles), [01 §12](01_Product.md#12-roadmap-team-budget-and-phase-gates), no-go list [01 §13.2](01_Product.md#132-no-go-conditions) | Market clarity vs store wording: [D-23](06_Decisions_and_Changes.md#2-decision-log). Readiness = gates G-P0–G-P4 and G-NG-1–10 |
 
 ## 1.1 Requirement-ID crosswalk (Source B FR → catalogue FR)
 
