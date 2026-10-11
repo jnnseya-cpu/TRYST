@@ -316,6 +316,12 @@ In the UK you cannot lawfully buy sex-offender or criminal-record screening for 
 - **Emergency override:** safety beats discretion (P7).
 - **Victim-support routing** after an incident.
 - **24/7 T&S rota** from P3, with published SLAs.
+- **Door check** (v1.3, FR-099): on arrival both phones show the other's verified main photo and the same three words; if the person doesn't match, leave.
+- **Duress PIN** (v1.3, FR-100): a check-in PIN that looks normal on screen but silently raises the alarm.
+- **TRYST safety line** (v1.3, FR-100, [D-42](06_Decisions_and_Changes.md#2-decision-log)): opt-in second step after the trusted contact; the 24/7 team receives location for that meet only.
+- **Video first** (v1.3, FR-103): an in-app video call is offered before every first meet and can be made a hard limit; a first meet at a private address triggers an on-device warning.
+
+The full defence against fake profiles and criminal use (grooming, trafficking, fraud, extortion, drugs) is in [03 §7.7](03_Backend.md#77-fake-profiles-and-criminal-misuse-v13).
 
 ---
 

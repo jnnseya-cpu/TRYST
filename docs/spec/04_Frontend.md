@@ -167,6 +167,9 @@ Location never leaves the device at better than geohash-5, except in the Panic f
 - **Panic** (FR-022): a prominent, distinct control in threads and the meet screen. It confirms with a hold, sends live location + preserved evidence through `POST /v1/safety/panic`, and offers a one-tap call to 999. It works even when notifications are masked or the app is in decoy mode (reachable through a gesture from the decoy).
 - **Share My Plan:** pick a trusted contact (stored locally only). It sends a neutral, unbranded, auto-deleting message with venue and time window through the device's share sheet or an encrypted link. The wording is chosen for someone who cannot tell their partner where they are.
 - **Check-in timer:** a missed check-in triggers silent escalation to the trusted contact.
+- **Check-in PINs** (FR-100): a check-in PIN and a different duress PIN; both show "Thanks, checked in." A meet can't start until a trusted contact or the TRYST safety line is set.
+- **Door check** (FR-099): an "I'm here" button shows the other member's verified main photo and three shared words, with "This isn't them, I'm leaving" one tap away (it starts a check-in and offers Panic).
+- **Video first** (FR-103): an in-app video call is offered before every first meet; members can make it a hard limit. A private-address venue for a first meet shows an on-device warning. Panic shows the Silent Solution (dial 999, then press 55).
 - **Report / block:** one tap on every profile, Brief, thread and media item. The reporter is never revealed.
 
 ### 7.1 Copy rules (claims discipline, P6)

@@ -460,6 +460,43 @@ Fairness slices: dialect/register (AAVE, MLE, regional), non-native English, gen
 - reads message content on the server;
 - flags on vocabulary alone.
 
+### 7.7 Fake profiles and criminal misuse (v1.3)
+
+*Founder request (11 Oct 2026): block fake profiles, keep members safe when meeting strangers, and keep criminals, groomers and illegal activity off TRYST.* No platform can guarantee safety or screen out every criminal: most people who harm others have no record, and TRYST cannot see anyone's criminal record (ToS 5.2). The design therefore makes fake identities expensive, catches **patterns of behaviour**, and gives members strong tools at the moment of risk. Every layer below is either already specified (marked) or added in v1.3.
+
+**A. Fake and duplicate profiles**
+
+| Layer | Control | Status |
+|---|---|---|
+| Real person | Liveness with randomised challenge; deepfake detection on selfie and video | Specified (§8) |
+| Real adult with a real ID | ID document with NFC chip read where available, face matched to the document (FR-094) | v1.3 |
+| No camera injection | V2 capture only in the native app with platform attestation, or through a provider certified for injection-attack detection (CEN/TS 18099); on the web, V2 hands off to the phone by QR ([D-44](06_Decisions_and_Changes.md#2-decision-log), FR-101) | v1.3 |
+| One person, one account | ID-document anchor indexed across active accounts: a second account on the same document is refused; lost access goes through recovery, not a new account ([D-41](06_Decisions_and_Changes.md#2-decision-log), FR-097; `backend/internal/admission/unique.go`) | **Built** |
+| No banned returnees | Ban anchors on document, device and card (§8 L2) | Built |
+| Real photos only | Face-matched main photo; AI, borrowed and third-party images refused (FR-093) | Built (rules) |
+| Account not sold or lent | Every mobile sign-in repeats the face match (B2) | Built |
+| Cost of faking | £9.99 deposit; 3 free intents a week; Keys per intent | Specified |
+| Bots and farms | Sign-up bursts, shared device or card, referral-chain anomalies, behaviour cadence (§8) | Specified |
+
+**B. Control networks: trafficking, pimping, scam farms.** One controller running several profiles is the common signature. A card may pay for at most two accounts (a member and their verified partner); a third is refused, and a card or phone shared with a non-partner is sent to review (`unique.go`). Further signals for review, never automatic bans: the same profile text or photos style across accounts, one account always answering for another, logistics always arranged by a third party, frequent city hopping. THIRD and QUAD use couple verification (FR-095), so a "couple" cannot be a cover for one person presenting another.
+
+**C. Profile text.** Names, bios and couple descriptions are screened before anyone sees them (FR-098; `backend/internal/profile/text.go`): contact details and payment or crypto details are refused (they push people off-platform, where scams and coercion happen); commercial sex, drug supply and **any reference to a minor or sexualisation of children** are refused and sent to Trust & Safety within 15 minutes. The same test vectors drive the on-device Guardian for messages.
+
+**D. In messages (on device; the server never reads them).** New Guardian models alongside M6a–e (FR-102):
+
+| Model | Detects | Action |
+|---|---|---|
+| M6f Romance and financial fraud | Requests for money, gift cards or crypto; investment pitches; sob-story escalation; moving to another app early | Warning banner to the recipient; payment links stripped; pattern across many recipients → account review (romance-fraud row, §7.3) |
+| M6g Child safety | Interest in a member's children, requests for photos of children, attempts to arrange access to children, age-play involving minors | Immediate freeze, human within 15 min, report to the police and NCA where required (suspected-minor row, §7.3) |
+| M6h Exposure extortion | Threats to tell a partner, family or employer; demands linked to secrecy | Thread freeze, evidence preserved with the victim's consent, victim support; permanent removal on confirmation |
+| On-device image check | An image that appears to contain a child is **never sent**; known CSAM hashes are blocked and reported | Blocked on the sender's device |
+
+**E. Meeting strangers.** Safe Meet, Share My Plan, check-ins and Panic are specified (01 §8.3). v1.3 adds: in-app video call before a first meet, which a member can make a hard limit; an on-device warning when a first meet is at a private address (the venue is never sent to TRYST); the **door check** (both phones show the other's verified photo and the same three words, FR-099); a **duress PIN** that looks like a normal check-in but silently raises the alarm; escalation to the trusted contact, then, if the member opted in, to TRYST's 24/7 safety team with location for that meet only (FR-100; `backend/internal/meet`); Panic guidance including the UK Silent Solution (dial 999, then press 55 if you cannot speak).
+
+**F. After a meet.** The private aftercare prompt asks whether the member felt safe. Two "felt unsafe" answers about the same member from different people within 90 days send that member to review; one answer starts a quiet watch. Never shown to the counterparty, never a public rating (FR-104).
+
+**G. Working with the authorities** (FR-105). A lawful-request process with legal review; emergency disclosure when life is at risk, approved by the DPO and Head of T&S; preservation on request; mandatory reporting of child sexual abuse material to the NCA and IWF; counts published in the transparency report. Court orders (SHPO, restraining or non-molestation) and police notifications are grounds for immediate permanent removal (01 §8.2).
+
 ---
 
 ## 8. Admission control (L1–L5)

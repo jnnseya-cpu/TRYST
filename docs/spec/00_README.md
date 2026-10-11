@@ -50,7 +50,7 @@ Both A and B call themselves "v1.0", so v1.1 refers to them as **Source A** and 
 | `S1`–`S6` | Member segments | 02 §2.2 |
 | `V0`–`V3`, `VC` | Verification tiers | 02 §3 |
 | `A1`–`A8` | Threat-model adversaries | 03 §6.1 |
-| `M1`–`M9`, `M6a`–`M6e`, `M7b` | Models | 03 §4.3 |
+| `M1`–`M9`, `M6a`–`M6h`, `M7b` | Models | 03 §4.3, §7.7 |
 | `L1`–`L5` | Admission-control layers | 03 §8 |
 | `FR-nnn`, `NFR-nn` | Functional and non-functional requirements | 02 §10 |
 | `D-nn` | Decisions | 06 §2 |
