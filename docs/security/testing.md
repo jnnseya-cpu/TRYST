@@ -39,6 +39,8 @@ first run on 11 October 2026, and what is still needed before launch.
 
 * An independent penetration test by a CREST-accredited firm, covering the web app, API,
   staff console host, Stripe and vendor integrations, and the native apps when they exist.
+  Scope and rules of engagement: [pentest-scope.md](pentest-scope.md); it runs on staging
+  ([../runbooks/staging.md](../runbooks/staging.md)).
 * A review of the cryptography (message envelopes, crypto-erasure, deletion proofs) by a
   specialist.
 * Cloud configuration review of the deployed AWS account (the Terraform is validated, not

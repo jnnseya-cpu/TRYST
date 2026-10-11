@@ -76,13 +76,13 @@ resource "aws_ecs_task_definition" "api" {
     image        = var.api_image
     essential    = true
     portMappings = [{ containerPort = 8081 }, { containerPort = 9090 }]
-    environment = [
-      { name = "TRYST_ENV", value = "prod" },
+    environment = concat([
+      { name = "TRYST_ENV", value = "prod" }, # staging runs with every production guard too
       { name = "METRICS_ADDR", value = ":9090" },
       { name = "TRUSTED_PROXIES", value = aws_vpc.main.cidr_block },
       { name = "INTERNAL_ADDR", value = ":8091" },
       { name = "SAFETY_INTERNAL_URL", value = "http://safety.tryst.internal:8092" },
-    ]
+    ], [for k, v in var.api_config : { name = k, value = v }])
     secrets                = [for k, s in aws_secretsmanager_secret.s : { name = k, valueFrom = s.arn }]
     readonlyRootFilesystem = true
     stopTimeout            = 30

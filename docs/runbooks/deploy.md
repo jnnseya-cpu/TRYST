@@ -18,6 +18,13 @@ are present (see the header of `backend/cmd/identity-svc/main.go`):
 | `POSTMARK_SERVER_TOKEN` and/or `TWILIO_*` | Sign-up codes must be deliverable |
 | `ARC_URL`, `ARC_SECRET` (+ a message channel) | Meet safety can't run without the safety line (D-48) |
 | `SAFETY_INTERNAL_URL`, `INTERNAL_SECRET_SAFETY`, `INTERNAL_SECRET_PLATFORM` | The API reaches the standalone safety service (D-59) |
+| `ASSURANCE_URL`, `ASSURANCE_SECRET`, `ASSURANCE_CALLBACK_SECRET` (≥ 32 chars) | Nobody can be verified without the identity provider (D-61) |
+| `ANCHOR_PEPPER` (hex, ≥ 32 bytes) | One-way document codes: one account per ID, bans, recovery (D-61, D-62) |
+
+Non-secret settings (`RP_ID`, `RP_ORIGINS`, `PUBLIC_URL`, `SALE_ITEMS`, `ASSURANCE_CERTS`, the
+vendor URLs and `STRIPE_PRICE_<KEY>`) go in the Terraform variable `api_config`; it refuses
+anything named like a secret. `ASSURANCE_CERTS` without a current certificate for web
+capture keeps every check refused (G-NG-4). Staging: [staging.md](staging.md).
 
 The safety service (`--entrypoint /safety-svc`, same image) refuses to start without
 `DATABASE_URL_SAFETY`, `PLATFORM_INTERNAL_URL`, both `INTERNAL_SECRET_*` (the same values as
