@@ -446,7 +446,7 @@ func TestProdConfigGuards(t *testing.T) {
 	if _, err := New(Config{RPID: "x.test", RPDisplayName: "x", RPOrigins: []string{"https://x.test"}, Env: "prod", ContactPepper: []byte("short")}, NewStore()); err == nil {
 		t.Fatal("a short pepper must be refused in prod")
 	}
-	s, err := New(Config{RPID: "x.test", RPDisplayName: "x", RPOrigins: []string{"https://x.test"}, Env: "prod", ContactPepper: bytes.Repeat([]byte{1}, 32)}, NewStore())
+	s, err := New(Config{RPID: "x.test", RPDisplayName: "x", RPOrigins: []string{"https://x.test"}, Env: "prod", ContactPepper: bytes.Repeat([]byte{1}, 32), AnchorPepper: bytes.Repeat([]byte{2}, 32)}, NewStore())
 	if err != nil {
 		t.Fatal(err)
 	}

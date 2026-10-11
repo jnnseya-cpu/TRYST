@@ -62,6 +62,16 @@ type Config struct {
 	// DevBirthYM stands in for the age-assurance provider in dev only: new accounts get this
 	// verified birth year-month so profile screens can show an age. Refused in prod.
 	DevBirthYM string
+	// Assurance runs the V1/V2 checks (D-61). Nil: verification unavailable (503).
+	Assurance AssuranceProvider
+	// AssuranceRoute, if set, refuses to start a check when no certified provider can run
+	// it (internal/assurance; G-NG-4).
+	AssuranceRoute     func() error
+	AssuranceReturnURL string
+	// AnchorPepper keys the one-way document codes (HSM-held in production; ≥ 32 bytes).
+	AnchorPepper []byte
+	// Consent appends to the member's consent ledger (consents service). May be nil.
+	Consent func(account, purpose, version string)
 }
 
 // Server is the identity HTTP service.
@@ -71,6 +81,7 @@ type Server struct {
 	store *Store
 	mux   *http.ServeMux
 	rl    map[string][]time.Time
+	as    *assuranceState
 }
 
 // New validates configuration. It refuses dev-only shortcuts outside the dev environment.
@@ -90,6 +101,18 @@ func New(cfg Config, store *Store) (*Server, error) {
 	if cfg.Env != "dev" && len(cfg.ContactPepper) < 32 {
 		return nil, errors.New("ContactPepper must be at least 32 bytes in prod")
 	}
+	if _, isDev := cfg.Assurance.(DevAssurance); isDev && cfg.Env != "dev" {
+		return nil, errors.New("DevAssurance is forbidden outside the dev environment")
+	}
+	if len(cfg.AnchorPepper) == 0 {
+		if cfg.Env != "dev" {
+			return nil, errors.New("AnchorPepper is required in prod")
+		}
+		cfg.AnchorPepper = []byte("dev-only-anchor-pepper")
+	}
+	if cfg.Env != "dev" && len(cfg.AnchorPepper) < 32 {
+		return nil, errors.New("AnchorPepper must be at least 32 bytes in prod")
+	}
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
@@ -103,6 +126,9 @@ func New(cfg Config, store *Store) (*Server, error) {
 	s := &Server{cfg: cfg, wa: wa, store: store, mux: http.NewServeMux(), rl: map[string][]time.Time{}}
 	if err := s.load(context.Background()); err != nil {
 		return nil, fmt.Errorf("loading identities: %w", err)
+	}
+	if err := s.loadAssurance(context.Background()); err != nil {
+		return nil, fmt.Errorf("loading assurance: %w", err)
 	}
 	s.routes()
 	return s, nil
@@ -230,6 +256,11 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /v1/me/security", s.handleSecurity)
 	m.HandleFunc("POST /v1/auth/logout", s.handleLogout)
 	m.HandleFunc("POST /v1/burn", s.handleBurn)
+	m.HandleFunc("POST /v1/assurance/session", s.handleAssuranceStart)
+	m.HandleFunc("POST /v1/assurance/callback", s.handleAssuranceCallback)
+	m.HandleFunc("GET /v1/assurance/status", s.handleAssuranceStatus)
+	m.HandleFunc("POST /v1/assurance/dev/complete", s.handleDevComplete)
+	m.HandleFunc("POST /v1/attestations/conduct", s.handleConduct)
 }
 
 // ---------------------------------------------------------------- helpers
@@ -383,7 +414,7 @@ func (s *Server) Authenticate(r *http.Request) (Account, bool) {
 		return Account{}, false
 	}
 	id, ok := s.store.identities[sess.IdentityID] // read-only: not marked for saving
-	if !ok {
+	if !ok || id.Refused != "" {
 		return Account{}, false
 	}
 	return Account{ID: id.ID(), Tier: id.Tier, BirthYM: id.BirthYM}, true
@@ -756,6 +787,10 @@ func (s *Server) finish(w http.ResponseWriter, la *LoginAttempt) {
 	id := s.store.get(la.IdentityID)
 	if !la.Attempt.Complete() {
 		genericLoginFailure(w)
+		return
+	}
+	if id.Refused != "" {
+		fail(w, 403, "account_refused", "This account can't be used. TRYST is for adults only, and each person may hold one account.")
 		return
 	}
 	// Tier is not raised here: a full session proves the account holder, not age. V1/V2 come

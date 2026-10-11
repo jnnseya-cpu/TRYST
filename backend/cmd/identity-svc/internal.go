@@ -67,6 +67,8 @@ func internalAPI(srv *identity.Server, prof *profilesvc.Service, notifier *notif
 			return
 		}
 		prof.SetStanding(r.PathValue("id"), in.Standing)
+		// A permanent removal bans the person's ID document; an overturned one lifts it.
+		srv.BanMember(r.Context(), r.PathValue("id"), in.Standing == "permanent")
 		w.WriteHeader(204)
 	})
 	m.HandleFunc("POST /internal/v1/notices", func(w http.ResponseWriter, r *http.Request) {

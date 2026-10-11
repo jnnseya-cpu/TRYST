@@ -5,7 +5,7 @@ export const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)
 export const fx = (n: string) => pathJoin(__dirname, "fixtures", n);
 
 /** A signed-in member with a complete profile (dev services). */
-export async function member(browser: Browser, name: string, district: string, photo: string): Promise<Page> {
+export async function member(browser: Browser, name: string, district: string, photo: string, opts: { verify?: boolean } = {}): Promise<Page> {
   const ctx = await browser.newContext({ userAgent: IPHONE_UA, viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
   const cdp = await ctx.newCDPSession(page);
@@ -31,7 +31,24 @@ export async function member(browser: Browser, name: string, district: string, p
   await page.getByLabel("Name shown to members").blur();
   await page.getByLabel("Area").selectOption({ label: district });
   await expect(page.getByTestId("ready")).toBeVisible();
+  if (opts.verify !== false) {
+    await verify(page, `DOC-${name}-${Date.now()}`);
+    await expect(page.getByTestId("verified")).toBeVisible();
+  }
   return page;
+}
+
+/** Verification through the development stand-in provider: face check, declaration, ID. */
+export async function verify(page: Page, doc: string, birth = "1990-05") {
+  await page.goto("/verify");
+  await page.getByRole("button", { name: "Start face check" }).click();
+  await page.getByRole("button", { name: "Pass" }).click();
+  await page.getByLabel("I make this declaration").check();
+  await page.getByRole("button", { name: "Confirm declaration" }).click();
+  await page.getByRole("button", { name: "Start ID check" }).click();
+  await page.getByLabel(/Birth month/).fill(birth);
+  await page.getByLabel("Document number").fill(doc);
+  await page.getByRole("button", { name: "Pass" }).click();
 }
 
 /** Makes two members a mutual Tonight match and returns the thread URL. */

@@ -127,9 +127,6 @@ func NewWithStore(auth Authenticator, mod Moderator, env string, st store.Store,
 	if err := s.loadStanding(context.Background()); err != nil {
 		return nil, err
 	}
-	if env == "dev" {
-		s.MinDiscoveryTier = "V0" // dev accounts have no real ID check; production requires V2
-	}
 	m := s.mux
 	m.HandleFunc("GET /v1/profile", s.handleGet)
 	m.HandleFunc("PUT /v1/profile", s.handlePut)

@@ -102,6 +102,7 @@ export default function Tonight() {
       {!view.ready || !view.tier_ok ? (
         <section className="pf-section">
           <p>{!view.tier_ok ? "Finish your ID check to use Tonight." : "Finish your profile first: a main photo, a name and your area."}</p>
+          {!view.tier_ok && <a className="button inline" href="/verify">Verify now</a>}
           <a className="button inline" href="/profile">Your profile</a>
         </section>
       ) : !view.on ? (

@@ -1,5 +1,6 @@
 import { test, expect, type Browser, type Page } from "@playwright/test";
 import { join as pathJoin } from "node:path";
+import { verify } from "./helpers";
 
 // Profile and photo upload end to end: real Chromium, the real Go services in dev mode
 // (moderation vendors simulated; provenance checks and metadata stripping are real).
@@ -62,6 +63,10 @@ test("profile: upload photos, refuse generated images, set details, preview the 
   await page.getByRole("link", { name: "Preview your card" }).click();
   const card = page.getByTestId("card");
   await expect(card).toContainText("Velvet");
+  // Until the ID check is done, no age is shown and nobody else can see the card.
+  await expect(card).toContainText("ID check not finished yet");
+  await verify(page, `PROFILE-${Date.now()}`, "1991-02");
+  await page.goto("/profile/card");
   await expect(card).toContainText(/, \d{2}/); // age from the verified ID
   await expect(card).toContainText("Islington, London · Nearby");
   await expect(card).toContainText("4 photos");

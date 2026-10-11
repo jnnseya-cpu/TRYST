@@ -60,6 +60,9 @@ export default function Account() {
         <p>Signed in with two checks ({me.surface === "desktop" ? "computer" : "phone"}).</p>
         <p className="note">Passkeys registered: {me.passkeys} · Verification: {me.tier}</p>
       </section>
+      {me.tier !== "V2" && me.tier !== "V3" && (
+        <a className="button" href="/verify" style={{ marginBottom: "0.8rem" }} data-testid="verify-link">Verify your account</a>
+      )}
       <Standing />
       <a className="button ghost" href="/notices" style={{ marginBottom: "0.8rem" }} data-testid="notices-link">Notices{unread > 0 ? ` (${unread})` : ""}</a>
       <a className="button" href="/tonight" style={{ marginBottom: "0.8rem" }}>Free tonight?</a>

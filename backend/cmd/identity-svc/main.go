@@ -43,6 +43,12 @@
 //	METRICS_ADDR    internal listener for /metrics (default 127.0.0.1:9090); never public
 //	SALE_ITEMS      catalogue keys on sale, comma-separated, or "all" (default: TRYST+
 //	                monthly and annual only; D-60)
+//	ASSURANCE_URL, ASSURANCE_API_KEY, ASSURANCE_SECRET, ASSURANCE_CALLBACK_SECRET  the
+//	                identity/age provider (required in prod; D-61)
+//	ASSURANCE_CERTS JSON certification records, e.g. [{"name":"idv","certs":[{"scheme":
+//	                "pad_iso30107_3_level2","lab":"iBeta","evidence":"ref","valid_until":
+//	                "2027-06-30T00:00:00Z"}]}]; checks are refused while none is valid (G-NG-4)
+//	ANCHOR_PEPPER   hex ≥ 32 bytes: keys one-way document codes (HSM in production)
 //	PUBLIC_URL      member site origin for checkout return links (default first RP origin)
 package main
 
@@ -51,6 +57,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -60,6 +68,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jnnseya-cpu/tryst/backend/internal/assurance"
 	"github.com/jnnseya-cpu/tryst/backend/internal/commercesvc"
 	"github.com/jnnseya-cpu/tryst/backend/internal/dsr"
 	"github.com/jnnseya-cpu/tryst/backend/internal/gate"
@@ -192,7 +201,7 @@ func build() *app {
 	}
 	if mode == "dev" {
 		cfg.Liveness = identity.DevLiveness{}
-		cfg.DevBirthYM = env("DEV_BIRTH_YM", "1988-04") // stands in for the ID check's birth year-month
+		cfg.DevBirthYM = os.Getenv("DEV_BIRTH_YM") // tests only; dev members verify through the stand-in provider
 		cfg.Sender = logSender{}
 		if cfg.ContactPepper == nil {
 			cfg.ContactPepper = []byte("dev-only-pepper")
@@ -208,6 +217,28 @@ func build() *app {
 	idGateway := gateway("LIVENESS")
 	if idGateway != nil {
 		cfg.Liveness = &vendors.Liveness{G: idGateway}
+	}
+	// Identity and age assurance (V1/V2, D-61).
+	if ag := gateway("ASSURANCE"); ag != nil {
+		sec := os.Getenv("ASSURANCE_CALLBACK_SECRET")
+		if len(sec) < 32 {
+			log.Fatal("ASSURANCE_CALLBACK_SECRET (≥ 32 characters) is required with ASSURANCE_URL")
+		}
+		cfg.Assurance = &vendors.Assurance{G: ag, CallbackSecret: sec, ProviderName: env("ASSURANCE_PROVIDER", "assurance")}
+		cfg.AssuranceRoute = assuranceRoute()
+	} else if mode == "dev" {
+		cfg.Assurance = identity.DevAssurance{}
+		log.Printf("DEV MODE: identity and age checks use a local stand-in (/verify/dev). Never use in production.")
+	} else {
+		log.Fatal("ASSURANCE_URL is required in production: nobody can be verified without the identity provider (D-61)")
+	}
+	cfg.AssuranceReturnURL = env("PUBLIC_URL", cfg.RPOrigins[0]) + "/verify"
+	if v := os.Getenv("ANCHOR_PEPPER"); v != "" {
+		b, err := hex.DecodeString(v)
+		if err != nil || len(b) < 32 {
+			log.Fatal("ANCHOR_PEPPER must be hex, ≥ 32 bytes")
+		}
+		cfg.AnchorPepper = b
 	}
 	ctx := context.Background()
 	idStore := openStore(ctx, mode, "DATABASE_URL_IDENTITY")
@@ -556,4 +587,45 @@ func saleItems() map[string]bool {
 		out[strings.TrimSpace(k)] = true
 	}
 	return out
+}
+
+// assuranceRoute refuses identity checks unless a provider holds a valid presentation-attack
+// certificate, and (until the native apps exist) an injection-attack one too, since web
+// capture needs it (internal/assurance; D-44, D-49).
+func assuranceRoute() func() error {
+	var recs []struct {
+		Name  string `json:"name"`
+		Certs []struct {
+			Scheme     string    `json:"scheme"`
+			Lab        string    `json:"lab"`
+			Evidence   string    `json:"evidence"`
+			ValidUntil time.Time `json:"valid_until"`
+		} `json:"certs"`
+	}
+	if v := os.Getenv("ASSURANCE_CERTS"); v != "" {
+		if err := json.Unmarshal([]byte(v), &recs); err != nil {
+			log.Fatal("ASSURANCE_CERTS: ", err)
+		}
+	}
+	var providers []assurance.Provider
+	for _, r := range recs {
+		p := assurance.Provider{Name: r.Name, Up: true}
+		for _, c := range r.Certs {
+			p.Certs = append(p.Certs, assurance.Cert{Scheme: assurance.Scheme(c.Scheme), Lab: c.Lab, Evidence: c.Evidence, ValidUntil: c.ValidUntil})
+		}
+		providers = append(providers, p)
+	}
+	if _, err := assurance.Choose(providers, assurance.Web, time.Now()); err != nil {
+		log.Printf("WARNING: no certified identity provider on record (ASSURANCE_CERTS): verification is refused until one is")
+	}
+	return func() error {
+		route, err := assurance.Choose(providers, assurance.Web, time.Now())
+		if err != nil {
+			return err
+		}
+		if route.HandOff {
+			return errors.New("web capture needs an injection-attack certificate until the native apps ship")
+		}
+		return nil
+	}
 }

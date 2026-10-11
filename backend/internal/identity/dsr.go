@@ -2,6 +2,9 @@ package identity
 
 import (
 	"context"
+	"encoding/hex"
+
+	"github.com/jnnseya-cpu/tryst/backend/internal/admission"
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/dsr"
 )
@@ -42,6 +45,9 @@ func (s *Server) Erase(ctx context.Context, account string) (dsr.Receipt, error)
 	rc := dsr.Receipt{Part: "identity"}
 	s.store.mu.Lock()
 	if i, ok := s.store.identities[account]; ok {
+		if b, err := hex.DecodeString(i.AnchorDoc); err == nil && len(b) > 0 {
+			s.as.index.Remove(account, admission.Anchors{Doc: b}) // a ban, if any, stays (ToS 15.3)
+		}
 		delete(s.store.byContact, i.ContactHash)
 		delete(s.store.identities, account)
 		s.store.dirty[account] = true // flush deletes it

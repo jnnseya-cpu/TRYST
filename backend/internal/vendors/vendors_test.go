@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
 	"github.com/jnnseya-cpu/tryst/backend/internal/meet"
 	"github.com/jnnseya-cpu/tryst/backend/internal/profile"
 )
@@ -205,3 +206,36 @@ func TestARCAlertingSendsOnlyPinnedFields(t *testing.T) {
 type messengerFunc func(ctx context.Context, to, text string) error
 
 func (f messengerFunc) Message(ctx context.Context, to, text string) error { return f(ctx, to, text) }
+
+func TestAssuranceAdapter(t *testing.T) {
+	v := newVendor(t)
+	v.answers["/assurance/sessions"] = `{"url":"https://idv.example/s/abc"}`
+	now := time.Unix(1_800_000_000, 0)
+	a := &Assurance{G: v.gw(), CallbackSecret: "cb-secret", Now: func() time.Time { return now }}
+	u, err := a.Start(context.Background(), identity.AssuranceSession{ID: "as_1", Kind: "age", Account: "acc-1"}, "https://app.example/verify")
+	if err != nil || u != "https://idv.example/s/abc" {
+		t.Fatalf("start: %q %v", u, err)
+	}
+	if b := v.bodies["/assurance/sessions"]; b["reference"] != "acc-1" || b["kind"] != "age" || len(b) != 4 {
+		t.Fatalf("start body: %v", b)
+	}
+	body := []byte(`{"session_id":"as_1","result":"pass"}`)
+	req := func(ts int64, sig string) *http.Request {
+		r := httptest.NewRequest("POST", "/v1/assurance/callback", nil)
+		r.Header.Set("X-Provider-Timestamp", strconv.FormatInt(ts, 10))
+		r.Header.Set("X-Provider-Signature", sig)
+		return r
+	}
+	if err := a.VerifyCallback(req(now.Unix(), Sign("cb-secret", now.Unix(), body)), body); err != nil {
+		t.Fatalf("genuine callback refused: %v", err)
+	}
+	for name, r := range map[string]*http.Request{
+		"wrong secret": req(now.Unix(), Sign("other", now.Unix(), body)),
+		"stale":        req(now.Add(-10*time.Minute).Unix(), Sign("cb-secret", now.Add(-10*time.Minute).Unix(), body)),
+		"other body":   req(now.Unix(), Sign("cb-secret", now.Unix(), []byte(`{"result":"fail"}`))),
+	} {
+		if a.VerifyCallback(r, body) == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+}

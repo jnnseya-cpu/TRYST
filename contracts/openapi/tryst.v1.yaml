@@ -428,6 +428,7 @@ paths:
     post:
       tags: [assurance]
       operationId: assuranceSession
+      summary: Start a check at the identity provider. liveness raises V0 to V1; age (needs V1) plus the conduct declaration raises V1 to V2. Refused (503) while no provider holds a valid certificate for web capture (D-44, D-49, G-NG-4).
       x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
@@ -440,20 +441,64 @@ paths:
               properties:
                 kind: { type: string, enum: [liveness, age] }
       responses:
-        '200':
+        '201':
           description: Provider hand-off URL
+          content: { application/json: { schema: { type: object, properties: { session_id: { type: string }, url: { type: string } } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+  /assurance/callback:
+    post:
+      tags: [assurance]
+      operationId: assuranceCallback
+      summary: The provider's signed result (X-Provider-Timestamp, X-Provider-Signature). TRYST re-checks the age itself, keeps a one-way code of the document number and discards the number; applied once per session.
+      security: []
+      x-min-tier: sys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session_id, result]
+              properties:
+                session_id: { type: string }
+                result: { type: string, enum: [pass, fail] }
+                is_adult: { type: boolean }
+                birth_year_month: { type: string, pattern: '^[0-9]{4}-[0-9]{2}$' }
+                document_number: { type: string }
+                method: { type: string }
+      responses:
+        '204': { description: Applied }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /assurance/status:
+    get:
+      tags: [assurance]
+      operationId: assuranceStatus
+      x-min-tier: V0
+      responses:
+        '200':
+          description: Where the member is in verification
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  handoff_url: { type: string, format: uri }
+                  tier: { type: string }
+                  liveness_done: { type: boolean }
+                  conduct_accepted: { type: boolean }
+                  conduct_version: { type: string }
+                  id_checked: { type: boolean }
+                  age_check: { type: string, enum: ['', pending, passed, failed, refused, duplicate, document_mismatch, not_eligible] }
+                  refused: { type: string }
+        '401': { $ref: '#/components/responses/Problem' }
   /attestations/conduct:
     post:
       tags: [assurance]
       operationId: conductAttestation
-      summary: Conduct declaration (ToS cl. 3.5); required to complete V2.
-      x-min-tier: V1
+      summary: Conduct declaration (ToS cl. 3.5); required to complete V2. Recorded with its version (and in the consent ledger).
+      x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
         required: true
@@ -461,11 +506,13 @@ paths:
           application/json:
             schema:
               type: object
-              required: [declared]
+              required: [version, accept]
               properties:
-                declared: { type: boolean, const: true }
+                version: { type: string }
+                accept: { type: boolean, const: true }
       responses:
-        '201': { description: Recorded in consent ledger }
+        '200': { description: Recorded; returns the verification status }
+        '422': { $ref: '#/components/responses/Problem' }
 
   # ---------------------------------------------------------------- account (02 §5.2)
   /consents:

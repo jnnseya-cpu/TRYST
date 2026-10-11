@@ -49,6 +49,14 @@ type Identity struct {
 	CreatedAt    time.Time
 	Events       []AuthEvent // own security activity, kept 90 days (NFR-11)
 	BirthYM      string      // "YYYY-MM" from the ID document at V2; the day is never stored (D-37)
+	// Assurance (02 §3.1, D-61). AnchorDoc is a one-way code of the ID document (never the
+	// number), kept to stop a second account on the same document and to match recovery.
+	AnchorDoc      string    `json:",omitempty"`
+	LivenessAt     time.Time `json:",omitempty"`
+	AgeCheckedAt   time.Time `json:",omitempty"`
+	ConductAt      time.Time `json:",omitempty"` // conduct declaration (ToS 3.5) accepted
+	ConductVersion string    `json:",omitempty"`
+	Refused        string    `json:",omitempty"` // under_18 | not_eligible: the account can't be used
 }
 
 // AuthEvent is one security event on the member's own account (02 §4.1 auth_event). It holds
