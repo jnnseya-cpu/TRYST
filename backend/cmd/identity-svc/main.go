@@ -142,6 +142,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if mode == "dev" {
+		prof.Alerts = &profilesvc.LogAlerting{}
+		log.Printf("DEV MODE: safety alerts go to the log, not to real contacts or the alarm-receiving centre.")
+	}
+	go func() {
+		for range time.Tick(30 * time.Second) {
+			prof.SweepSafety(context.Background())
+		}
+	}()
 	root := http.NewServeMux()
 	root.Handle("/v1/profile", prof)
 	root.Handle("/v1/profile/", prof)
@@ -150,6 +159,8 @@ func main() {
 	root.Handle("/v1/threads", prof)
 	root.Handle("/v1/threads/", prof)
 	root.Handle("/v1/devices/", prof)
+	root.Handle("/v1/meets/", prof)
+	root.Handle("/v1/safety/", prof)
 	root.Handle("/", srv)
 	addr := ":" + env("PORT", "8081")
 	log.Printf("identity-svc (%s) listening on %s", mode, addr)

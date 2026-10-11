@@ -4,7 +4,8 @@ import { deviceIdentity, open, seal, type Envelope, type PublicDevice } from "./
 
 export type ThreadView = { id: string; name: string; age: number | null; state: "normal" | "frozen" | "closed"; retention_days: number; last_seq: number; last_at: string; created: string };
 type DeviceKey = { id: string; jwk: JsonWebKey };
-export type Payload = { v: 1; type: "text"; text: string } | { v: 1; type: "meet"; place: string; time: string; note?: string };
+export type MeetPayload = { v: 1; type: "meet"; meet_id: string; place: string; start: string; end: string; door: string; note?: string };
+export type Payload = { v: 1; type: "text"; text: string } | MeetPayload;
 
 export type Shown = { seq: number; mine: boolean; at: string; payload: Payload | null };
 

@@ -81,6 +81,9 @@ type Service struct {
 	vault *store.Vault
 	dirty map[string]bool
 	th    *threadState
+	mt    *meetState
+	// Alerts delivers safety escalations (trusted contact, safety line, emergency).
+	Alerts Alerting
 	// OnSignal is called when an on-device Guardian signal arrives (safety case queue).
 	OnSignal func(threadID, reporter, subject, kind string)
 	// MinDiscoveryTier is the tier needed to use Tonight (V2 in production, E-01).
@@ -105,11 +108,14 @@ func NewWithStore(auth Authenticator, mod Moderator, env string, st store.Store,
 		return nil, errors.New("DevModerator is forbidden outside the dev environment")
 	}
 	s := &Service{auth: auth, mod: mod, now: time.Now, data: map[string]*memberProfile{}, mux: http.NewServeMux(),
-		tn: newTonight(), MinDiscoveryTier: "V2", st: st, vault: vault, dirty: map[string]bool{}, th: newThreadState()}
+		tn: newTonight(), MinDiscoveryTier: "V2", st: st, vault: vault, dirty: map[string]bool{}, th: newThreadState(), mt: newMeetState()}
 	if err := s.load(context.Background()); err != nil {
 		return nil, err
 	}
 	if err := s.loadThreads(context.Background()); err != nil {
+		return nil, err
+	}
+	if err := s.loadMeets(context.Background()); err != nil {
 		return nil, err
 	}
 	if env == "dev" {
@@ -135,6 +141,12 @@ func NewWithStore(auth Authenticator, mod Moderator, env string, st store.Store,
 	m.HandleFunc("POST /v1/threads/{id}/block", s.handleBlock)
 	m.HandleFunc("POST /v1/threads/{id}/signal", s.handleSignal)
 	m.HandleFunc("GET /v1/threads/{id}/photo", s.handleThreadPhoto)
+	m.HandleFunc("POST /v1/threads/{id}/meets", s.handleProposeMeet)
+	m.HandleFunc("GET /v1/meets/{meet}", s.handleGetMeet)
+	m.HandleFunc("POST /v1/meets/{meet}/safety", s.handleSafetyStart)
+	m.HandleFunc("POST /v1/meets/{meet}/checkin", s.handleCheckIn)
+	m.HandleFunc("POST /v1/meets/{meet}/{decision}", s.handleMeetDecision)
+	m.HandleFunc("POST /v1/safety/panic", s.handlePanic)
 	m.HandleFunc("GET /v1/tonight", s.handleTonight)
 	m.HandleFunc("PUT /v1/tonight", s.handleTonightStart)
 	m.HandleFunc("DELETE /v1/tonight", s.handleTonightStop)

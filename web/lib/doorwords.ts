@@ -1,0 +1,78 @@
+// Door-check words (FR-099): both phones derive the same three words from the meet's door
+// secret, which travels only inside the encrypted thread. Port of backend/internal/meet
+// DoorWords; web/test/doorwords.test.ts pins the shared vector.
+
+const WORDS = [
+  "amber",
+  "anchor",
+  "apple",
+  "arrow",
+  "autumn",
+  "badge",
+  "bamboo",
+  "banner",
+  "basil",
+  "beacon",
+  "birch",
+  "blossom",
+  "bridge",
+  "bronze",
+  "cabin",
+  "canyon",
+  "cedar",
+  "cello",
+  "cherry",
+  "cobalt",
+  "comet",
+  "coral",
+  "cotton",
+  "crystal",
+  "dahlia",
+  "delta",
+  "ember",
+  "falcon",
+  "feather",
+  "fern",
+  "fjord",
+  "garnet",
+  "ginger",
+  "glacier",
+  "harbor",
+  "hazel",
+  "heron",
+  "indigo",
+  "island",
+  "ivory",
+  "jasmine",
+  "juniper",
+  "kettle",
+  "lagoon",
+  "lantern",
+  "lemon",
+  "linen",
+  "lotus",
+  "maple",
+  "marble",
+  "meadow",
+  "mint",
+  "nectar",
+  "olive",
+  "orchid",
+  "pebble",
+  "pepper",
+  "quartz",
+  "raven",
+  "saffron",
+  "silver",
+  "tulip",
+  "velvet",
+  "willow",
+];
+
+export async function doorWords(secret: Uint8Array<ArrayBuffer>, meetId: string): Promise<[string, string, string]> {
+  const key = await crypto.subtle.importKey("raw", secret, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const msg = new Uint8Array(new TextEncoder().encode("tryst/meet/door/v1\u0000" + meetId));
+  const sum = new Uint8Array(await crypto.subtle.sign("HMAC", key, msg));
+  const n = ((sum[0] << 24) | (sum[1] << 16) | (sum[2] << 8) | sum[3]) >>> 0;
+  return [WORDS[(n >>> 26) & 63], WORDS[(n >>> 20) & 63], WORDS[(n >>> 14) & 63]];
+}

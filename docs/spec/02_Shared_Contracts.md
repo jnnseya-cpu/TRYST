@@ -605,8 +605,8 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 | POST | `/v1/threads/{id}/block` | V2 | Closes the thread for both and hides the pair from each other everywhere; the other member is not told why |
 | POST | `/v1/threads/{id}/signal` | V2 | On-device Guardian signal (kind and model only); child safety and extortion freeze the thread for review |
 | PUT | `/v1/threads/{id}/retention` | V2 | 7 / 30 / 90 days; the shortest elected by any participant wins |
-| POST | `/v1/threads/{id}/meet` | V2 | `propose|confirm|cancel` |
-| POST | `/v1/threads/{id}/checkin` | V2 | Safe Meet check-in; a missed check-in triggers silent escalation to the trusted contact |
+| POST | `/v1/threads/{id}/meets` · `/v1/meets/{meet}/confirm|cancel` | V2 | Time window only; the place and door secret travel inside the encrypted thread. Only the other member can confirm |
+| POST | `/v1/meets/{meet}/safety` · `/v1/meets/{meet}/checkin` | V2 | Start check-ins (interval, check-in PIN, duress PIN, trusted contact for this meet only, safety line); check in or end with "home safe". The duress PIN gets the identical reply and never ends check-ins; a missed check-in alerts the trusted contact, then the safety line. Timers run on the server |
 | POST | `/v1/threads/{id}/burn` | V2 | Revoke keys on both sides; thread closed |
 | POST | `/v1/aftercare/{meet_id}` | V2 | Private outcome (48 h after the meet) |
 
@@ -912,6 +912,7 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-112 | V2 identity checks run only through a provider with a valid, evidenced liveness certificate (ISO/IEC 30107-3, iBeta Level 2 or equivalent); without a valid injection-attack certificate (CEN/TS 18099 or equivalent) capture is native-app only with platform attestation and the web hands off by QR; with no certified provider, V2 fails closed; certificate expiry is monitored | BE | P1 | Founder v1.3, D-49 |
 | FR-113 | Everything a member creates survives restarts: identities, credentials, sessions and profiles persist in per-domain PostgreSQL databases; photos are stored encrypted under the member's own key and unreadable without the key vault; services refuse to start in production without their databases and key-encryption key | BE | P1 | D-50 |
 | FR-114 | End-to-end encrypted conversations: a thread opens only after mutual interest; every message is encrypted on the sender's device separately for each device of both members; the server stores and relays ciphertext only, with expiry from retention; the on-device Guardian warns on fraud, refuses to send child-safety content and freezes threads on child-safety or extortion signals; either member can block, which closes the thread for both and hides them from each other | Both | P1 | A §9.2, D-51 |
+| FR-115 | Meet planning and safety screens: propose and confirm a meet in the conversation (place never sent to TRYST), door-check words and verified photo on arrival, check-ins with duress PIN and "home safe", Share my plan (neutral text), and a Panic screen with a 999 call button and the Silent Solution; server-side timers alert the trusted contact and the safety line | Both | P1 | A §19.7, FR-020–FR-022, FR-099, FR-100 |
 
 ### 10.2 Non-functional requirements
 

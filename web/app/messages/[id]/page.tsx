@@ -110,7 +110,7 @@ export default function Conversation() {
             ) : m.payload.type === "text" ? (
               <span>{m.payload.text}</span>
             ) : (
-              <span className="ms-meet">Meet: {m.payload.place}, {m.payload.time}</span>
+              <span className="ms-meet">Meet proposed: {m.payload.place}, {new Date(m.payload.start).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" })}. <a href={`/messages/${id}/meet`}>Open</a></span>
             )}
           </li>
         ))}

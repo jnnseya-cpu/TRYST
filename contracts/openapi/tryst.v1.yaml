@@ -1331,10 +1331,11 @@ paths:
               properties:
                 days: { type: integer, enum: [7, 30, 90] }
       responses: { '204': { description: Shortest elected value applies } }
-  /threads/{id}/meet:
+  /threads/{id}/meets:
     post:
       tags: [threads]
-      operationId: meetAction
+      operationId: proposeMeet
+      summary: Propose a meet's time window. The place is never sent to the server; it travels in the encrypted thread with the door secret (FR-099, FR-115).
       x-min-tier: V2
       parameters:
         - { $ref: '#/components/parameters/ThreadId' }
@@ -1345,20 +1346,72 @@ paths:
           application/json:
             schema:
               type: object
-              required: [action]
+              required: [start, end]
+              additionalProperties: false
               properties:
-                action: { type: string, enum: [propose, confirm, cancel] }
-                window_start: { type: string, format: date-time }
-      responses: { '204': { description: Recorded } }
-  /threads/{id}/checkin:
+                start: { type: string, format: date-time }
+                end: { type: string, format: date-time, description: At most 12 hours after start; within the next month }
+      responses:
+        '201': { description: Proposed, content: { application/json: { schema: { $ref: '#/components/schemas/Meet' } } } }
+        '422': { $ref: '#/components/responses/Problem' }
+  /meets/{meet}:
+    parameters: [{ name: meet, in: path, required: true, schema: { type: string } }]
+    get:
+      tags: [threads]
+      operationId: getMeet
+      x-min-tier: V2
+      responses: { '200': { description: Meet, content: { application/json: { schema: { $ref: '#/components/schemas/Meet' } } } }, '404': { $ref: '#/components/responses/Problem' } }
+  /meets/{meet}/confirm:
+    parameters: [{ name: meet, in: path, required: true, schema: { type: string } }]
     post:
       tags: [threads]
-      operationId: meetCheckin
+      operationId: confirmMeet
+      summary: Only the other member can confirm a proposed meet.
       x-min-tier: V2
-      parameters:
-        - { $ref: '#/components/parameters/ThreadId' }
-        - { $ref: '#/components/parameters/IdempotencyKey' }
-      responses: { '204': { description: Checked in } }
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '200': { description: Confirmed }, '409': { $ref: '#/components/responses/Problem' } }
+  /meets/{meet}/cancel:
+    parameters: [{ name: meet, in: path, required: true, schema: { type: string } }]
+    post:
+      tags: [threads]
+      operationId: cancelMeet
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '200': { description: Cancelled } }
+  /meets/{meet}/safety:
+    parameters: [{ name: meet, in: path, required: true, schema: { type: string } }]
+    post:
+      tags: [safety]
+      operationId: startCheckIns
+      summary: Start check-ins for a confirmed meet. Needs a trusted contact (kept for this meet only) or the safety line.
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [every_minutes, pin, duress_pin]
+              properties:
+                every_minutes: { type: integer, minimum: 15, maximum: 180 }
+                pin: { type: string, minLength: 4 }
+                duress_pin: { type: string, minLength: 4, description: Must differ from pin }
+                trusted_contact: { type: string, description: Phone (+…) or email; deleted when the meet ends }
+                safety_line: { type: boolean }
+      responses: { '200': { description: Running }, '409': { $ref: '#/components/responses/Problem' }, '422': { $ref: '#/components/responses/Problem' } }
+  /meets/{meet}/checkin:
+    parameters: [{ name: meet, in: path, required: true, schema: { type: string } }]
+    post:
+      tags: [safety]
+      operationId: checkIn
+      summary: Check in, or end with "home safe". The reply is identical for the check-in PIN and the duress PIN; the duress PIN never ends check-ins.
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [pin], properties: { pin: { type: string }, end: { type: boolean } } } } }
+      responses: { '200': { description: Checked in }, '422': { $ref: '#/components/responses/Problem' } }
   /threads/{id}/burn:
     post:
       tags: [threads]
@@ -1444,21 +1497,22 @@ paths:
     post:
       tags: [safety]
       operationId: panic
-      summary: Emergency escalation with live location. Overrides retention (P7). Never gated.
+      summary: Emergency escalation. Exact location is accepted here and only here (P7). Never gated; the reply always gives the 999 and Silent Solution guidance.
       x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               type: object
-              required: [lat, lon]
               properties:
                 lat: { type: number }
                 lon: { type: number }
-                thread_id: { type: string, format: uuid }
-      responses: { '202': { description: Escalated } }
+                meet_id: { type: string }
+      responses:
+        '200':
+          description: Escalated
+          content: { application/json: { schema: { type: object, properties: { alert: { type: string }, call: { const: '999' }, silent_solution: { type: string } } } } }
   /safety/share-plan:
     post:
       tags: [safety]
@@ -1640,6 +1694,17 @@ components:
             properties:
               checkout_url: { type: string, format: uri }
   schemas:
+    Meet:
+      type: object
+      properties:
+        id: { type: string }
+        thread: { type: string }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        state: { type: string, enum: [proposed, confirmed, cancelled, done] }
+        mine: { type: boolean }
+        safety_active: { type: boolean }
+        safety_line: { type: boolean }
     ThreadView:
       type: object
       properties:
