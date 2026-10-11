@@ -475,3 +475,47 @@ func TestRestartPostgres(t *testing.T) {
 	_, _ = rand.Read(ns)
 	restart(t, prefixed{p, "t" + hex.EncodeToString(ns) + ":"})
 }
+
+func TestExportAndErase(t *testing.T) {
+	g := newRig(t, store.NewMemory())
+	ctx := context.Background()
+	// bob reported alice (closed with a warning) and carol reported bob (still open).
+	g.dir.threads["th_ba"] = [2]string{"bob", "alice"}
+	ref := g.report("bob", "th_ba", "harassment")
+	open := g.report("carol", "th_cb", "harassment")
+	byAlice := g.report("alice", "th_ab", "other")
+	g.do("POST", "/ops/v1/cases/"+byAlice+"/decision", "", tokMod1, map[string]any{"outcome": "uphold", "reason": "Repeated unwanted messages"})
+
+	ex, _ := g.svc.Export(ctx, "bob")
+	m := ex.(map[string]any)
+	var back map[string][]any
+	_ = json.Unmarshal([]byte(mustJSON(m)), &back)
+	if len(back["reports_you_made"]) != 1 || len(back["decisions_about_you"]) != 1 {
+		t.Fatalf("export: %v", back)
+	}
+	if s := mustJSON(m); !strings.Contains(s, "Repeated unwanted messages") || strings.Contains(s, "carol") || strings.Contains(s, "alice") {
+		t.Fatalf("export content: %s", s)
+	}
+
+	rc, err := g.svc.Erase(ctx, "bob")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rc.Retained) != 1 || !strings.Contains(rc.Retained[0], "under review") {
+		t.Fatalf("receipt: %+v", rc)
+	}
+	g.svc.mu.Lock()
+	reportByBob := g.svc.cases[ref]
+	_, openKept := g.svc.cases[open]
+	_, warnKept := g.svc.cases[byAlice]
+	g.svc.mu.Unlock()
+	if reportByBob == nil || !strings.HasPrefix(reportByBob.Reporter, "erased:") || reportByBob.Disclosed != nil {
+		t.Fatalf("bob's report not de-identified: %+v", reportByBob)
+	}
+	if !openKept || warnKept {
+		t.Fatalf("open kept=%v, closed warning kept=%v", openKept, warnKept)
+	}
+	if err := VerifyChain(g.svc.chain); err != nil {
+		t.Fatal(err)
+	}
+}

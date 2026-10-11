@@ -514,26 +514,57 @@ paths:
     post:
       tags: [account]
       operationId: exportAccount
-      summary: Requires step-up.
+      summary: Everything TRYST holds about the member, built on request and returned over the signed-in session (nothing is kept on the server). Messages are end-to-end encrypted, so only their metadata is included. Step-up applies once 02 §3.3 step-up ships; until then a full two-factor session is required.
       x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
-      responses: { '202': { description: Encrypted export prepared (< 30 days; target < 24 h) } }
+      responses:
+        '200':
+          description: Export (download)
+          headers:
+            Content-Disposition: { schema: { type: string }, description: 'attachment; filename="member-data.json"' }
+          content: { application/json: { schema: { type: object, properties: { format: { const: tryst-member-export/v1 }, generated_at: { type: string, format: date-time } }, additionalProperties: true } } }
+        '401': { $ref: '#/components/responses/Problem' }
   /account:
     delete:
       tags: [account]
       operationId: deleteAccount
-      summary: Cryptographic erasure < 60 s p99. Requires B1 only (never a full step-up).
+      summary: Cryptographic erasure < 60 s p99. Requires B1 only (never a full step-up) and the typed phrase "delete my account".
+      description: The member's data key is destroyed first (sealed data in primaries and backups becomes unreadable), then they leave discovery, then records are purged service by service; identity goes last. Declared exceptions (ToS 15.3, 17.4) are named in the proof. An interrupted erasure is finished by a background sweep.
       x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [confirm], properties: { confirm: { const: delete my account } } } } }
       responses:
+        '200':
+          description: Erased
+          content: { application/json: { schema: { type: object, properties: { deletion_job_id: { type: string }, status: { const: complete }, completion_proof: { $ref: '#/components/schemas/DeletionProof' } } } } }
         '202':
-          description: Deletion job started
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  deletion_job_id: { type: string, format: uuid }
+          description: Erasure in progress; the proof appears at /deletion-proofs/{id}
+          content: { application/json: { schema: { type: object, properties: { deletion_job_id: { type: string }, status: { const: in_progress } } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /deletion-proofs/key:
+    get:
+      tags: [account]
+      operationId: deletionProofKey
+      summary: Ed25519 public key that verifies completion proofs.
+      security: []
+      x-min-tier: none
+      responses:
+        '200': { description: Key, content: { application/json: { schema: { type: object, properties: { alg: { const: Ed25519 }, key_id: { type: string }, public_key: { type: string } } } } } }
+  /deletion-proofs/{id}:
+    get:
+      tags: [account]
+      operationId: deletionProof
+      summary: A signed completion proof. It names the member only by a one-way code.
+      security: []
+      x-min-tier: none
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^del_[0-9a-f]{24}$' } }
+      responses:
+        '200': { description: Proof, content: { application/json: { schema: { $ref: '#/components/schemas/DeletionProof' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
   /emergency-lock:
     post:
       tags: [account]
@@ -2059,3 +2090,21 @@ components:
               in_cooling_off: { type: boolean }
         voucher_plan: { type: object, properties: { plan: { type: string }, until: { type: string, format: date-time } } }
         catalogue: { type: array, items: { type: object } }
+    DeletionProof:
+      type: object
+      required: [deletion_job_id, subject, completed_at, receipts, key_id, signature]
+      properties:
+        deletion_job_id: { type: string }
+        subject: { type: string, description: 'SHA-256 of "tryst/erasure/v1\0" + account id' }
+        started: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+        receipts:
+          type: array
+          items:
+            type: object
+            properties:
+              part: { type: string }
+              erased: { type: integer }
+              retained: { type: array, items: { type: string } }
+        key_id: { type: string }
+        signature: { type: string, description: Ed25519 over the canonical JSON of the other fields (base64) }

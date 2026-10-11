@@ -432,3 +432,53 @@ func TestRestartPostgres(t *testing.T) {
 	_, _ = rand.Read(ns)
 	restart(t, prefixed{p, "t" + hex.EncodeToString(ns) + ":"})
 }
+
+func TestExportAndErase(t *testing.T) {
+	g := newRig(t, store.NewMemory())
+	ctx := context.Background()
+	g.do("POST", "/v1/subscription", "ana", map[string]any{"plan": "tryst_plus", "pre_contract_ack": true, "start_now": true})
+	ref := g.ref("ana")
+	g.send("evt_s", "checkout.session.completed", map[string]any{"mode": "subscription", "client_reference_id": ref,
+		"metadata": map[string]string{"billing_ref": ref, "item": "tryst_plus"}, "subscription": "sub_e", "payment_intent": "pi_sub", "amount_total": 2499})
+	g.send("evt_d", "checkout.session.completed", map[string]any{"mode": "payment", "payment_status": "paid", "client_reference_id": ref,
+		"metadata": map[string]string{"billing_ref": ref, "item": "deposit"}, "payment_intent": "pi_dep", "amount_total": 999})
+
+	ex, _ := g.svc.Export(ctx, "ana")
+	if m := ex.(map[string]any); m["keys"] != 60 || m["deposit_paid"] != true {
+		t.Fatalf("export: %v", m)
+	}
+	g.now = g.now.Add(24 * time.Hour)
+	rc, err := g.svc.Erase(ctx, "ana")
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.mu.Lock()
+	calls := append([]stripeCall(nil), g.calls...)
+	g.mu.Unlock()
+	var cancelled, subRefund, depRefund bool
+	for _, c := range calls {
+		switch {
+		case c.Method == "DELETE" && c.Path == "/v1/subscriptions/sub_e":
+			cancelled = true
+		case c.Path == "/v1/refunds" && c.Form.Get("payment_intent") == "pi_sub":
+			subRefund = true
+		case c.Path == "/v1/refunds" && c.Form.Get("payment_intent") == "pi_dep" && c.Form.Get("amount") == "999":
+			depRefund = true
+		}
+	}
+	if !cancelled || !subRefund || !depRefund {
+		t.Fatalf("cancel=%v subRefund=%v depositRefund=%v", cancelled, subRefund, depRefund)
+	}
+	if len(rc.Retained) != 1 {
+		t.Fatalf("receipt: %+v", rc)
+	}
+	if _, err := g.svc.cfg.Store.Get(ctx, "account", "ana"); err == nil {
+		t.Fatal("commerce record left")
+	}
+	if _, err := g.svc.SubscriptionFor(ref + "|tryst_plus"); err == nil {
+		t.Fatal("subscription mapping left")
+	}
+	if _, err := g.svc.Erase(ctx, "ana"); err != nil {
+		t.Fatal("erase not idempotent")
+	}
+}

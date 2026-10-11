@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { api, getToken, setToken } from "@/lib/api";
 import { forgetDevice } from "@/lib/e2ee";
+import { DataRights } from "./DataRights";
 import { Standing } from "./Standing";
 
 type Me = { session_kind: string; surface: string; tier: string; passkeys: number; expires_at: string };
@@ -63,6 +64,7 @@ export default function Account() {
       <button type="button" className="button ghost" onClick={signOut}>Sign out</button>
       <p />
       <button type="button" className="button ghost" onClick={burn}>Burn: sign out everywhere and wipe this device</button>
+      <DataRights />
     </Shell>
   );
 }

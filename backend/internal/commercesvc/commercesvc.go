@@ -716,3 +716,5 @@ func isPlan(k string) bool {
 	it, ok := item(k)
 	return ok && it.Kind == "plan"
 }
+
+var errProviderNeeded = errors.New("a live subscription can't be stopped without the payment processor")

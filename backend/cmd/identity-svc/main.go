@@ -25,6 +25,8 @@
 //	DATABASE_URL_COMMERCE  entitlements, Keys ledger, processed events, vouchers
 //	STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET  payments (dev uses a local test checkout)
 //	STRIPE_PRICE_<KEY>  Stripe Price id per catalogue key, e.g. STRIPE_PRICE_TRYST_PLUS
+//	DSR_SIGNING_KEY hex, 32-byte Ed25519 seed for deletion completion proofs (KMS in
+//	                production; required outside dev)
 //	PUBLIC_URL      member site origin for checkout return links (default first RP origin)
 package main
 
@@ -41,6 +43,7 @@ import (
 	"time"
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/commercesvc"
+	"github.com/jnnseya-cpu/tryst/backend/internal/dsr"
 	"github.com/jnnseya-cpu/tryst/backend/internal/gate"
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
 	"github.com/jnnseya-cpu/tryst/backend/internal/payments"
@@ -180,6 +183,30 @@ func main() {
 	prof.OnSignal = safety.FromSignal
 
 	commerce := openCommerce(ctx, mode, srv, staff, cfg.RPOrigins[0])
+
+	// Data rights: export and erasure. Order matters: the profile part destroys the member's
+	// data key and removes them from discovery first; identity goes last.
+	seed, err := hex.DecodeString(os.Getenv("DSR_SIGNING_KEY"))
+	if err != nil || len(seed) != 32 {
+		if mode != "dev" {
+			log.Fatal("DSR_SIGNING_KEY (hex, 32 bytes) is required in production")
+		}
+		seed = make([]byte, 32)
+		_, _ = rand.Read(seed)
+		log.Printf("DEV MODE: DSR_SIGNING_KEY not set; deletion proofs use a temporary key")
+	}
+	rights, err := dsr.New(func(r *http.Request) (string, bool) {
+		a, ok := srv.Authenticate(r)
+		return a.ID, ok
+	}, idStore, seed, prof, safety, commerce, srv)
+	if err != nil {
+		log.Fatal(err)
+	}
+	go func() {
+		for range time.Tick(time.Minute) {
+			rights.Sweep(context.Background())
+		}
+	}()
 	go func() {
 		for range time.Tick(30 * time.Second) {
 			prof.SweepSafety(context.Background())
@@ -201,6 +228,9 @@ func main() {
 	root.Handle("/v1/me/standing", safety)
 	root.Handle("/ops/v1/", safety)
 	root.Handle("/ops/v1/vouchers", commerce)
+	root.Handle("/v1/account", rights)
+	root.Handle("/v1/account/export", rights)
+	root.Handle("/v1/deletion-proofs/", rights)
 	for _, p := range []string{"/v1/entitlements", "/v1/deposit", "/v1/keys/", "/v1/subscription", "/v1/subscription/", "/v1/vouchers/", "/v1/billing/"} {
 		root.Handle(p, commerce)
 	}
