@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { api, getToken, setToken } from "@/lib/api";
+import { forgetDevice } from "@/lib/e2ee";
 
 type Me = { session_kind: string; surface: string; tier: string; passkeys: number; expires_at: string };
 
@@ -25,6 +26,7 @@ export default function Account() {
 
   async function burn() {
     await api("/v1/burn", { method: "POST", token: getToken() });
+    await forgetDevice();
     setToken(null);
     try {
       localStorage.clear();
@@ -53,6 +55,7 @@ export default function Account() {
         <p className="note">Passkeys registered: {me.passkeys} · Verification: {me.tier}</p>
       </section>
       <a className="button" href="/tonight" style={{ marginBottom: "0.8rem" }}>Free tonight?</a>
+      <a className="button ghost" href="/messages" style={{ marginBottom: "0.8rem" }}>Messages</a>
       <a className="button ghost" href="/profile" style={{ marginBottom: "0.8rem" }}>Your profile and photos</a>
       <button type="button" className="button ghost" onClick={signOut}>Sign out</button>
       <p />

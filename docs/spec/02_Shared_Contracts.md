@@ -599,7 +599,11 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 
 | Method | Path | Min | Contract |
 |---|---|---|---|
-| POST / GET | `/v1/threads/{id}/messages` | V2 | MLS ciphertext envelopes; `expires_at` set from `retention_days` |
+| GET | `/v1/threads` · `/v1/threads/{id}` | V2 | Conversations (opened only by mutual interest) and the device public keys of both members |
+| PUT | `/v1/devices/key` | V0 | Register this device's ECDH P-256 public key; at most 5 devices; private keys never leave the device |
+| POST / GET | `/v1/threads/{id}/messages` | V2 | One ciphertext envelope per device of both members (P1 scheme, [D-51](06_Decisions_and_Changes.md#2-decision-log); MLS from P2); idempotent on `client_id`; `expires_at` from retention; expired envelopes purged |
+| POST | `/v1/threads/{id}/block` | V2 | Closes the thread for both and hides the pair from each other everywhere; the other member is not told why |
+| POST | `/v1/threads/{id}/signal` | V2 | On-device Guardian signal (kind and model only); child safety and extortion freeze the thread for review |
 | PUT | `/v1/threads/{id}/retention` | V2 | 7 / 30 / 90 days; the shortest elected by any participant wins |
 | POST | `/v1/threads/{id}/meet` | V2 | `propose|confirm|cancel` |
 | POST | `/v1/threads/{id}/checkin` | V2 | Safe Meet check-in; a missed check-in triggers silent escalation to the trusted contact |
@@ -907,6 +911,7 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-111 | Safety line staffed 24/7 from launch by a contracted alarm-receiving centre (BS EN 50518, BS 8484) with the on-call T&S rota as backup: acknowledgement within 60 s or the alert moves on; an ARC with no heartbeat for 5 minutes is skipped; if nobody acknowledges, the trusted contact is alerted and the member's phone shows the 999 / Silent Solution screen; alerts carry only alias, callback number, shared location, meet window and reason | BE | P1 | Founder v1.3, D-48 |
 | FR-112 | V2 identity checks run only through a provider with a valid, evidenced liveness certificate (ISO/IEC 30107-3, iBeta Level 2 or equivalent); without a valid injection-attack certificate (CEN/TS 18099 or equivalent) capture is native-app only with platform attestation and the web hands off by QR; with no certified provider, V2 fails closed; certificate expiry is monitored | BE | P1 | Founder v1.3, D-49 |
 | FR-113 | Everything a member creates survives restarts: identities, credentials, sessions and profiles persist in per-domain PostgreSQL databases; photos are stored encrypted under the member's own key and unreadable without the key vault; services refuse to start in production without their databases and key-encryption key | BE | P1 | D-50 |
+| FR-114 | End-to-end encrypted conversations: a thread opens only after mutual interest; every message is encrypted on the sender's device separately for each device of both members; the server stores and relays ciphertext only, with expiry from retention; the on-device Guardian warns on fraud, refuses to send child-safety content and freezes threads on child-safety or extortion signals; either member can block, which closes the thread for both and hides them from each other | Both | P1 | A §9.2, D-51 |
 
 ### 10.2 Non-functional requirements
 

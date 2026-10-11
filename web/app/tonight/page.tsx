@@ -17,6 +17,7 @@ type Person = {
   blurred: number;
   interested: boolean;
   mutual: boolean;
+  thread_id?: string;
 };
 
 type View = {
@@ -148,6 +149,7 @@ export default function Tonight() {
                       <p className="tn-name">{p.display_name}{p.age !== null && <span>, {p.age}</span>}</p>
                       <p className="tn-place">{p.area} · {p.distance}</p>
                       <p className="tn-flag">You both said yes for tonight.</p>
+                      {p.thread_id && <a className="button inline" href={`/messages/${p.thread_id}`}>Message</a>}
                     </div>
                   </li>
                 ))}

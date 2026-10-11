@@ -12,6 +12,7 @@ package profilesvc
 //   - Interest stays private until it is mutual. At most 10 interests per evening.
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -80,7 +81,7 @@ func (t *tonight) active(id string, now time.Time) *tonightEntry {
 type Eligible func(viewer, member string) bool
 
 func (s *Service) eligible(viewer, member string) bool {
-	if viewer == member {
+	if viewer == member || s.isBlocked(viewer, member) {
 		return false
 	}
 	if s.Eligible != nil {
@@ -103,6 +104,7 @@ type tonightPerson struct {
 	Blurred     int    `json:"blurred"`
 	Interested  bool   `json:"interested"`
 	Mutual      bool   `json:"mutual"`
+	ThreadID    string `json:"thread_id,omitempty"`
 	km          float64
 }
 
@@ -163,6 +165,7 @@ func (s *Service) tonightView(me string, p *memberProfile) map[string]any {
 			Area: oa.Label(other.CityOnly), Distance: label, Photos: len(shown), Blurred: blurred,
 			Interested: e.interests[id], Mutual: e.interests[id] && oe.interests[me], km: km}
 		if tp.Mutual {
+			tp.ThreadID = s.ensureThread(context.Background(), me, id, "tonight").ID
 			mutual = append(mutual, tp)
 		} else {
 			people = append(people, tp)

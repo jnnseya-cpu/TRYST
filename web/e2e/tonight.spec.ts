@@ -1,39 +1,7 @@
-import { test, expect, type Browser, type Page } from "@playwright/test";
-import { join as pathJoin } from "node:path";
+import { test, expect } from "@playwright/test";
+import { member } from "./helpers";
 
 // Tonight end to end with two real members (dev services).
-const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148";
-const fx = (n: string) => pathJoin(__dirname, "fixtures", n);
-
-async function member(browser: Browser, name: string, district: string, photo: string): Promise<Page> {
-  const ctx = await browser.newContext({ userAgent: IPHONE_UA, viewport: { width: 1280, height: 900 } });
-  const page = await ctx.newPage();
-  const cdp = await ctx.newCDPSession(page);
-  await cdp.send("WebAuthn.enable");
-  await cdp.send("WebAuthn.addVirtualAuthenticator", {
-    options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
-  });
-  await page.goto("/join");
-  await page.getByLabel(/Email or mobile/).fill(`${name}${Date.now()}@example.com`);
-  await page.getByRole("button", { name: "Send code" }).click();
-  const code = (await page.getByTestId("dev-otp").textContent())!.match(/\d{6}/)![0];
-  await page.getByLabel(/6-digit code/).fill(code);
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Create passkey" }).click();
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.getByRole("button", { name: "Sign in with passkey" }).click();
-  await page.getByRole("button", { name: "Start live check" }).click();
-  await expect(page.getByTestId("session")).toBeVisible();
-  await page.goto("/profile");
-  await page.getByTestId("file-input").setInputFiles([fx(photo)]);
-  await expect(page.getByTestId("photo")).toHaveCount(1);
-  await page.getByLabel("Name shown to members").fill(name);
-  await page.getByLabel("Name shown to members").blur();
-  await page.getByLabel("Area").selectOption({ label: district });
-  await expect(page.getByTestId("ready")).toBeVisible();
-  return page;
-}
-
 test("tonight: reciprocal visibility and private interest until it's mutual", async ({ browser }) => {
   // Unique names: other test runs may have members free in the same dev service.
   const tag = String(Date.now()).slice(-5);

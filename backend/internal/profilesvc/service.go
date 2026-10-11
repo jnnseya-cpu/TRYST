@@ -80,6 +80,9 @@ type Service struct {
 	st    store.Store
 	vault *store.Vault
 	dirty map[string]bool
+	th    *threadState
+	// OnSignal is called when an on-device Guardian signal arrives (safety case queue).
+	OnSignal func(threadID, reporter, subject, kind string)
 	// MinDiscoveryTier is the tier needed to use Tonight (V2 in production, E-01).
 	MinDiscoveryTier string
 }
@@ -102,8 +105,11 @@ func NewWithStore(auth Authenticator, mod Moderator, env string, st store.Store,
 		return nil, errors.New("DevModerator is forbidden outside the dev environment")
 	}
 	s := &Service{auth: auth, mod: mod, now: time.Now, data: map[string]*memberProfile{}, mux: http.NewServeMux(),
-		tn: newTonight(), MinDiscoveryTier: "V2", st: st, vault: vault, dirty: map[string]bool{}}
+		tn: newTonight(), MinDiscoveryTier: "V2", st: st, vault: vault, dirty: map[string]bool{}, th: newThreadState()}
 	if err := s.load(context.Background()); err != nil {
+		return nil, err
+	}
+	if err := s.loadThreads(context.Background()); err != nil {
 		return nil, err
 	}
 	if env == "dev" {
@@ -120,6 +126,15 @@ func NewWithStore(auth Authenticator, mod Moderator, env string, st store.Store,
 	m.HandleFunc("PATCH /v1/profile/photos/{id}", s.handlePatch)
 	m.HandleFunc("POST /v1/profile/photos/{id}/main", s.handleMain)
 	m.HandleFunc("DELETE /v1/profile/photos/{id}", s.handleDelete)
+	m.HandleFunc("PUT /v1/devices/key", s.handleDeviceKey)
+	m.HandleFunc("GET /v1/threads", s.handleThreads)
+	m.HandleFunc("GET /v1/threads/{id}", s.handleThread)
+	m.HandleFunc("GET /v1/threads/{id}/messages", s.handleMessages)
+	m.HandleFunc("POST /v1/threads/{id}/messages", s.handleSend)
+	m.HandleFunc("PUT /v1/threads/{id}/retention", s.handleRetention)
+	m.HandleFunc("POST /v1/threads/{id}/block", s.handleBlock)
+	m.HandleFunc("POST /v1/threads/{id}/signal", s.handleSignal)
+	m.HandleFunc("GET /v1/threads/{id}/photo", s.handleThreadPhoto)
 	m.HandleFunc("GET /v1/tonight", s.handleTonight)
 	m.HandleFunc("PUT /v1/tonight", s.handleTonightStart)
 	m.HandleFunc("DELETE /v1/tonight", s.handleTonightStop)

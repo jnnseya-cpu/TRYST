@@ -1,0 +1,25 @@
+/* Messages (FR-114). */
+.ms-list { list-style: none; padding: 0; margin: 1.5rem 0; max-width: 40rem; }
+.ms-list a { display: flex; justify-content: space-between; gap: 1rem; padding: 1.1rem 0; border-top: 1px solid var(--hairline); text-decoration: none; color: var(--tryst-cream); }
+.ms-name { font-family: var(--serif); font-size: 1.5rem; }
+.ms-name span { color: var(--tryst-champagne); }
+.ms-meta { font-size: 0.85rem; color: var(--ink-muted); align-self: center; }
+.ms-head { display: flex; gap: 1.4rem; align-items: center; }
+.ms-face { width: 5.5rem; aspect-ratio: 4 / 5; overflow: hidden; background: var(--night-raised); flex: none; }
+.ms-face img { width: 100%; height: 100%; object-fit: cover; }
+.ms-title { margin-bottom: 0.2rem; }
+.ms-title span { color: var(--tryst-champagne); }
+.ms-banner { border-left: 2px solid var(--tryst-gold); padding-left: 0.9rem; color: var(--tryst-champagne); max-width: 40rem; }
+.ms-thread { list-style: none; padding: 0; margin: 2rem 0 1rem; display: flex; flex-direction: column; gap: 0.6rem; max-width: 40rem; }
+.ms-thread li { max-width: 80%; padding: 0.7rem 1rem; background: var(--night-raised); border-left: 1px solid var(--hairline); align-self: flex-start; }
+.ms-thread li.is-mine { align-self: flex-end; border-left: 0; border-right: 1px solid var(--tryst-gold); }
+.ms-thread .ms-empty { max-width: 100%; color: var(--ink-muted); font-family: var(--serif); font-style: italic; font-size: 1.2rem; background: none; border: 0; padding: 0; }
+.ms-locked { color: var(--ink-muted); font-size: 0.85rem; font-style: italic; }
+.ms-meet { color: var(--tryst-champagne); }
+.ms-compose { display: flex; gap: 1rem; align-items: flex-end; max-width: 40rem; }
+.ms-input { font-family: var(--sans); font-size: 1rem; resize: vertical; margin-bottom: 0; }
+.ms-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.ms-tools { display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: center; max-width: 40rem; }
+.ms-retain { display: flex; gap: 0.8rem; align-items: center; margin: 0; text-transform: none; letter-spacing: 0; font-size: 0.9rem; color: var(--ink-muted); }
+.ms-retain .input { margin: 0; width: auto; font-size: 1rem; }
+.ms-block { background: none; border: 0; color: var(--ink-muted); text-decoration: underline; cursor: pointer; font-family: var(--sans); font-size: 0.9rem; }

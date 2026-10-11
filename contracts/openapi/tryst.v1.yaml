@@ -381,6 +381,24 @@ paths:
         '200':
           description: Refreshed session
           content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } }
+  /devices/key:
+    put:
+      tags: [threads]
+      operationId: putDeviceKey
+      summary: Register this device's ECDH P-256 public key for end-to-end encryption (private keys never leave the device). At most 5 devices.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id, public_jwk]
+              properties:
+                device_id: { type: string, minLength: 8, maxLength: 64 }
+                public_jwk: { type: object, required: [kty, crv, x, y], properties: { kty: { const: EC }, crv: { const: P-256 }, x: { type: string }, y: { type: string } } }
+      responses: { '200': { description: Updated }, '201': { description: Added }, '422': { $ref: '#/components/responses/Problem' } }
   /devices:
     get:
       tags: [auth]
@@ -1176,38 +1194,132 @@ paths:
       responses: { '204': { description: Revoked } }
 
   # ---------------------------------------------------------------- threads (02 §5.7)
+  /threads:
+    get:
+      tags: [threads]
+      operationId: listThreads
+      summary: The member's conversations, newest first. A thread exists only after mutual interest.
+      x-min-tier: V2
+      responses:
+        '200': { description: Threads, content: { application/json: { schema: { type: object, properties: { threads: { type: array, items: { $ref: '#/components/schemas/ThreadView' } } } } } } }
+  /threads/{id}:
+    get:
+      tags: [threads]
+      operationId: getThread
+      summary: Thread view plus both members' device public keys (for encrypting to every device).
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/ThreadId' }]
+      responses:
+        '200':
+          description: Thread
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  thread: { $ref: '#/components/schemas/ThreadView' }
+                  my_devices: { type: [array, 'null'], items: { $ref: '#/components/schemas/DeviceKey' } }
+                  their_devices: { type: [array, 'null'], items: { $ref: '#/components/schemas/DeviceKey' } }
+        '404': { $ref: '#/components/responses/Problem' }
   /threads/{id}/messages:
     get:
       tags: [threads]
       operationId: listMessages
+      summary: Ciphertext only. Each message carries the envelope for the requesting device, if any. Expired messages are purged.
       x-min-tier: V2
       parameters:
-        - { $ref: '#/components/parameters/Id' }
-        - { name: after_seq, in: query, schema: { type: integer } }
+        - { $ref: '#/components/parameters/ThreadId' }
+        - { name: device_id, in: query, required: true, schema: { type: string } }
+        - { name: after, in: query, schema: { type: integer } }
       responses:
         '200':
-          description: MLS ciphertext envelopes only
+          description: Messages
           content:
             application/json:
-              schema: { type: array, items: { $ref: '#/components/schemas/Envelope' } }
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    maxItems: 200
+                    items:
+                      type: object
+                      properties:
+                        seq: { type: integer }
+                        client_id: { type: string }
+                        mine: { type: boolean }
+                        at: { type: string, format: date-time }
+                        expires: { type: string, format: date-time }
+                        envelope: { oneOf: [{ $ref: '#/components/schemas/DeviceEnvelope' }, { type: 'null' }] }
     post:
       tags: [threads]
       operationId: postMessage
+      summary: One envelope per device of both members (ECDH P-256 + HKDF-SHA256 + AES-256-GCM, D-51). Idempotent on client_id.
       x-min-tier: V2
       parameters:
-        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/ThreadId' }
         - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } }
-      responses: { '201': { description: Stored ciphertext } }
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_id, sender_device, envelopes]
+              properties:
+                client_id: { type: string }
+                sender_device: { type: string }
+                envelopes: { type: array, minItems: 1, items: { $ref: '#/components/schemas/DeviceEnvelope' } }
+      responses:
+        '201': { description: Stored ciphertext, content: { application/json: { schema: { type: object, properties: { seq: { type: integer } } } } } }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /threads/{id}/block:
+    post:
+      tags: [threads]
+      operationId: blockThread
+      summary: Close the thread for both and hide the pair from each other everywhere. The other member is not told why.
+      x-min-tier: V2
+      parameters:
+        - { $ref: '#/components/parameters/ThreadId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses: { '200': { description: Closed } }
+  /threads/{id}/signal:
+    post:
+      tags: [threads]
+      operationId: threadGuardianSignal
+      summary: On-device Guardian signal (kind and model only, never content). child_safety and extortion freeze the thread for review.
+      x-min-tier: V2
+      parameters:
+        - { $ref: '#/components/parameters/ThreadId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind: { type: string, enum: [fraud, child_safety, extortion] }
+                model: { type: string }
+                about: { type: string, enum: [received, blocked_send] }
+      responses: { '200': { description: Recorded }, '422': { $ref: '#/components/responses/Problem' } }
+  /threads/{id}/photo:
+    get:
+      tags: [threads]
+      operationId: threadPhoto
+      summary: The other member's main photo (not after a block).
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/ThreadId' }]
+      responses: { '200': { description: Image, content: { image/jpeg: { schema: { type: string, format: binary } } } }, '404': { $ref: '#/components/responses/Problem' } }
   /threads/{id}/retention:
     put:
       tags: [threads]
       operationId: setRetention
       x-min-tier: V2
       parameters:
-        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/ThreadId' }
         - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
         required: true
@@ -1225,7 +1337,7 @@ paths:
       operationId: meetAction
       x-min-tier: V2
       parameters:
-        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/ThreadId' }
         - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
         required: true
@@ -1244,7 +1356,7 @@ paths:
       operationId: meetCheckin
       x-min-tier: V2
       parameters:
-        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/ThreadId' }
         - { $ref: '#/components/parameters/IdempotencyKey' }
       responses: { '204': { description: Checked in } }
   /threads/{id}/burn:
@@ -1253,7 +1365,7 @@ paths:
       operationId: burnThread
       x-min-tier: V2
       parameters:
-        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/ThreadId' }
         - { $ref: '#/components/parameters/IdempotencyKey' }
       responses: { '204': { description: Keys revoked on both sides } }
   /aftercare/{id}:
@@ -1484,6 +1596,11 @@ components:
       in: header
       required: true
       schema: { type: string, minLength: 16, maxLength: 128 }
+    ThreadId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^th_[0-9a-f]{24}$' }
     Id:
       name: id
       in: path
@@ -1523,6 +1640,31 @@ components:
             properties:
               checkout_url: { type: string, format: uri }
   schemas:
+    ThreadView:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        age: { type: [integer, 'null'] }
+        state: { type: string, enum: [normal, frozen, closed] }
+        retention_days: { type: integer, enum: [7, 30, 90] }
+        last_seq: { type: integer }
+        last_at: { type: string, format: date-time }
+        created: { type: string, format: date-time }
+    DeviceKey:
+      type: object
+      properties:
+        id: { type: string }
+        jwk: { type: object }
+        added: { type: string, format: date-time }
+    DeviceEnvelope:
+      type: object
+      required: [device_id, epk, iv, ct]
+      properties:
+        device_id: { type: string }
+        epk: { type: string, description: "Sender's ephemeral P-256 public key (base64, raw)" }
+        iv: { type: string }
+        ct: { type: string, maxLength: 16384 }
     TonightPerson:
       type: object
       properties:
@@ -1720,14 +1862,6 @@ components:
         blocking: { type: array, items: { type: string } }
         recommended_next: { type: string, enum: [open_thread, amend, decline] }
         meet_probability_band: { type: string, enum: [low, medium, high] }
-    Envelope:
-      type: object
-      required: [ciphertext]
-      properties:
-        seq: { type: integer }
-        sender_device: { type: string, format: uuid }
-        ciphertext: { type: string, contentEncoding: base64 }
-        expires_at: { type: string, format: date-time }
     BehaviourEvent:
       type: object
       additionalProperties: false
