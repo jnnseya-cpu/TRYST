@@ -156,7 +156,13 @@ type Config struct {
 	StaffLead func(r *http.Request) (string, bool)
 	// Notify records a masked notice for a member. May be nil.
 	Notify func(account, kind, link string)
+	// OnSale lists the catalogue keys that can be bought (and granted by voucher). Nil
+	// means everything. Launch sells TRYST+ only: nothing is sold before it exists.
+	OnSale map[string]bool
 }
+
+// LaunchSaleItems is the launch catalogue: Verified is free; TRYST+ monthly and annual.
+var LaunchSaleItems = []string{"tryst_plus", "tryst_plus_annual"}
 
 // Service is the HTTP handler.
 type Service struct {
@@ -379,7 +385,7 @@ func (s *Service) handleEntitlements(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(subs, func(i, j int) bool { return subs[i].Item < subs[j].Item })
 	out := map[string]any{
 		"plan": e.Plan, "ghost": e.Ghost, "keys": e.Keys, "deposit_paid": e.Deposit, "subscriptions": subs,
-		"catalogue": Catalogue, "payments_available": s.cfg.Provider != nil,
+		"catalogue": s.onSale(), "payments_available": s.cfg.Provider != nil,
 	}
 	if a.Voucher != nil && now.Before(a.Voucher.Until) {
 		out["voucher_plan"] = a.Voucher
@@ -394,6 +400,10 @@ func (s *Service) handleEntitlements(w http.ResponseWriter, r *http.Request) {
 func (s *Service) checkout(w http.ResponseWriter, r *http.Request, acc identity.Account, a *account, key string) {
 	ref := a.BillingRef
 	s.mu.Unlock()
+	if !s.sells(key) {
+		fail(w, 409, "not_on_sale", "That isn't available yet.")
+		return
+	}
 	if s.cfg.Provider == nil {
 		fail(w, 503, "payments_unavailable", "Payments aren't available right now. Please try again later.")
 		return
@@ -682,10 +692,10 @@ func (s *Service) handleIssueVouchers(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&in)
 	parts := strings.Split(in.Grant, ":")
-	valid := (len(parts) == 2 && parts[0] == "keys" && isDigits(parts[1])) ||
-		(len(parts) == 3 && parts[0] == "plan" && isDigits(parts[2]) && isPlan(parts[1]))
+	valid := (len(parts) == 2 && parts[0] == "keys" && isDigits(parts[1]) && s.sells("keys_60")) ||
+		(len(parts) == 3 && parts[0] == "plan" && isDigits(parts[2]) && isPlan(parts[1]) && s.sells(parts[1]))
 	if !valid || in.Count < 1 || in.Count > 500 {
-		fail(w, 422, "validation_failed", "grant is keys:<n> or plan:<plan>:<days>; count 1–500.")
+		fail(w, 422, "validation_failed", "grant is keys:<n> or plan:<plan>:<days> for something on sale; count 1–500.")
 		return
 	}
 	codes := make([]string, 0, in.Count)
@@ -715,6 +725,20 @@ func isDigits(s string) bool {
 		}
 	}
 	return s != "0"
+}
+
+// sells reports whether key is on sale.
+func (s *Service) sells(key string) bool { return s.cfg.OnSale == nil || s.cfg.OnSale[key] }
+
+// onSale is the catalogue members see.
+func (s *Service) onSale() []Item {
+	out := []Item{}
+	for _, it := range Catalogue {
+		if s.sells(it.Key) {
+			out = append(out, it)
+		}
+	}
+	return out
 }
 
 func isPlan(k string) bool {

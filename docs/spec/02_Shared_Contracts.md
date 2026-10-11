@@ -657,7 +657,7 @@ Served by the commerce service (`commercesvc`, COMMERCE-DB; [FR-117](#10-require
 | POST | `/v1/billing/stripe/webhook` | sys | Stripe events (signature-verified, idempotent on event id, out-of-order safe) → entitlement and Keys-ledger updates: `checkout.session.completed`, `invoice.paid`, `customer.subscription.*`, `charge.refunded` (removes the refunded share of Keys; never below zero), `charge.dispute.created`, `invoice.upcoming` (in-app renewal notice; the processor emails the billing address ≥ 7 days ahead) (v1.2, D-22) |
 | POST | `/v1/subscription/cancel` | V0 | `{item?}`. One step; no retention flow. Within 14 days of starting: ends now and refunds the unused days (whole days used are charged). After: runs to the end of the paid period, no further charge |
 
-Purchases answer 503 `payments_unavailable` until the processor is configured. Dev builds use a local test checkout (`/billing/checkout`, `POST /v1/billing/dev/complete`) that production refuses. Staff leads issue vouchers through `POST /ops/v1/vouchers` (console contract).
+Only items on sale can be bought or granted by voucher (launch: TRYST+ only, [D-60](06_Decisions_and_Changes.md#2-decision-log)); others answer 409 `not_on_sale` and are left out of `catalogue`. Purchases answer 503 `payments_unavailable` until the processor is configured. Dev builds use a local test checkout (`/billing/checkout`, `POST /v1/billing/dev/complete`) that production refuses. Staff leads issue vouchers through `POST /ops/v1/vouchers` (console contract).
 
 ### 5.10 Error model
 

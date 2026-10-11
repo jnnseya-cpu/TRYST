@@ -53,7 +53,9 @@ export default function Billing() {
   if (signedOut) return <Shell><h1>Signed out</h1><a className="button inline" href="/sign-in">Sign in</a></Shell>;
   if (!e) return <Shell><p>Loading…</p></Shell>;
   const plans = e.catalogue.filter((c) => c.kind === "plan" || c.kind === "addon");
-  const current = e.catalogue.find((c) => c.key === e.plan);
+  const current = e.catalogue.find((c) => c.key === e.plan) ?? (e.plan ? { name: e.plan.replace(/_/g, " ").toUpperCase() } : undefined);
+  const sellsKeys = e.catalogue.some((c) => c.kind === "keys");
+  const sellsDeposit = e.catalogue.some((c) => c.kind === "deposit");
   const live = e.subscriptions.filter((s) => s.status !== "canceled");
 
   return (
@@ -80,20 +82,23 @@ export default function Billing() {
         ))}
       </section>
 
+      {(sellsKeys || sellsDeposit || e.keys > 0) && (
       <section className="pf-section">
         <h2>Keys</h2>
         <p className="bl-keys" data-testid="keys">{e.keys}</p>
         <p className="note">An intent costs 5 Keys (15 from a couple to a single member). You get them all back when they reply. Keys don&rsquo;t expire.</p>
         <div className="bl-row">
-          <button type="button" className="button inline" disabled={!e.payments_available} onClick={async () => go(await buyKeys("keys_60"))}>Buy 60 Keys · £9.99</button>
-          {!e.deposit_paid && (
+          {sellsKeys && <button type="button" className="button inline" disabled={!e.payments_available} onClick={async () => go(await buyKeys("keys_60"))}>Buy 60 Keys · £9.99</button>}
+          {sellsDeposit && !e.deposit_paid && (
             <button type="button" className="button ghost inline" disabled={!e.payments_available} onClick={async () => go(await payDeposit())}>Pay the £9.99 deposit (credited as 60 Keys)</button>
           )}
         </div>
       </section>
+      )}
 
       <section className="pf-section">
         <h2>Plans</h2>
+        <p className="note">Verified is free: full profile, be discovered, reply to anyone, Tonight and the full safety suite.</p>
         <ul className="bl-plans">
           {plans.map((p) => (
             <li key={p.key} className="bl-plan" data-testid="plan">

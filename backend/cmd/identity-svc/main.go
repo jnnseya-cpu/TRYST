@@ -41,6 +41,8 @@
 //	ARC_URL, ARC_API_KEY, ARC_SECRET  the alarm-receiving centre (safety line, Panic);
 //	                required in production (D-48)
 //	METRICS_ADDR    internal listener for /metrics (default 127.0.0.1:9090); never public
+//	SALE_ITEMS      catalogue keys on sale, comma-separated, or "all" (default: TRYST+
+//	                monthly and annual only; D-60)
 //	PUBLIC_URL      member site origin for checkout return links (default first RP origin)
 package main
 
@@ -381,7 +383,7 @@ func serve(a *app) {
 // openCommerce builds the commerce service: Stripe when configured, the local test checkout
 // in dev, and no processor otherwise (purchases answer 503 until Stripe is approved).
 func openCommerce(mode string, members *identity.Server, staff staffauth.Auth, origin string, notifyFn func(string, string, string), st store.Store) *commercesvc.Service {
-	cfg := commercesvc.Config{Members: members, Store: st, Env: mode, MinTier: gate.V1, Notify: notifyFn,
+	cfg := commercesvc.Config{Members: members, Store: st, Env: mode, OnSale: saleItems(), MinTier: gate.V1, Notify: notifyFn,
 		StaffLead: func(r *http.Request) (string, bool) {
 			st, ok := staff.Authenticate(r)
 			if !ok {
@@ -536,4 +538,22 @@ func devOnly(mode, envVar, def string) string {
 		log.Fatalf("%s is required in production", envVar)
 	}
 	return def
+}
+
+// saleItems reads SALE_ITEMS (comma-separated catalogue keys, or "all"); the default is
+// the launch catalogue (D-60).
+func saleItems() map[string]bool {
+	v := os.Getenv("SALE_ITEMS")
+	if v == "all" {
+		return nil
+	}
+	keys := commercesvc.LaunchSaleItems
+	if v != "" {
+		keys = strings.Split(v, ",")
+	}
+	out := map[string]bool{}
+	for _, k := range keys {
+		out[strings.TrimSpace(k)] = true
+	}
+	return out
 }

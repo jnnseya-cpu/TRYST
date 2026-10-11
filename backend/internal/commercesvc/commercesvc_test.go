@@ -497,3 +497,38 @@ func TestBillingNotices(t *testing.T) {
 		t.Fatalf("notices: %v", got)
 	}
 }
+
+func TestOnlyItemsOnSaleCanBeBought(t *testing.T) {
+	g := newRig(t, store.NewMemory())
+	g.svc.cfg.OnSale = map[string]bool{"tryst_plus": true, "tryst_plus_annual": true}
+	e := g.ent("ana")
+	keys := []string{}
+	for _, it := range e["catalogue"].([]any) {
+		keys = append(keys, it.(map[string]any)["key"].(string))
+	}
+	if strings.Join(keys, ",") != "tryst_plus,tryst_plus_annual" {
+		t.Fatalf("catalogue: %v", keys)
+	}
+	if c, out := g.do("POST", "/v1/subscription", "ana", map[string]any{"plan": "duo", "pre_contract_ack": true, "start_now": true}); c != 409 || out["code"] != "not_on_sale" {
+		t.Fatalf("duo: %d %v", c, out)
+	}
+	for _, p := range []string{"/v1/deposit"} {
+		if c, _ := g.do("POST", p, "ana", nil); c != 409 {
+			t.Fatalf("%s: %d", p, c)
+		}
+	}
+	if c, _ := g.do("POST", "/v1/keys/purchase", "ana", map[string]any{"pack": "keys_60"}); c != 409 {
+		t.Fatalf("keys: %d", c)
+	}
+	if c, _ := g.do("POST", "/v1/subscription", "ana", map[string]any{"plan": "tryst_plus", "pre_contract_ack": true, "start_now": true}); c != 201 {
+		t.Fatalf("tryst_plus: %d", c)
+	}
+	for _, grant := range []string{"keys:60", "plan:envoy:30"} {
+		if c, _ := g.do("POST", "/ops/v1/vouchers", "lead", map[string]any{"grant": grant, "count": 1}); c != 422 {
+			t.Fatalf("voucher %s: %d", grant, c)
+		}
+	}
+	if c, _ := g.do("POST", "/ops/v1/vouchers", "lead", map[string]any{"grant": "plan:tryst_plus:30", "count": 1}); c != 201 {
+		t.Fatalf("tryst_plus voucher: %d", c)
+	}
+}
