@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"sort"
 	"strings"
@@ -32,7 +31,9 @@ import (
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/enforcement"
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
+	"github.com/jnnseya-cpu/tryst/backend/internal/outbox"
 	"github.com/jnnseya-cpu/tryst/backend/internal/problem"
+	"github.com/jnnseya-cpu/tryst/backend/internal/staffauth"
 	"github.com/jnnseya-cpu/tryst/backend/internal/store"
 )
 
@@ -49,8 +50,8 @@ type Directory interface {
 	Summary(account string) (name, area string)
 	// MainPhoto returns the subject's main photo bytes and content type.
 	MainPhoto(ctx context.Context, account string) ([]byte, string, error)
-	// SetStanding applies an enforcement outcome on the member platform.
-	SetStanding(account, standing string)
+	// SetStanding applies an enforcement outcome on the member platform. Idempotent.
+	SetStanding(ctx context.Context, account, standing string) error
 }
 
 // Category is what a member reports (02 ReportCategory), mapped to the escalation matrix
@@ -107,7 +108,28 @@ type Case struct {
 	PhotoSeen  []string  `json:"photo_seen,omitempty"`  // staff who revealed the photo, with reasons
 	Interim    bool      `json:"interim,omitempty"`     // subject frozen until decided (03 §7.3)
 	MergedInto string    `json:"merged_into,omitempty"` // closed by the decision on another case
+	// Mandatory external reporting: an upheld suspected-minor (CSEA) case must be reported
+	// to the National Crime Agency (03 §7.3; OSA reporting duty where in force), recorded
+	// here with the agency's reference. It stays in the queue until recorded.
+	ExternalRequired bool            `json:"external_required,omitempty"`
+	ExternalDue      time.Time       `json:"external_due,omitempty"`
+	External         *ExternalReport `json:"external,omitempty"`
 }
+
+// ExternalReport is a report made to an authority about a case.
+type ExternalReport struct {
+	Agency    string    `json:"agency"` // NCA | police | IWF
+	Reference string    `json:"reference"`
+	By        string    `json:"by"`
+	At        time.Time `json:"at"`
+}
+
+// MaxReportsPerDay limits reports per member, so reporting can't flood the queue or be
+// used to harass someone.
+const MaxReportsPerDay = 20
+
+// ExternalReportWindow is the policy deadline for a mandatory report once a case is upheld.
+const ExternalReportWindow = 24 * time.Hour
 
 // Decision is an enforcement decision on a case.
 type Decision struct {
@@ -130,50 +152,12 @@ type Appeal struct {
 	Outcome  string    `json:"outcome,omitempty"` // upheld | overturned
 }
 
-// Staff is an authenticated moderator.
-type Staff struct {
-	ID    string
-	Roles []string
-}
-
-func (s Staff) has(role string) bool {
-	for _, r := range s.Roles {
-		if r == role {
-			return true
-		}
-	}
-	return false
-}
-
-// StaffAuth authenticates the console. Production: the identity header set by the company
-// sign-in proxy (Cloudflare Access / oauth2-proxy), believed only from TrustedProxies.
-// Dev: "Authorization: Staff <token>" against DevTokens (refused in prod).
-type StaffAuth struct {
-	TrustedProxies []string
-	DevTokens      map[string]Staff // sha256(token) hex -> staff
-	Env            string
-}
-
-func (a StaffAuth) Authenticate(r *http.Request) (Staff, bool) {
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		ip = r.RemoteAddr
-	}
-	if identity.TrustedAddr(a.TrustedProxies, ip) {
-		if id := r.Header.Get("X-Staff-Identity"); id != "" {
-			return Staff{ID: id, Roles: strings.Split(r.Header.Get("X-Staff-Roles"), ",")}, true
-		}
-	}
-	if a.Env == "dev" {
-		if tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Staff "); ok {
-			h := sha256.Sum256([]byte(tok))
-			if s, ok := a.DevTokens[hex.EncodeToString(h[:])]; ok {
-				return s, true
-			}
-		}
-	}
-	return Staff{}, false
-}
+// Staff and StaffAuth are the shared staff sign-in (internal/staffauth): the sign-in
+// proxy's verified token in production, hashed dev tokens in development.
+type (
+	Staff     = staffauth.Staff
+	StaffAuth = staffauth.Auth
+)
 
 // Service is the HTTP handler for /v1/reports, /v1/appeals, /v1/me/standing and /ops/v1/*.
 type Service struct {
@@ -186,20 +170,46 @@ type Service struct {
 	cases   map[string]*Case
 	chain   []AuditEntry
 	mux     *http.ServeMux
-	// Notify records a masked notice for a member. May be nil.
-	Notify func(account, kind, link string)
-	// pending standing changes, applied after s.mu is released: the member platform calls
-	// FromSignal while holding its own lock, so we never call into it while holding ours.
-	pending [][2]string
+	// Notices delivers a masked notice to a member (the notification service). May be nil.
+	Notices func(ctx context.Context, account, kind, link string) error
+	// Outboxes (D-59): standing changes for the member platform and member notices are
+	// written here with the change that caused them and delivered with retries.
+	standingBox *outbox.Box
+	noticeBox   *outbox.Box
 }
 
-var ErrDevTokensInProd = errors.New("staff dev tokens are forbidden outside the dev environment")
+var ErrDevTokensInProd = staffauth.ErrDevTokensInProd
+
+type standingMsg struct {
+	Account  string `json:"account"`
+	Standing string `json:"standing"`
+}
+
+type noticeMsg struct {
+	Account string `json:"account"`
+	Kind    string `json:"kind"`
+	Link    string `json:"link"`
+}
 
 func New(members MemberAuth, staff StaffAuth, dir Directory, st store.Store) (*Service, error) {
-	if staff.Env != "dev" && len(staff.DevTokens) > 0 {
-		return nil, ErrDevTokensInProd
+	if err := staff.Check(); err != nil {
+		return nil, err
 	}
 	s := &Service{members: members, staff: staff, dir: dir, st: st, now: time.Now, cases: map[string]*Case{}, mux: http.NewServeMux()}
+	s.standingBox = &outbox.Box{Name: "standing", St: st, Send: func(ctx context.Context, m outbox.Message) error {
+		var v standingMsg
+		if err := m.Decode(&v); err != nil {
+			return nil // unreadable: drop rather than block the queue
+		}
+		return s.dir.SetStanding(ctx, v.Account, v.Standing)
+	}}
+	s.noticeBox = &outbox.Box{Name: "notices", St: st, Send: func(ctx context.Context, m outbox.Message) error {
+		var v noticeMsg
+		if err := m.Decode(&v); err != nil || s.Notices == nil {
+			return nil
+		}
+		return s.Notices(ctx, v.Account, v.Kind, v.Link)
+	}}
 	if err := s.load(context.Background()); err != nil {
 		return nil, err
 	}
@@ -216,6 +226,7 @@ func New(members MemberAuth, staff StaffAuth, dir Directory, st store.Store) (*S
 	m.HandleFunc("POST /ops/v1/cases/{id}/appeal", s.handleAppealDecision)
 	m.HandleFunc("GET /ops/v1/audit/verify", s.handleAuditVerify)
 	m.HandleFunc("GET /ops/v1/stats", s.handleStats)
+	m.HandleFunc("POST /ops/v1/cases/{id}/external-report", s.handleExternalReport)
 	return s, nil
 }
 
@@ -223,28 +234,35 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	s.mux.ServeHTTP(w, r)
-	s.applyPending()
+	// Deliver what this request queued now; the sweep retries anything that fails.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	s.Flush(ctx)
 }
 
+// Flush delivers queued standing changes and notices. Call it periodically too.
+func (s *Service) Flush(ctx context.Context) (pending int) {
+	return s.standingBox.Deliver(ctx) + s.noticeBox.Deliver(ctx)
+}
+
+// OutboxPending counts undelivered messages (metrics).
+func (s *Service) OutboxPending(ctx context.Context) int {
+	return s.standingBox.Pending(ctx) + s.noticeBox.Pending(ctx)
+}
+
+// notify queues a masked notice. Caller holds s.mu.
 func (s *Service) notify(account, kind string) {
-	if s.Notify != nil {
-		s.Notify(account, kind, "/account")
+	if err := s.noticeBox.Add(context.Background(), noticeMsg{account, kind, "/account"}); err != nil {
+		log.Printf("queue notice failed: %v", err)
 	}
 }
 
-func (s *Service) applyPending() {
-	s.mu.Lock()
-	pending := s.pending
-	s.pending = nil
-	s.mu.Unlock()
-	for _, p := range pending {
-		s.dir.SetStanding(p[0], p[1])
-	}
-}
-
-// restand queues the subject's current standing for the member platform. Caller holds s.mu.
+// restand queues the subject's current standing for the member platform. The latest
+// standing replaces an undelivered earlier one. Caller holds s.mu.
 func (s *Service) restand(account string) {
-	s.pending = append(s.pending, [2]string{account, s.standingOf(account)})
+	if err := s.standingBox.Put(context.Background(), account, standingMsg{account, s.standingOf(account)}); err != nil {
+		log.Printf("queue standing failed: %v", err)
+	}
 }
 
 // closeRelated closes other open cases about the same conduct: one decision covers every
@@ -360,23 +378,34 @@ func (s *Service) audit(ctx context.Context, staff, action, caseID, detail strin
 
 // FromSignal opens a case from an on-device Guardian signal (no message content).
 func (s *Service) FromSignal(threadID, reporter, subject, kind string) {
+	_ = s.Signal(context.Background(), newID("sg_"), threadID, reporter, subject, kind)
+}
+
+// Signal opens a case from an on-device signal, at most once per signal id (the member
+// platform's outbox may deliver a signal more than once).
+func (s *Service) Signal(ctx context.Context, id, threadID, reporter, subject, kind string) error {
 	cat := map[string]string{"child_safety": "minor", "extortion": "sextortion", "fraud": "romance_fraud"}[kind]
-	if cat == "" {
-		return
+	if cat == "" || subject == "" {
+		return nil
 	}
 	c, _ := category(cat)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if _, err := s.st.Get(ctx, "signal", id); err == nil {
+		return nil
+	}
 	now := s.now()
 	cs := &Case{ID: newID("cs_"), Subject: subject, Reporter: reporter, Source: "guardian", Category: cat, Thread: threadID,
 		Opened: now, Due: now.Add(c.Deadline), State: "open", Note: "On-device signal: " + kind, Interim: c.AutoSuspend}
 	s.cases[cs.ID] = cs
-	s.save(context.Background(), cs)
+	s.save(ctx, cs)
+	if err := s.st.Put(ctx, "signal", id, []byte(`"`+cs.ID+`"`)); err != nil {
+		return err
+	}
 	if cs.Interim {
 		s.restand(subject)
-		// The member platform calls us holding its own lock; apply once it has returned.
-		go s.applyPending()
 	}
+	return nil
 }
 
 func (s *Service) handleCategories(w http.ResponseWriter, r *http.Request) {
@@ -428,6 +457,16 @@ func (s *Service) handleReport(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.now()
+	recent := 0
+	for _, c := range s.cases {
+		if c.Reporter == acc.ID && c.Source == "report" && now.Sub(c.Opened) < 24*time.Hour {
+			recent++
+		}
+	}
+	if recent >= MaxReportsPerDay {
+		fail(w, 429, "rate_limited", "You've sent a lot of reports today. If you're in danger now, call 999.")
+		return
+	}
 	cs := &Case{ID: newID("cs_"), Subject: subject, Reporter: acc.ID, Source: "report", Category: cat.Key, Thread: in.Thread,
 		Disclosed: in.Disclosed, Note: in.Note, Opened: now, Due: now.Add(cat.Deadline), State: "open", Interim: cat.AutoSuspend}
 	s.cases[cs.ID] = cs
@@ -536,7 +575,7 @@ func (s *Service) handleAppeal(w http.ResponseWriter, r *http.Request) {
 
 func (s *Service) staffOr401(w http.ResponseWriter, r *http.Request) (Staff, bool) {
 	st, ok := s.staff.Authenticate(r)
-	if !ok || !(st.has("moderator") || st.has("lead")) {
+	if !ok || !(st.Has("moderator") || st.Has("lead")) {
 		fail(w, 401, "staff_required", "Staff sign-in required.")
 		return Staff{}, false
 	}
@@ -553,16 +592,29 @@ type caseSummary struct {
 	Overdue  bool      `json:"overdue"`
 	State    string    `json:"state"`
 	Appeal   bool      `json:"appeal_pending"`
+	External bool      `json:"external_report_pending"`
 }
 
 func (s *Service) summary(c *Case) caseSummary {
 	cat, _ := category(c.Category)
 	appeal := c.Appeal != nil && c.Appeal.Outcome == ""
+	ext := externalPending(c)
 	due := c.Due
-	if appeal {
+	switch {
+	case appeal:
 		due = c.Appeal.Due
+	case c.State == "closed" && ext:
+		due = c.ExternalDue
 	}
-	return caseSummary{c.ID, c.Category, cat.Label, c.Source, c.Opened, due, s.now().After(due) && (c.State != "closed" || appeal), c.State, appeal}
+	return caseSummary{c.ID, c.Category, cat.Label, c.Source, c.Opened, due, s.now().After(due) && (c.State != "closed" || appeal || ext), c.State, appeal, ext}
+}
+
+func externalPending(c *Case) bool { return c.ExternalRequired && c.External == nil }
+
+// inQueue reports whether a case still needs staff: undecided, an open appeal, or a
+// mandatory external report not yet recorded.
+func inQueue(c *Case) bool {
+	return c.State != "closed" || (c.Appeal != nil && c.Appeal.Outcome == "") || externalPending(c)
 }
 
 func (s *Service) handleQueue(w http.ResponseWriter, r *http.Request) {
@@ -573,7 +625,7 @@ func (s *Service) handleQueue(w http.ResponseWriter, r *http.Request) {
 	defer s.mu.Unlock()
 	var out []caseSummary
 	for _, c := range s.cases {
-		if c.State != "closed" || (c.Appeal != nil && c.Appeal.Outcome == "") {
+		if inQueue(c) {
 			out = append(out, s.summary(c))
 		}
 	}
@@ -621,6 +673,9 @@ func (s *Service) handleCase(w http.ResponseWriter, r *http.Request) {
 		"prior_strikes":         prior,
 		"decision":              c.Decision,
 		"appeal":                c.Appeal,
+		"external_required":     c.ExternalRequired,
+		"external_due":          c.ExternalDue,
+		"external":              c.External,
 	})
 }
 
@@ -726,6 +781,9 @@ func (s *Service) handleDecision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.Decision = &Decision{ID: newID("dc_"), Action: actionNames[d.Action], Ground: string(d.Ground), DecidedBy: st.ID, At: now, Reason: in.Reason, Anchors: d.RetainAnchors}
+	if cat.Conduct == enforcement.Minor && c.External == nil {
+		c.ExternalRequired, c.ExternalDue = true, now.Add(ExternalReportWindow)
+	}
 	if d.Action == enforcement.Permanent {
 		// Two-person rule (03 §7.3). The member is suspended while the second moderator
 		// looks: the conduct is serious enough that they shouldn't keep using TRYST meanwhile.
@@ -832,26 +890,100 @@ func (s *Service) handleAuditVerify(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"ok": err == nil, "entries": len(s.chain)})
 }
 
+// ExternalPending counts upheld cases whose mandatory external report isn't recorded yet.
+func (s *Service) ExternalPending() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for _, c := range s.cases {
+		if externalPending(c) {
+			n++
+		}
+	}
+	return n
+}
+
 // QueueStats returns open cases, overdue cases, and overdue cases in the 15-minute and 1-hour
 // categories, for the on-call alert rules.
 func (s *Service) QueueStats() (open, overdue, overdueUrgent int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, c := range s.cases {
-		pending := c.State != "closed" || (c.Appeal != nil && c.Appeal.Outcome == "")
-		if !pending {
+		if !inQueue(c) {
 			continue
 		}
 		open++
 		sm := s.summary(c)
 		if sm.Overdue {
 			overdue++
-			if cat, _ := category(c.Category); cat.Deadline <= time.Hour && c.State != "closed" {
+			if cat, _ := category(c.Category); (cat.Deadline <= time.Hour && c.State != "closed") || externalPending(c) {
 				overdueUrgent++
 			}
 		}
 	}
 	return
+}
+
+// handleExternalReport records a report made to an authority (NCA, police, IWF) with the
+// authority's reference. Required for upheld suspected-minor cases; allowed on any decided
+// case (for example a police referral). Audited.
+func (s *Service) handleExternalReport(w http.ResponseWriter, r *http.Request) {
+	st, ok := s.staffOr401(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Agency    string `json:"agency"`
+		Reference string `json:"reference"`
+	}
+	_ = json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&in)
+	in.Reference = strings.TrimSpace(in.Reference)
+	switch in.Agency {
+	case "NCA", "police", "IWF":
+	default:
+		fail(w, 422, "validation_failed", "Agency is NCA, police or IWF.")
+		return
+	}
+	if len(in.Reference) < 3 || len(in.Reference) > 100 {
+		fail(w, 422, "validation_failed", "Enter the reference the agency gave you.")
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c, ok := s.cases[r.PathValue("id")]
+	if !ok || c.Decision == nil || c.Decision.Action == "dismiss" {
+		fail(w, 409, "not_decided", "Record an external report only on an upheld case.")
+		return
+	}
+	if c.External != nil {
+		fail(w, 409, "already_reported", "An external report is already recorded.")
+		return
+	}
+	c.External = &ExternalReport{Agency: in.Agency, Reference: in.Reference, By: st.ID, At: s.now()}
+	s.save(r.Context(), c)
+	s.audit(r.Context(), st.ID, "external_report", c.ID, in.Agency+" "+in.Reference)
+	writeJSON(w, 200, map[string]any{"external": c.External})
+}
+
+// Accounts lists every account the safety database refers to (subjects and reporters),
+// for re-applying erasures after a restore.
+func (s *Service) Accounts() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	seen := map[string]bool{}
+	for _, c := range s.cases {
+		for _, a := range []string{c.Subject, c.Reporter} {
+			if a != "" && !strings.HasPrefix(a, "erased:") {
+				seen[a] = true
+			}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for a := range seen {
+		out = append(out, a)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // handleStats is the transparency-report input: counts only, no member data.
@@ -861,7 +993,7 @@ func (s *Service) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	byCat, byAction := map[string]int{}, map[string]int{}
+	byCat, byAction, external := map[string]int{}, map[string]int{}, map[string]int{}
 	appeals, overturned, onTime, closed := 0, 0, 0, 0
 	for _, c := range s.cases {
 		byCat[c.Category]++
@@ -872,6 +1004,9 @@ func (s *Service) handleStats(w http.ResponseWriter, r *http.Request) {
 				onTime++
 			}
 		}
+		if c.External != nil {
+			external[c.External.Agency]++
+		}
 		if c.Appeal != nil && c.Appeal.Outcome != "" {
 			appeals++
 			if c.Appeal.Outcome == "overturned" {
@@ -880,5 +1015,5 @@ func (s *Service) handleStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, 200, map[string]any{"by_category": byCat, "by_action": byAction, "decided": closed, "decided_on_time": onTime,
-		"appeals_decided": appeals, "overturned": overturned})
+		"appeals_decided": appeals, "overturned": overturned, "external_reports": external})
 }

@@ -6,7 +6,7 @@ import { ops, setStaffToken, staffToken } from "@/lib/safety";
 import "../profile/profile.css";
 import "./ops.css";
 
-type Row = { id: string; category: string; label: string; source: string; opened: string; due: string; overdue: boolean; state: string; appeal_pending: boolean };
+type Row = { id: string; category: string; label: string; source: string; opened: string; due: string; overdue: boolean; state: string; appeal_pending: boolean; external_report_pending: boolean };
 
 function dueText(due: string) {
   const mins = Math.round((new Date(due).getTime() - Date.now()) / 60000);
@@ -69,7 +69,7 @@ export default function Console() {
                 <td className={c.overdue ? "op-due-late" : ""}>{dueText(c.due)}</td>
                 <td><a href={`/ops/cases/${c.id}`}>{c.label}</a></td>
                 <td>{c.source === "guardian" ? "On-device signal" : "Member report"}</td>
-                <td>{c.appeal_pending ? "Appeal" : c.state === "pending_second" ? "Needs second moderator" : "Open"}</td>
+                <td>{c.appeal_pending ? "Appeal" : c.state === "pending_second" ? "Needs second moderator" : c.external_report_pending ? "Report to NCA" : "Open"}</td>
               </tr>
             ))}
           </tbody>

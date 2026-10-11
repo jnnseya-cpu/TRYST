@@ -15,6 +15,20 @@ groups:
         annotations:
           summary: "A safety-line, trusted-contact or Panic alert could not be delivered"
           runbook: "docs/runbooks/oncall.md#safety-alert-delivery-failing"
+      - alert: ExternalReportPending
+        expr: tryst_safety_external_reports_pending > 0
+        for: 12h
+        labels: { severity: ticket }
+        annotations:
+          summary: "An upheld suspected-minor case hasn't been reported to the NCA yet (pages at 24 h via UrgentSafetyCaseOverdue)"
+          runbook: "docs/runbooks/oncall.md#external-report-pending"
+      - alert: SafetyDeliveryBacklog
+        expr: tryst_safety_outbox_pending > 0 or tryst_outbox_pending > 0
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "Bans, freezes, notices or on-device signals aren't getting between the API and the safety service"
+          runbook: "docs/runbooks/oncall.md#safety-delivery-backlog"
       - alert: SafetyCasesOverdue
         expr: tryst_safety_cases_overdue > 0
         for: 30m

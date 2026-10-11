@@ -5,7 +5,7 @@
 # recovery time) and counts only.
 #
 #   DRILL_ADMIN_DSN=postgres://.../postgres  DRILL_PREFIX=tryst_drill \
-#   DRILL_LEDGER_URL=<live ledger DSN>  TRYST_BIN=./identity-svc \
+#   DRILL_LEDGER_URL=<live ledger DSN>  TRYST_BIN=./identity-svc  [SAFETY_BIN=./safety-svc] \
 #   [BACKUP_KEY_FILE=...] [KEYS_BACKUP=<dir holding keys.dump>] \
 #   (plus the service's secrets: DATA_KEK, DSR_SIGNING_KEY, ...) scripts/restore-drill.sh <backup-dir>
 set -euo pipefail
@@ -38,4 +38,10 @@ echo "== reapply erasures from the live ledger"
 "$bin" admin reapply-erasures
 echo "== verify (after reapply)"
 "$bin" admin verify
+if [ -n "${SAFETY_BIN:-}" ]; then
+  echo "== safety service: verify, reapply erasures, verify"
+  "$SAFETY_BIN" admin verify
+  "$SAFETY_BIN" admin reapply-erasures
+  "$SAFETY_BIN" admin verify
+fi
 echo "restore: $((restored - start)) s, total: $(( $(date +%s) - start )) s"

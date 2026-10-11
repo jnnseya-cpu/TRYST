@@ -33,6 +33,7 @@ type directory struct {
 	mu       sync.Mutex
 	threads  map[string][2]string
 	standing map[string]string
+	down     bool
 }
 
 func newDirectory() *directory {
@@ -62,10 +63,14 @@ func (d *directory) MainPhoto(_ context.Context, a string) ([]byte, string, erro
 	}
 	return nil, "", errors.New("none")
 }
-func (d *directory) SetStanding(a, s string) {
+func (d *directory) SetStanding(_ context.Context, a, s string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.down {
+		return errors.New("member platform unavailable")
+	}
 	d.standing[a] = s
+	return nil
 }
 func (d *directory) get(a string) string {
 	d.mu.Lock()
@@ -208,8 +213,9 @@ func TestStaffAuth(t *testing.T) {
 	if _, err := New(members{}, StaffAuth{Env: "prod", DevTokens: devStaff().DevTokens}, newDirectory(), store.NewMemory()); !errors.Is(err, ErrDevTokensInProd) {
 		t.Fatalf("dev tokens in prod: %v", err)
 	}
-	// Production: identity headers are believed only from the staff sign-in proxy.
-	a := StaffAuth{Env: "prod", TrustedProxies: []string{"10.0.0.5"}}
+	// Production: identity headers are believed only from the staff sign-in proxy, and
+	// roles come from the roster, never from the request.
+	a := StaffAuth{Env: "prod", TrustedProxies: []string{"10.0.0.5"}, Roster: map[string][]string{"mallory": {"lead"}}}
 	r := httptest.NewRequest("GET", "/ops/v1/cases", nil)
 	r.Header.Set("X-Staff-Identity", "mallory")
 	r.Header.Set("X-Staff-Roles", "lead")
@@ -218,7 +224,7 @@ func TestStaffAuth(t *testing.T) {
 		t.Fatal("staff header believed from an untrusted address")
 	}
 	r.RemoteAddr = "10.0.0.5:4000"
-	if s, ok := a.Authenticate(r); !ok || s.ID != "mallory" || !s.has("lead") {
+	if s, ok := a.Authenticate(r); !ok || s.ID != "mallory" || !s.Has("lead") {
 		t.Fatal("staff header from the trusted proxy was refused")
 	}
 	r.Header.Set("Authorization", "Staff "+tokMod1)
@@ -394,9 +400,7 @@ func TestGuardianSignalOpensCase(t *testing.T) {
 	g := newRig(t, store.NewMemory())
 	g.svc.FromSignal("th_ab", "alice", "bob", "child_safety")
 	g.svc.FromSignal("th_ab", "alice", "bob", "nothing")
-	for i := 0; i < 100 && g.dir.get("bob") != "suspend"; i++ {
-		time.Sleep(5 * time.Millisecond)
-	}
+	g.svc.Flush(context.Background())
 	if g.dir.get("bob") != "suspend" {
 		t.Fatal("child-safety signal didn't freeze the subject")
 	}
@@ -524,7 +528,12 @@ func TestDecisionNotices(t *testing.T) {
 	g := newRig(t, store.NewMemory())
 	var mu sync.Mutex
 	var got []string
-	g.svc.Notify = func(acc, kind, _ string) { mu.Lock(); got = append(got, acc+":"+kind); mu.Unlock() }
+	g.svc.Notices = func(_ context.Context, acc, kind, _ string) error {
+		mu.Lock()
+		got = append(got, acc+":"+kind)
+		mu.Unlock()
+		return nil
+	}
 	id := g.report("alice", "th_ab", "harassment")
 	g.do("POST", "/ops/v1/cases/"+id+"/decision", "", tokMod1, map[string]any{"outcome": "uphold", "reason": "Pressure after a clear no"})
 	_, st := g.do("GET", "/v1/me/standing", "bob", "", nil)

@@ -26,3 +26,15 @@ variable "api_count" {
   type    = number
   default = 2
 }
+variable "ops_image" {
+  type        = string
+  description = "Web image built with OPS_CONSOLE=1 (moderator console), pinned by digest"
+}
+variable "ops_host" {
+  type        = string
+  description = "Staff-only console host name, fronted by the company sign-in proxy (Cloudflare Access)"
+}
+variable "staff_access" {
+  type        = object({ issuer = string, audience = string, jwks_url = string })
+  description = "Sign-in proxy token settings for the safety service (STAFF_ACCESS_*)"
+}

@@ -13,6 +13,7 @@ web/app/brand-tokens.css
 *.tsbuildinfo
 next-env.d.ts
 .e2e-identity-svc
+.e2e-safety-svc
 test-results/
 playwright-report/
 

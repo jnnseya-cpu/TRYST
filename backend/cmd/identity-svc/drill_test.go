@@ -13,6 +13,9 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/jnnseya-cpu/tryst/backend/internal/safetysvc"
+	"github.com/jnnseya-cpu/tryst/backend/internal/store"
 )
 
 // TestRestoreDrill runs the real backup and restore scripts against PostgreSQL and proves
@@ -56,8 +59,19 @@ func TestRestoreDrill(t *testing.T) {
 	t.Setenv("DATA_KEK", key)
 	t.Setenv("DSR_SIGNING_KEY", key)
 
-	// Live system with two members' sealed data.
+	startFakeSafety(t)
+	t.Setenv("INTERNAL_SECRET_SAFETY", "")
+	// Live system with two members' sealed data, and a safety case about each.
 	live := build()
+	sst, err := store.OpenPostgres(ctx, dsn("live_"+run+"_safety"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sst.Close()
+	liveSafety, err := safetysvc.New(nil, safetysvc.StaffAuth{Env: "dev"}, nil, sst)
+	if err != nil {
+		t.Fatal(err)
+	}
 	sealed := map[string][]byte{}
 	for _, acc := range []string{"acc-erased", "acc-kept"} {
 		ct, err := live.vault.Seal(ctx, acc, []byte("photo of "+acc), []byte("photo:p1"))
@@ -66,7 +80,7 @@ func TestRestoreDrill(t *testing.T) {
 		}
 		sealed[acc] = ct
 		live.notifier.Notify(acc, "match", "/messages")
-		live.safety.FromSignal("th_x", "acc-other", acc, "fraud")
+		liveSafety.FromSignal("th_x", "acc-other", acc, "fraud")
 	}
 
 	// Back up (encrypted, keys to their own directory).
@@ -100,11 +114,13 @@ func TestRestoreDrill(t *testing.T) {
 	// Restore into scratch databases: the erased member's key is back (this is the risk).
 	bin := filepath.Join(dir, "identity-svc")
 	sh(nil, "go", "build", "-o", bin, ".")
+	safetyBin := filepath.Join(dir, "safety-svc")
+	sh(nil, "go", "build", "-o", safetyBin, "../safety-svc")
 	prefix := "drill_" + run
 	keysDir := filepath.Join(dir, "keys", filepath.Base(backupDir))
 	out := sh([]string{"DRILL_ADMIN_DSN=" + admin, "DRILL_PREFIX=" + prefix, "DRILL_LEDGER_URL=" + dsn("live_"+run+"_ledger"),
-		"TRYST_BIN=" + bin, "BACKUP_KEY_FILE=" + keyFile, "KEYS_BACKUP=" + keysDir}, "../../../scripts/restore-drill.sh", backupDir)
-	if !strings.Contains(out, `"erased_again": 1`) || strings.Count(out, `"ok": true`) != 2 {
+		"TRYST_BIN=" + bin, "SAFETY_BIN=" + safetyBin, "BACKUP_KEY_FILE=" + keyFile, "KEYS_BACKUP=" + keysDir}, "../../../scripts/restore-drill.sh", backupDir)
+	if strings.Count(out, `"erased_again": 1`) != 2 || strings.Count(out, `"ok": true`) != 4 {
 		t.Fatalf("drill output:\n%s", out)
 	}
 

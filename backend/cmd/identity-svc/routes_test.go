@@ -73,6 +73,7 @@ func TestEveryContractRouteRefusesSignedOutCallers(t *testing.T) {
 		t.Setenv(k, "")
 	}
 	t.Setenv("TRYST_ENV", "dev")
+	startFakeSafety(t)
 	t.Setenv("STAFF_DEV_TOKENS", "")
 	t.Setenv("RATE_LIMIT_PER_MIN", "1000000") // a 429 must not hide a 2xx
 	h := apiHeaders(routes(build()))

@@ -18,10 +18,11 @@
 //	                back to memory when unset)
 //	DATA_KEK        hex, 32 bytes: key-encryption key for member data keys (KMS in
 //	                production; required whenever DATABASE_URL_KEYS is set)
-//	DATABASE_URL_SAFETY  the Trust & Safety database (cases, decisions, audit chain)
-//	STAFF_TRUSTED_PROXIES comma-separated addresses of the staff sign-in proxy whose
-//	                X-Staff-Identity / X-Staff-Roles headers are believed (/ops/v1/*)
-//	STAFF_DEV_TOKENS dev only: id:role:token,... for the moderator console
+//	SAFETY_INTERNAL_URL  the safety service's internal API (cmd/safety-svc; D-59)
+//	INTERNAL_SECRET_SAFETY, INTERNAL_SECRET_PLATFORM  hex ≥ 32 bytes: signing secrets for
+//	                calls to the safety service and from it (required outside dev)
+//	INTERNAL_ADDR   private listener for the safety service (default 127.0.0.1:8091)
+//	STAFF_*         staff sign-in for voucher issuing (see internal/staffauth.FromEnv)
 //	DATABASE_URL_COMMERCE  entitlements, Keys ledger, processed events, vouchers
 //	STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET  payments (dev uses a local test checkout)
 //	STRIPE_PRICE_<KEY>  Stripe Price id per catalogue key, e.g. STRIPE_PRICE_TRYST_PLUS
@@ -47,7 +48,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"log"
 	"net/http"
@@ -65,10 +65,14 @@ import (
 	"github.com/jnnseya-cpu/tryst/backend/internal/metrics"
 	"github.com/jnnseya-cpu/tryst/backend/internal/notify"
 	"github.com/jnnseya-cpu/tryst/backend/internal/outbound"
+	"github.com/jnnseya-cpu/tryst/backend/internal/outbox"
 	"github.com/jnnseya-cpu/tryst/backend/internal/payments"
 	"github.com/jnnseya-cpu/tryst/backend/internal/profilesvc"
 	"github.com/jnnseya-cpu/tryst/backend/internal/safetysvc"
+	"github.com/jnnseya-cpu/tryst/backend/internal/staffauth"
 	"github.com/jnnseya-cpu/tryst/backend/internal/store"
+	"github.com/jnnseya-cpu/tryst/backend/internal/svcauth"
+	"github.com/jnnseya-cpu/tryst/backend/internal/svcenv"
 	"github.com/jnnseya-cpu/tryst/backend/internal/vendors"
 )
 
@@ -125,15 +129,17 @@ func openVault(mode string, keys store.Store) *store.Vault {
 
 // app is the wired service set, shared by the server and the admin commands.
 type app struct {
-	mode     string
-	srv      *identity.Server
-	prof     *profilesvc.Service
-	safety   *safetysvc.Service
-	commerce *commercesvc.Service
-	notifier *notify.Service
-	rights   *dsr.Service
-	stores   map[string]store.Store // by database name, for readiness and admin
-	vault    *store.Vault
+	mode string
+	srv  *identity.Server
+	prof *profilesvc.Service
+	// signals is the outbox of on-device safety signals for the safety service.
+	signals    *outbox.Box
+	signalKick chan struct{}
+	commerce   *commercesvc.Service
+	notifier   *notify.Service
+	rights     *dsr.Service
+	stores     map[string]store.Store // by database name, for readiness and admin
+	vault      *store.Vault
 }
 
 func main() {
@@ -243,27 +249,33 @@ func build() *app {
 		prof.Alerts = &profilesvc.LogAlerting{}
 		log.Printf("DEV MODE: safety alerts go to the log, not to real contacts or the alarm-receiving centre.")
 	}
-	staff := safetysvc.StaffAuth{Env: mode, DevTokens: map[string]safetysvc.Staff{}}
-	if v := os.Getenv("STAFF_TRUSTED_PROXIES"); v != "" {
-		staff.TrustedProxies = strings.Split(v, ",")
-	}
-	if v := os.Getenv("STAFF_DEV_TOKENS"); v != "" {
-		for _, item := range strings.Split(v, ",") {
-			parts := strings.SplitN(item, ":", 3)
-			if len(parts) != 3 || len(parts[2]) < 16 {
-				log.Fatal("STAFF_DEV_TOKENS entries are id:role:token with a token of 16+ characters")
-			}
-			h := sha256.Sum256([]byte(parts[2]))
-			staff.DevTokens[hex.EncodeToString(h[:])] = safetysvc.Staff{ID: parts[0], Roles: []string{parts[1]}}
-		}
-	}
-	safetyStore := openStore(ctx, mode, "DATABASE_URL_SAFETY")
-	safety, err := safetysvc.New(srv, staff, prof, safetyStore)
+	// Staff sign-in (voucher issuing here; the moderator console is the safety service's).
+	staff, err := staffauth.FromEnv(mode, os.Getenv)
 	if err != nil {
 		log.Fatal(err)
 	}
-	prof.OnSignal = safety.FromSignal
-	safety.Notify = notifyFn
+
+	// The safety service is standalone (D-59). Signals from conversations go to it through
+	// a durable outbox in the profile database; data rights reach it over its internal API.
+	toSafety := &svcauth.Client{BaseURL: svcenv.Env("SAFETY_INTERNAL_URL", devOnly(mode, "SAFETY_INTERNAL_URL", "http://127.0.0.1:8092")),
+		Caller: "profile", Secret: svcenv.InternalSecret(mode, "INTERNAL_SECRET_SAFETY")}
+	signals := &outbox.Box{Name: "signals", St: profStore, Send: func(ctx context.Context, m outbox.Message) error {
+		return toSafety.Do(ctx, "POST", "/internal/v1/signals", m.Payload, nil)
+	}}
+	signalKick := make(chan struct{}, 1)
+	prof.OnSignal = func(threadID, reporter, subject, kind string) {
+		id := make([]byte, 12)
+		_, _ = rand.Read(id)
+		if err := signals.Add(context.Background(), map[string]string{"id": "sg_" + hex.EncodeToString(id), "thread_id": threadID,
+			"reporter": reporter, "subject": subject, "kind": kind}); err != nil {
+			log.Printf("queue safety signal failed: %v", err)
+		}
+		select {
+		case signalKick <- struct{}{}:
+		default:
+		}
+	}
+	safetyPart := safetysvc.RemotePart{C: toSafety}
 
 	commerceStore := openStore(ctx, mode, "DATABASE_URL_COMMERCE")
 	commerce := openCommerce(mode, srv, staff, cfg.RPOrigins[0], notifyFn, commerceStore)
@@ -282,7 +294,7 @@ func build() *app {
 	rights, err := dsr.New(func(r *http.Request) (string, bool) {
 		a, ok := srv.Authenticate(r)
 		return a.ID, ok
-	}, idStore, seed, prof, safety, commerce, notifier, srv)
+	}, idStore, seed, prof, safetyPart, commerce, notifier, srv)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -290,13 +302,29 @@ func build() *app {
 	// erasures newer than the backup are applied again (admin reapply-erasures, D-57).
 	ledger := openStore(ctx, mode, "DATABASE_URL_LEDGER")
 	rights.Ledger = ledger
-	return &app{mode: mode, srv: srv, prof: prof, safety: safety, commerce: commerce, notifier: notifier, rights: rights, vault: vault,
-		stores: map[string]store.Store{"identity": idStore, "profile": profStore, "keys": keyStore, "safety": safetyStore, "commerce": commerceStore, "ledger": ledger}}
+	return &app{mode: mode, srv: srv, prof: prof, commerce: commerce, notifier: notifier, rights: rights, vault: vault,
+		signals: signals, signalKick: signalKick,
+		stores: map[string]store.Store{"identity": idStore, "profile": profStore, "keys": keyStore, "commerce": commerceStore, "ledger": ledger}}
 }
 
 // serve runs the HTTP server, background sweeps and the metrics listener.
 func serve(a *app) {
-	mode, prof, safety, notifier, rights := a.mode, a.prof, a.safety, a.notifier, a.rights
+	mode, prof, notifier, rights := a.mode, a.prof, a.notifier, a.rights
+	go func() { // deliver safety signals now, and every 15 s whatever failed
+		t := time.NewTicker(15 * time.Second)
+		for {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			a.signals.Deliver(ctx)
+			cancel()
+			select {
+			case <-a.signalKick:
+			case <-t.C:
+			}
+		}
+	}()
+	// Internal API for the safety service (private listener, signed calls only).
+	internal := &svcauth.Verifier{Secrets: map[string][]byte{"safety": svcenv.InternalSecret(mode, "INTERNAL_SECRET_PLATFORM")}}
+	svcenv.ServeInternal(svcenv.Env("INTERNAL_ADDR", "127.0.0.1:8091"), internal.Wrap(internalAPI(a.srv, prof, notifier)))
 	go func() {
 		for range time.Tick(time.Minute) {
 			rights.Sweep(context.Background())
@@ -311,12 +339,9 @@ func serve(a *app) {
 
 	m := metrics.Default
 	m.Help("tryst_http_requests_total", "Requests by route shape, method and status.")
-	m.Help("tryst_safety_cases_overdue_urgent", "Open suspected-minor, image-abuse, sextortion and threat cases past their deadline.")
 	m.Help("tryst_safety_alert_failures_total", "Safety alerts that could not be delivered after a retry.")
 	m.Help("tryst_erasure_seconds", "Account erasure duration (NFR-01: < 60 s p99).")
-	m.Gauge("tryst_safety_cases_open", func() float64 { o, _, _ := safety.QueueStats(); return float64(o) })
-	m.Gauge("tryst_safety_cases_overdue", func() float64 { _, od, _ := safety.QueueStats(); return float64(od) })
-	m.Gauge("tryst_safety_cases_overdue_urgent", func() float64 { _, _, u := safety.QueueStats(); return float64(u) })
+	m.Gauge("tryst_outbox_pending", func() float64 { return float64(a.signals.Pending(context.Background())) })
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle("GET /metrics", m.Handler())
@@ -354,7 +379,7 @@ func serve(a *app) {
 
 // openCommerce builds the commerce service: Stripe when configured, the local test checkout
 // in dev, and no processor otherwise (purchases answer 503 until Stripe is approved).
-func openCommerce(mode string, members *identity.Server, staff safetysvc.StaffAuth, origin string, notifyFn func(string, string, string), st store.Store) *commercesvc.Service {
+func openCommerce(mode string, members *identity.Server, staff staffauth.Auth, origin string, notifyFn func(string, string, string), st store.Store) *commercesvc.Service {
 	cfg := commercesvc.Config{Members: members, Store: st, Env: mode, MinTier: gate.V1, Notify: notifyFn,
 		StaffLead: func(r *http.Request) (string, bool) {
 			st, ok := staff.Authenticate(r)
@@ -458,7 +483,7 @@ func gateway(prefix string) *vendors.Gateway {
 // routes is the public HTTP surface. Every route here is covered by the route security
 // test (routes_test.go), driven from the OpenAPI contracts.
 func routes(a *app) *http.ServeMux {
-	srv, prof, safety, commerce, notifier, rights, stores := a.srv, a.prof, a.safety, a.commerce, a.notifier, a.rights, a.stores
+	srv, prof, commerce, notifier, rights, stores := a.srv, a.prof, a.commerce, a.notifier, a.rights, a.stores
 	root := http.NewServeMux()
 	root.Handle("/v1/profile", prof)
 	root.Handle("/v1/profile/", prof)
@@ -469,11 +494,8 @@ func routes(a *app) *http.ServeMux {
 	root.Handle("/v1/devices/", prof)
 	root.Handle("/v1/meets/", prof)
 	root.Handle("/v1/safety/", prof)
-	root.Handle("/v1/reports", safety)
-	root.Handle("/v1/reports/", safety)
-	root.Handle("/v1/appeals", safety)
-	root.Handle("/v1/me/standing", safety)
-	root.Handle("/ops/v1/", safety)
+	// Reports, appeals, standing and the moderator console are served by the safety
+	// service (cmd/safety-svc); the web proxy routes them there.
 	root.Handle("/ops/v1/vouchers", commerce)
 	root.Handle("/v1/account", rights)
 	root.Handle("/v1/account/export", rights)
@@ -504,15 +526,13 @@ func routes(a *app) *http.ServeMux {
 	return root
 }
 
-// apiHeaders adds a locked-down content policy to every API response: the API serves JSON
-// and images only, so nothing it returns may run script or be framed, even if opened
-// directly in a browser.
-func apiHeaders(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h := w.Header()
-		h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; sandbox")
-		h.Set("X-Frame-Options", "DENY")
-		h.Set("Referrer-Policy", "no-referrer")
-		next.ServeHTTP(w, r)
-	})
+// apiHeaders is the shared API response policy (svcenv.APIHeaders).
+func apiHeaders(next http.Handler) http.Handler { return svcenv.APIHeaders(next) }
+
+// devOnly returns def in dev; in production the variable must be set.
+func devOnly(mode, envVar, def string) string {
+	if mode != "dev" && os.Getenv(envVar) == "" {
+		log.Fatalf("%s is required in production", envVar)
+	}
+	return def
 }

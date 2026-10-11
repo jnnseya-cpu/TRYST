@@ -15,6 +15,7 @@ import (
 //
 //	verify             check a database set loads, the audit chain holds and photos decrypt
 //	reapply-erasures   after a restore, erase again every account in the erasure ledger
+//	                   (member platform databases; the safety service has its own command)
 //
 // Output is JSON with counts only; no member data is printed.
 func runAdmin(a *app, args []string) int {
@@ -48,7 +49,7 @@ func verify(ctx context.Context, a *app) (any, error) {
 	counts := map[string]map[string]int{}
 	kinds := map[string][]string{
 		"identity": {"identity", "session", "proof"}, "profile": {"profile", "thread", "meet", "inbox"},
-		"keys": {"datakey"}, "safety": {"case", "audit"}, "commerce": {"account", "event", "voucher"}, "ledger": {"erasure"},
+		"keys": {"datakey"}, "commerce": {"account", "event", "voucher"}, "ledger": {"erasure"},
 	}
 	for db, ks := range kinds {
 		counts[db] = map[string]int{}
@@ -122,7 +123,9 @@ func reapplyErasures(ctx context.Context, a *app) (any, error) {
 	}
 	sort.Strings(ids)
 	a.commerce.SkipProcessor = true
-	parts := []dsr.Part{a.prof, a.safety, a.commerce, a.notifier, a.srv}
+	// The safety service has its own database and runs its own reapply-erasures
+	// (cmd/safety-svc admin), so a restore here never depends on it being up.
+	parts := []dsr.Part{a.prof, a.commerce, a.notifier, a.srv}
 	for _, id := range ids {
 		for _, p := range parts {
 			if _, err := p.Erase(ctx, id); err != nil {

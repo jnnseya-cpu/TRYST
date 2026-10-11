@@ -134,6 +134,51 @@ resource "aws_security_group" "api" {
   }
 }
 
+resource "aws_security_group" "safety" {
+  name   = "${local.name}-safety"
+  vpc_id = aws_vpc.main.id
+  ingress { # public API, through the web tier only
+    from_port       = 8082
+    to_port         = 8082
+    protocol        = "tcp"
+    security_groups = [aws_security_group.web.id]
+  }
+  ingress { # internal API, member platform only
+    from_port       = 8092
+    to_port         = 8092
+    protocol        = "tcp"
+    security_groups = [aws_security_group.api.id]
+  }
+  ingress {
+    from_port       = 9092
+    to_port         = 9092
+    protocol        = "tcp"
+    security_groups = [aws_security_group.monitoring.id]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [aws_vpc.main.cidr_block]
+  }
+  egress { # the sign-in proxy's published keys (JWKS)
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# The member platform's internal API answers the safety service only.
+resource "aws_security_group_rule" "api_internal_from_safety" {
+  type                     = "ingress"
+  from_port                = 8091
+  to_port                  = 8091
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.api.id
+  source_security_group_id = aws_security_group.safety.id
+}
+
 resource "aws_security_group" "db" {
   name   = "${local.name}-db"
   vpc_id = aws_vpc.main.id
@@ -141,6 +186,6 @@ resource "aws_security_group" "db" {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [aws_security_group.api.id]
+    security_groups = [aws_security_group.api.id, aws_security_group.safety.id]
   }
 }

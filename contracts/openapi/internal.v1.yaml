@@ -1,0 +1,147 @@
+openapi: 3.1.0
+info:
+  title: TRYST Internal Service API
+  version: 1.0.0
+  summary: Calls between the member platform (identity-svc) and the safety service (safety-svc).
+  description: |
+    D-59. Served only on each service's private listener (8091 member platform, 8092 safety
+    service), reachable only from the other service's security group, and every call is
+    signed (internal/svcauth): `X-Svc-Caller`, `X-Svc-Timestamp` (±2 min) and
+    `X-Svc-Signature: v1=hex(HMAC-SHA256(secret, caller\ntimestamp\nmethod\npath?query\nsha256(body)))`,
+    with one secret per direction. Messages that must not be lost (signals, standing,
+    notices) are sent from durable outboxes and are idempotent at the receiver.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: http://api.tryst.internal:8091
+    description: Member platform internal API (called by the safety service)
+  - url: http://safety.tryst.internal:8092
+    description: Safety service internal API (called by the member platform)
+security:
+  - svcSignature: []
+tags:
+  - name: platform
+    description: Served by the member platform for the safety service
+  - name: safety
+    description: Served by the safety service for the member platform
+paths:
+  /internal/v1/authenticate:
+    post:
+      tags: [platform]
+      operationId: authenticateMember
+      summary: Who a member's bearer token belongs to (full sessions only).
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [authorization], properties: { authorization: { type: string } } } } }
+      responses:
+        '200': { description: Member, content: { application/json: { schema: { type: object, properties: { account: { type: string }, tier: { type: integer }, birth_ym: { type: string } } } } } }
+        '401': { description: 'Not a valid session, or unsigned call' }
+  /internal/v1/threads/{id}/counterpart:
+    get:
+      tags: [platform]
+      operationId: threadCounterpart
+      summary: The other member of a thread, if `member` belongs to it.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: member, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Counterpart, content: { application/json: { schema: { type: object, properties: { member: { type: string } } } } } }
+        '401': { description: Unsigned call }
+        '404': { description: No such thread for that member }
+  /internal/v1/members/{id}/summary:
+    get:
+      tags: [platform]
+      operationId: memberSummary
+      summary: Pseudonym and city only.
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Summary, content: { application/json: { schema: { type: object, properties: { name: { type: string }, area: { type: string } } } } } }
+        '401': { description: Unsigned call }
+  /internal/v1/members/{id}/main-photo:
+    get:
+      tags: [platform]
+      operationId: memberMainPhoto
+      summary: Main photo, for a moderator who recorded a reason (the safety service audits it).
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Image, content: { image/jpeg: { schema: { type: string, format: binary } } } }
+        '401': { description: Unsigned call }
+        '404': { description: No photo }
+  /internal/v1/members/{id}/standing:
+    put:
+      tags: [platform]
+      operationId: setStanding
+      summary: Apply an enforcement outcome. Idempotent; latest wins.
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [standing], properties: { standing: { type: string, enum: [good, warn, shadow_limit, suspend, permanent] } } } } }
+      responses:
+        '204': { description: Applied }
+        '400': { description: Unknown standing }
+        '401': { description: Unsigned call }
+  /internal/v1/notices:
+    post:
+      tags: [platform]
+      operationId: deliverNotice
+      summary: Record a masked notice for a member.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [account, kind], properties: { account: { type: string }, kind: { type: string }, link: { type: string } } } } }
+      responses:
+        '204': { description: Recorded }
+        '401': { description: Unsigned call }
+  /internal/v1/signals:
+    post:
+      tags: [safety]
+      operationId: deliverSignal
+      summary: An on-device Guardian signal (no content). At most one case per signal id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, subject, kind]
+              properties:
+                id: { type: string }
+                thread_id: { type: string }
+                reporter: { type: string }
+                subject: { type: string }
+                kind: { type: string, enum: [child_safety, extortion, fraud] }
+      responses:
+        '204': { description: Accepted }
+        '400': { description: Malformed }
+        '401': { description: Unsigned call }
+        '503': { description: Retry }
+  /internal/v1/export:
+    post:
+      tags: [safety]
+      operationId: exportSafetyPart
+      summary: The safety service's part of a member's data export.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [account], properties: { account: { type: string } } } } }
+      responses:
+        '200': { description: Export part, content: { application/json: { schema: { type: object } } } }
+        '401': { description: Unsigned call }
+  /internal/v1/erase:
+    post:
+      tags: [safety]
+      operationId: eraseSafetyPart
+      summary: The safety service's part of an account erasure. Idempotent; returns a receipt naming declared exceptions.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [account], properties: { account: { type: string } } } } }
+      responses:
+        '200': { description: Receipt, content: { application/json: { schema: { type: object, properties: { part: { type: string }, erased: { type: integer }, retained: { type: array, items: { type: string } } } } } } }
+        '401': { description: Unsigned call }
+        '503': { description: Retry }
+components:
+  securitySchemes:
+    svcSignature:
+      type: apiKey
+      in: header
+      name: X-Svc-Signature
+      description: HMAC-SHA256 request signature with X-Svc-Caller and X-Svc-Timestamp (see the description above).

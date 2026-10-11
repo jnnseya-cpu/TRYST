@@ -5,9 +5,11 @@ info:
   summary: Staff-only Trust & Safety console (FR-116, D-52).
   description: |
     Generated from docs/spec/02_Shared_Contracts.md §5.8 (moderator console). That section is
-    the source of truth. Served on a separate staff-only host behind the company sign-in
-    proxy; staff identity comes from `X-Staff-Identity` / `X-Staff-Roles`, believed only from
-    that proxy. Every call is written to a hash-chained audit log. Reporters are never shown.
+    the source of truth. Served by the standalone safety service (cmd/safety-svc, D-59) on a
+    staff-only host behind the company sign-in proxy. In production the proxy's signed token
+    (`Cf-Access-Jwt-Assertion`) is verified against its published keys, issuer and audience;
+    roles come from the staff roster, never from the request. Every call is written to a
+    hash-chained audit log. Reporters are never shown. `/vouchers` is served by the API.
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -15,7 +17,7 @@ servers:
   - url: https://ops.tryst.example/ops/v1
     description: Placeholder staff-only host.
 security:
-  - staffProxy: []
+  - staffAccess: []
 tags:
   - name: cases
     description: Case queue, decisions and appeals
@@ -55,6 +57,9 @@ paths:
                   prior_strikes: { type: integer }
                   decision: { type: [object, 'null'] }
                   appeal: { type: [object, 'null'] }
+                  external_required: { type: boolean }
+                  external_due: { type: string, format: date-time }
+                  external: { oneOf: [{ $ref: '#/components/schemas/ExternalReport' }, { type: 'null' }] }
         '401': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
   /cases/{id}/photo:
@@ -144,6 +149,27 @@ paths:
         '201': { description: Codes, content: { application/json: { schema: { type: object, properties: { codes: { type: array, items: { type: string } } } } } } }
         '401': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
+  /cases/{id}/external-report:
+    parameters: [{ $ref: '#/components/parameters/CaseId' }]
+    post:
+      tags: [cases]
+      operationId: recordExternalReport
+      summary: Record a report made to an authority, with its reference. Required for upheld suspected-minor (CSEA) cases, which stay in the queue until recorded (due 24 h after the decision). Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agency, reference]
+              properties:
+                agency: { type: string, enum: [NCA, police, IWF] }
+                reference: { type: string, minLength: 3, maxLength: 100 }
+      responses:
+        '200': { description: Recorded, content: { application/json: { schema: { type: object, properties: { external: { $ref: '#/components/schemas/ExternalReport' } } } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /audit/verify:
     get:
       tags: [audit]
@@ -162,11 +188,11 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
-    staffProxy:
+    staffAccess:
       type: apiKey
       in: header
-      name: X-Staff-Identity
-      description: Set by the company sign-in proxy (Cloudflare Access or oauth2-proxy); believed only from that proxy's address.
+      name: Cf-Access-Jwt-Assertion
+      description: The sign-in proxy's signed JWT (RS256/ES256), verified against its JWKS, issuer, audience and expiry. Alternatively X-Staff-Identity from a configured header-asserting proxy address.
   parameters:
     CaseId:
       name: id
@@ -198,3 +224,11 @@ components:
         overdue: { type: boolean }
         state: { type: string, enum: [open, pending_second, closed] }
         appeal_pending: { type: boolean }
+        external_report_pending: { type: boolean }
+    ExternalReport:
+      type: object
+      properties:
+        agency: { type: string, enum: [NCA, police, IWF] }
+        reference: { type: string }
+        by: { type: string }
+        at: { type: string, format: date-time }

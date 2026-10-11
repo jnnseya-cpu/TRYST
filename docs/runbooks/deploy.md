@@ -17,6 +17,24 @@ are present (see the header of `backend/cmd/identity-svc/main.go`):
 | `CONTACT_PEPPER` (≥ 32 bytes) | Contact hashes |
 | `POSTMARK_SERVER_TOKEN` and/or `TWILIO_*` | Sign-up codes must be deliverable |
 | `ARC_URL`, `ARC_SECRET` (+ a message channel) | Meet safety can't run without the safety line (D-48) |
+| `SAFETY_INTERNAL_URL`, `INTERNAL_SECRET_SAFETY`, `INTERNAL_SECRET_PLATFORM` | The API reaches the standalone safety service (D-59) |
+
+The safety service (`--entrypoint /safety-svc`, same image) refuses to start without
+`DATABASE_URL_SAFETY`, `PLATFORM_INTERNAL_URL`, both `INTERNAL_SECRET_*` (the same values as
+the API), staff sign-in (`STAFF_ACCESS_ISSUER`, `STAFF_ACCESS_AUDIENCE`,
+`STAFF_ACCESS_JWKS_URL`, or `STAFF_TRUSTED_PROXIES`) and `STAFF_ROSTER`. Dev staff tokens
+are refused in production.
+
+### Staff console host
+
+1. Create a Cloudflare Access application for the console host (`ops_host`), limited to the
+   T&S group, with hardware-key MFA. Note its AUD tag and team domain.
+2. Set `staff_access` in Terraform (issuer `https://<team>.cloudflareaccess.com`, the AUD
+   tag, JWKS `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs`).
+3. Put the roster in `tryst-prod/STAFF_ROSTER` (`email:moderator` or `email:lead,moderator`).
+   Removing someone from the roster removes their console access at once, even if Access
+   still lets them in.
+4. Build the console image with `OPS_CONSOLE=1` (`ops_image`).
 
 Without these, features degrade safely rather than stop the service: no `STRIPE_*` →
 purchases answer 503; no `VAPID_PRIVATE_KEY` → no push (in-app notices still work); no

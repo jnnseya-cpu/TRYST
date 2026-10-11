@@ -19,9 +19,12 @@ accounts that members deleted after the backup was taken. Step 4 is not optional
    a logical backup). Do **not** restore the ledger unless it is itself lost.
 3. `identity-svc admin verify`: every service loads, the safety audit hash chain holds,
    every photo decrypts. Stop if `ok` is false.
-4. `identity-svc admin reapply-erasures`: every account in the live ledger is erased again
-   (keys destroyed, records purged). Record `erased_again` in the incident log.
-5. `identity-svc admin verify` again, then scale the API back up.
+4. `identity-svc admin reapply-erasures` and `safety-svc admin reapply-erasures`: every
+   account in the live ledger is erased again in each service's databases (keys destroyed,
+   records purged). Record both `erased_again` counts in the incident log.
+5. `identity-svc admin verify` and `safety-svc admin verify` again, then scale both
+   services back up. Queued messages between them (outboxes) are in the restored databases
+   and resume delivering on their own.
 
 ## Drill
 

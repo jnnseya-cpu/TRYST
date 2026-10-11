@@ -28,6 +28,13 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
+      // The standalone safety service (D-59), talking to the API over signed internal calls.
+      command: "cd ../backend && go build -o ../web/.e2e-safety-svc ./cmd/safety-svc && TRYST_ENV=dev PORT=8082 STAFF_DEV_TOKENS=mod1:moderator:e2e-mod-one-token-0001,mod2:moderator:e2e-mod-two-token-0002,lead1:lead:e2e-lead-token-00000003 ../web/.e2e-safety-svc",
+      url: "http://localhost:8082/healthz",
+      timeout: 180_000,
+      reuseExistingServer: false,
+    },
+    {
       command: "OPS_CONSOLE=1 npm run build && OPS_CONSOLE=1 npm run start -- -p 3000",
       url: "http://localhost:3000",
       timeout: 300_000,

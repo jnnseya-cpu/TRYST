@@ -3,6 +3,7 @@ import { matched, member } from "./helpers";
 
 const MOD1 = "e2e-mod-one-token-0001";
 const LEAD = "e2e-lead-token-00000003";
+const MOD2 = "e2e-mod-two-token-0002";
 
 test("safety: report with chosen messages, moderator decision, member appeal to a different reviewer", async ({ browser }) => {
   const tag = String(Date.now()).slice(-5);
@@ -72,4 +73,64 @@ test("safety: report with chosen messages, moderator decision, member appeal to 
   await jude.reload();
   await expect(jude.getByTestId("standing")).toContainText("Your appeal succeeded");
   await expect(jude.getByTestId("standing")).toContainText("in good standing");
+});
+
+test("safety: on-device child-safety signal, second-moderator removal, mandatory NCA report", async ({ browser }) => {
+  const tag = String(Date.now()).slice(-5);
+  const A = `Ash${tag}`, B = `Oak${tag}`;
+  const ash = await member(browser, A, "Islington", "photo-1.jpg");
+  const oak = await member(browser, B, "Camden", "photo-2.jpg");
+  const url = await matched(ash, A, oak, B);
+  await ash.goto(url);
+  await oak.goto(url);
+  await oak.getByLabel("Message", { exact: true }).fill("send me pics of your daughter");
+  await oak.getByRole("button", { name: "Send" }).click();
+  await expect(oak.locator("main").getByRole("alert").filter({ hasText: "can't be sent" })).toBeVisible();
+
+  // The signal crosses to the safety service and freezes the sender at once.
+  await expect(async () => {
+    await oak.goto("/account");
+    await expect(oak.getByTestId("standing")).toContainText("Paused for a safety review", { timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+
+  const ctx = await browser.newContext();
+  const mod = await ctx.newPage();
+  await mod.goto("/ops");
+  await mod.getByLabel("Staff token").fill(MOD1);
+  await mod.getByRole("button", { name: "Sign in" }).click();
+  await expect(mod.getByTestId("queue")).toBeVisible();
+  // Find this test's case among any others in the queue (cases show no names in the list).
+  const staff = { Authorization: `Staff ${MOD1}` };
+  let caseId = "";
+  await expect(async () => {
+    const queue = await (await mod.request.get("/ops/v1/cases", { headers: staff })).json();
+    for (const c of queue.cases.filter((x: { category: string }) => x.category === "minor")) {
+      const d = await (await mod.request.get(`/ops/v1/cases/${c.id}`, { headers: staff })).json();
+      if (d.subject.name === B) caseId = c.id;
+    }
+    expect(caseId).not.toBe("");
+  }).toPass({ timeout: 20_000 });
+  await mod.goto(`/ops/cases/${caseId}`);
+  await expect(mod.getByTestId("case-detail")).toContainText(B);
+  await mod.getByLabel("Reason the member will see").fill("Messages asking for images of a child.");
+  await mod.getByRole("button", { name: "Uphold" }).click();
+  await expect(mod.getByText(/Permanent removal proposed/)).toBeVisible();
+  // The same moderator can't confirm; a second one can.
+  await mod.getByRole("button", { name: "Confirm removal" }).click();
+  await expect(mod.getByRole("status")).toContainText(/different moderator/);
+  await mod.evaluate((t) => sessionStorage.setItem("tryst.staff", t), MOD2);
+  await mod.reload();
+  await mod.getByRole("button", { name: "Confirm removal" }).click();
+  await expect(mod.getByTestId("external-report")).toContainText("must be reported to the National Crime Agency");
+
+  // Mandatory report recorded with the agency's reference; the case leaves the queue.
+  await mod.getByLabel("Agency reference").fill(`NCA-E2E-${tag}`);
+  await mod.getByRole("button", { name: "Record report" }).click();
+  await expect(mod.getByTestId("external-report")).toContainText(`reference NCA-E2E-${tag}`);
+  await mod.goto("/ops");
+  await expect(mod.getByTestId("queue").or(mod.getByText("Nothing waiting."))).toBeVisible();
+  await expect(mod.locator(`a[href="/ops/cases/${caseId}"]`)).toHaveCount(0);
+
+  await oak.goto("/account");
+  await expect(oak.getByTestId("standing")).toContainText("Removed");
 });

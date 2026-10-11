@@ -2,7 +2,8 @@
 # Web image (Next.js standalone server), non-root. Build from the repository root so the
 # brand assets (assets/brand) are in the context:
 #   docker build -f web/Dockerfile --build-arg IDENTITY_URL=http://api:8081 -t tryst-web .
-# Rewrites are fixed at build time: IDENTITY_URL is where /v1/* is proxied; OPS_CONSOLE=1
+# Rewrites are fixed at build time: IDENTITY_URL is where /v1/* is proxied, SAFETY_URL where
+# reports, appeals, standing and the console API go; OPS_CONSOLE=1
 # only for the staff-only console build.
 ARG NODE_IMAGE=node:22-alpine
 
@@ -14,8 +15,9 @@ RUN --mount=type=secret,id=ca,required=false \
 COPY assets/brand assets/brand
 COPY web web
 ARG IDENTITY_URL=http://api:8081
+ARG SAFETY_URL=http://safety:8082
 ARG OPS_CONSOLE=0
-ENV NEXT_TELEMETRY_DISABLED=1 IDENTITY_URL=${IDENTITY_URL} OPS_CONSOLE=${OPS_CONSOLE}
+ENV NEXT_TELEMETRY_DISABLED=1 IDENTITY_URL=${IDENTITY_URL} SAFETY_URL=${SAFETY_URL} OPS_CONSOLE=${OPS_CONSOLE}
 RUN cd web && npm run build
 
 FROM ${NODE_IMAGE}

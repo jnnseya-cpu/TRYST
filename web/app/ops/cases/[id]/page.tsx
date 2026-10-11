@@ -17,6 +17,9 @@ type Detail = {
   prior_strikes: number;
   decision: { id: string; action: string; ground?: string; decided_by: string; confirmed_by?: string; reason: string } | null;
   appeal: { text: string; due: string; outcome?: string; reviewer?: string } | null;
+  external_required: boolean;
+  external_due: string;
+  external: { agency: string; reference: string; by: string; at: string } | null;
 };
 
 const grounds = [
@@ -38,6 +41,8 @@ export default function CaseView() {
   const [ground, setGround] = useState("");
   const [reason, setReason] = useState("");
   const [msg, setMsg] = useState("");
+  const [agency, setAgency] = useState("NCA");
+  const [extRef, setExtRef] = useState("");
 
   const load = useCallback(async () => {
     const r = await ops<Detail>(`/ops/v1/cases/${id}`);
@@ -134,6 +139,29 @@ export default function CaseView() {
                 <button type="button" className="button inline" onClick={() => act("confirm", { agree: true, reason })}>Confirm removal</button>
                 <button type="button" className="button ghost inline" onClick={() => act("confirm", { agree: false, reason })}>Send back</button>
               </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {(d.external_required || d.external) && (
+        <section className="pf-section" aria-label="External report" data-testid="external-report">
+          <h2>Report to the authorities</h2>
+          {d.external ? (
+            <p>Reported to {d.external.agency}, reference {d.external.reference}, by {d.external.by} on {new Date(d.external.at).toLocaleString()}.</p>
+          ) : (
+            <div>
+              <p role="alert">This upheld case must be reported to the National Crime Agency. Due {new Date(d.external_due).toLocaleString()}.</p>
+              <p className="note">Report through the agency&rsquo;s own channel, then record the reference it gives you here.</p>
+              <label htmlFor="agency">Agency</label>
+              <select id="agency" className="input pf-select" value={agency} onChange={(e) => setAgency(e.target.value)}>
+                <option value="NCA">National Crime Agency</option>
+                <option value="police">Police</option>
+                <option value="IWF">Internet Watch Foundation</option>
+              </select>
+              <label htmlFor="ext-ref">Agency reference</label>
+              <input id="ext-ref" className="input" value={extRef} onChange={(e) => setExtRef(e.target.value)} />
+              <button type="button" className="button inline" onClick={() => act("external-report", { agency, reference: extRef })}>Record report</button>
             </div>
           )}
         </section>

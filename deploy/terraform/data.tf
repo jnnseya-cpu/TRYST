@@ -129,10 +129,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "key_backups" {
 
 # Secrets: created empty; values are put by the operator (never in state or the repo).
 locals {
-  secret_names = ["DATA_KEK", "DSR_SIGNING_KEY", "CONTACT_PEPPER", "VAPID_PRIVATE_KEY", "POSTMARK_SERVER_TOKEN",
+  # Least privilege: each service reads only its own secrets.
+  api_secrets = ["DATA_KEK", "DSR_SIGNING_KEY", "CONTACT_PEPPER", "VAPID_PRIVATE_KEY", "POSTMARK_SERVER_TOKEN",
     "TWILIO_AUTH_TOKEN", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "LIVENESS_SECRET", "SIGHTENGINE_SECRET",
     "PHOTODNA_KEY", "ARC_SECRET", "DATABASE_URL_IDENTITY", "DATABASE_URL_PROFILE", "DATABASE_URL_KEYS",
-  "DATABASE_URL_SAFETY", "DATABASE_URL_COMMERCE", "DATABASE_URL_LEDGER"]
+  "DATABASE_URL_COMMERCE", "DATABASE_URL_LEDGER", "INTERNAL_SECRET_SAFETY", "INTERNAL_SECRET_PLATFORM", "STAFF_ROSTER"]
+  safety_secrets = ["DATABASE_URL_SAFETY", "DATABASE_URL_LEDGER", "INTERNAL_SECRET_SAFETY", "INTERNAL_SECRET_PLATFORM", "STAFF_ROSTER"]
+  secret_names   = distinct(concat(local.api_secrets, local.safety_secrets))
 }
 
 resource "aws_secretsmanager_secret" "s" {

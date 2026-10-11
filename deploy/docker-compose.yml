@@ -25,18 +25,34 @@ services:
       DATABASE_URL_IDENTITY: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/tryst_identity?sslmode=disable
       DATABASE_URL_PROFILE: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/tryst_profile?sslmode=disable
       DATABASE_URL_KEYS: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/tryst_keys?sslmode=disable
-      DATABASE_URL_SAFETY: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/tryst_safety?sslmode=disable
       DATABASE_URL_COMMERCE: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/tryst_commerce?sslmode=disable
       DATABASE_URL_LEDGER: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/tryst_ledger?sslmode=disable
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      INTERNAL_ADDR: ":8091"
+      SAFETY_INTERNAL_URL: http://safety:8092
     healthcheck:
       test: ["CMD", "/identity-svc", "healthcheck"]
       interval: 5s
       retries: 20
+  safety:
+    image: tryst-api:local
+    entrypoint: ["/safety-svc"]
+    depends_on: { db: { condition: service_healthy } }
+    env_file: .env
+    environment:
+      DATABASE_URL_SAFETY: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/tryst_safety?sslmode=disable
+      DATABASE_URL_LEDGER: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/tryst_ledger?sslmode=disable
+      PLATFORM_INTERNAL_URL: http://api:8091
+      INTERNAL_ADDR: ":8092"
+      METRICS_ADDR: ":9092"
+    healthcheck:
+      test: ["CMD", "/safety-svc", "healthcheck"]
+      interval: 5s
+      retries: 20
   web:
-    build: { context: .., dockerfile: web/Dockerfile, args: { IDENTITY_URL: "http://api:8081" } }
+    build: { context: .., dockerfile: web/Dockerfile, args: { IDENTITY_URL: "http://api:8081", SAFETY_URL: "http://safety:8082" } }
     image: tryst-web:local
-    depends_on: { api: { condition: service_healthy } }
+    depends_on: { api: { condition: service_healthy }, safety: { condition: service_healthy } }
     ports: ["127.0.0.1:3000:3000"]
   prometheus:
     image: ${PROMETHEUS_IMAGE:-prom/prometheus:v3.5.0}

@@ -38,3 +38,20 @@ hand. The member's key is destroyed first, so their data is already unreadable.
 Payment events failing or arriving with a bad signature. Check `STRIPE_WEBHOOK_SECRET`
 matches the endpoint in Stripe, then replay failed events from the Stripe dashboard;
 processing is idempotent.
+
+## External report pending
+
+An upheld suspected-minor case needs its report to the National Crime Agency. The T&S
+lead files it through the NCA's own channel and records the reference on the case in the
+console ("Report to the authorities"). The case stays in the queue until then, and turns
+into an urgent page 24 hours after the decision.
+
+## Safety delivery backlog
+
+Messages between the API and the safety service are queued but not delivered: bans and
+freezes (safety → API), member notices, or on-device signals (API → safety). Nothing is
+lost; they sit in each service's database and retry every 15 seconds. Check both services'
+`/readyz`, the internal listeners (8091, 8092), and that `INTERNAL_SECRET_*` match on both
+sides (a mismatch shows as 401s in the receiver's log). Until it clears, a member who
+should be frozen may still be active: if it lasts more than 15 minutes, a T&S lead freezes
+urgent cases by hand from the console once delivery is restored.
