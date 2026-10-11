@@ -88,6 +88,8 @@ type Service struct {
 	OnSignal func(threadID, reporter, subject, kind string)
 	// standing holds enforcement outcomes other than good (see standing.go).
 	standing map[string]string
+	// Notify records a masked notice for a member (notification service). May be nil.
+	Notify func(account, kind, link string)
 	// MinDiscoveryTier is the tier needed to use Tonight (V2 in production, E-01).
 	MinDiscoveryTier string
 }
@@ -199,6 +201,12 @@ func (s *Service) flush(ctx context.Context) {
 		if err := s.st.Put(ctx, "profile", id, b); err != nil {
 			log.Printf("persist profile failed: %v", err)
 		}
+	}
+}
+
+func (s *Service) notify(account, kind, link string) {
+	if s.Notify != nil {
+		s.Notify(account, kind, link)
 	}
 }
 

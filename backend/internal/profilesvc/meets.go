@@ -160,6 +160,7 @@ func (s *Service) handleProposeMeet(w http.ResponseWriter, r *http.Request) {
 	m := &meetRecord{ID: "mt_" + randHex(10), Thread: t.ID, Proposer: acc.ID, Start: in.Start.UTC(), End: in.End.UTC(), State: "proposed"}
 	s.mt.meets[m.ID] = m
 	s.saveMeet(r.Context(), m)
+	s.notify(t.other(acc.ID), "meet_proposed", "/messages/"+t.ID+"/meet")
 	writeJSON(w, 201, s.meetView(acc.ID, m))
 }
 
@@ -214,6 +215,9 @@ func (s *Service) handleMeetDecision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.saveMeet(r.Context(), m)
+	if t := s.th.threads[m.Thread]; t != nil {
+		s.notify(t.other(acc.ID), "meet_update", "/messages/"+t.ID+"/meet")
+	}
 	writeJSON(w, 200, s.meetView(acc.ID, m))
 }
 

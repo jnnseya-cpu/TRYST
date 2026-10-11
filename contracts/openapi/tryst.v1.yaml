@@ -565,6 +565,83 @@ paths:
       responses:
         '200': { description: Proof, content: { application/json: { schema: { $ref: '#/components/schemas/DeletionProof' } } } }
         '404': { $ref: '#/components/responses/Problem' }
+  /notices:
+    get:
+      tags: [account]
+      operationId: listNotices
+      summary: Masked in-app notices (what happened, never who), newest first.
+      x-min-tier: V0
+      responses:
+        '200':
+          description: Notices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unread: { type: integer }
+                  notices:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        kind: { type: string, enum: [match, message, meet_proposed, meet_update, safety, appeal, renewal, plan_ended, new_device, payment] }
+                        text: { type: string }
+                        link: { type: string }
+                        at: { type: string, format: date-time }
+                        read: { type: boolean }
+        '401': { $ref: '#/components/responses/Problem' }
+  /notices/read:
+    post:
+      tags: [account]
+      operationId: markNoticesRead
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '200': { description: All read }
+  /notifications/settings:
+    get:
+      tags: [account]
+      operationId: getNotificationSettings
+      x-min-tier: V0
+      responses:
+        '200': { description: Settings, content: { application/json: { schema: { $ref: '#/components/schemas/NotificationSettings' } } } }
+    put:
+      tags: [account]
+      operationId: putNotificationSettings
+      summary: Push is off by default. The wording is at most 40 characters, has no link and never names the app (FR-026).
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, properties: { push: { type: boolean }, text: { type: string, maxLength: 40 } } } } }
+      responses:
+        '200': { description: Settings, content: { application/json: { schema: { $ref: '#/components/schemas/NotificationSettings' } } } }
+        '422': { $ref: '#/components/responses/Problem' }
+  /notifications/push:
+    put:
+      tags: [account]
+      operationId: addPushEndpoint
+      summary: Register this device's Web Push endpoint. Browser push services only; pushes carry no payload.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [endpoint], properties: { endpoint: { type: string, format: uri, maxLength: 1024 } } } } }
+      responses:
+        '200': { description: Settings, content: { application/json: { schema: { $ref: '#/components/schemas/NotificationSettings' } } } }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [account]
+      operationId: removePushEndpoint
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        content: { application/json: { schema: { type: object, properties: { endpoint: { type: string } } } } }
+      responses:
+        '200': { description: Settings, content: { application/json: { schema: { $ref: '#/components/schemas/NotificationSettings' } } } }
   /emergency-lock:
     post:
       tags: [account]
@@ -2108,3 +2185,11 @@ components:
               retained: { type: array, items: { type: string } }
         key_id: { type: string }
         signature: { type: string, description: Ed25519 over the canonical JSON of the other fields (base64) }
+    NotificationSettings:
+      type: object
+      properties:
+        push: { type: boolean }
+        text: { type: string }
+        devices: { type: integer }
+        vapid_public_key: { type: string }
+        push_available: { type: boolean }

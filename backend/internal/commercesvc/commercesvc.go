@@ -154,6 +154,8 @@ type Config struct {
 	MinTier gate.Tier
 	// StaffLead authenticates a T&S or finance lead for voucher issuing.
 	StaffLead func(r *http.Request) (string, bool)
+	// Notify records a masked notice for a member. May be nil.
+	Notify func(account, kind, link string)
 }
 
 // Service is the HTTP handler.

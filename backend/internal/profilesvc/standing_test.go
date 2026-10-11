@@ -2,7 +2,9 @@ package profilesvc
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 )
 
 func TestSuspensionLocksOutAndClosesConversations(t *testing.T) {
@@ -81,5 +83,48 @@ func TestSignalSubjectIsTheSender(t *testing.T) {
 	want := [][2]string{{"acc-ana", "acc-ben"}, {"acc-ben", "acc-ben"}}
 	if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
 		t.Fatalf("signals = %v, want %v", got, want)
+	}
+}
+
+func TestNoticesForMatchMessageAndMeet(t *testing.T) {
+	w := newWorld(t, "dev", "ana", "ben")
+	var got []string
+	w.s.Notify = func(acc, kind, link string) { got = append(got, acc+":"+kind) }
+	w.ready("ana", "Islington")
+	w.ready("ben", "Camden")
+	for _, n := range []string{"ana", "ben"} {
+		w.do(n, "PUT", "/v1/tonight", `{"hours":4,"radius_km":10}`)
+	}
+	like := func(who, name string) {
+		_, out := w.do(who, "GET", "/v1/tonight", "")
+		for _, p := range append(people(out, "people"), people(out, "mutual")...) {
+			if p["display_name"] == name {
+				w.do(who, "POST", "/v1/tonight/interest/"+p["handle"].(string), "")
+			}
+		}
+	}
+	like("ana", "Ben")
+	like("ben", "Ana")
+	w.do("ana", "GET", "/v1/tonight", "") // viewing again doesn't notify again
+	tid := threadID("acc-ana", "acc-ben")
+	if _, ok := w.s.th.threads[tid]; !ok {
+		tid = threadID("acc-ben", "acc-ana")
+	}
+	w.do("ana", "PUT", "/v1/devices/key", `{"device_id":"dev-ana-0001","public_jwk":{"kty":"EC","crv":"P-256","x":"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU","y":"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"}}`)
+	if c, _ := send(w, "ana", tid, "dev-ana-0001", "c1", "dev-ana-0001"); c != 201 {
+		t.Fatalf("send: %d", c)
+	}
+	w.do("ben", "POST", "/v1/threads/"+tid+"/meets", fmt.Sprintf(`{"start":"%s","end":"%s"}`,
+		w.now.Add(time.Hour).Format(time.RFC3339), w.now.Add(3*time.Hour).Format(time.RFC3339)))
+	want := []string{"acc-ben:match", "acc-ana:match", "acc-ben:message", "acc-ana:meet_proposed"}
+	if len(got) != len(want) {
+		t.Fatalf("notices = %v, want %v", got, want)
+	}
+	matches := map[string]bool{}
+	for _, g := range got[:2] {
+		matches[g] = true
+	}
+	if !matches["acc-ana:match"] || !matches["acc-ben:match"] || got[2] != want[2] || got[3] != want[3] {
+		t.Fatalf("notices = %v, want %v", got, want)
 	}
 }

@@ -116,6 +116,7 @@ func (s *Service) apply(ev event) {
 			if it.Kind == "deposit" {
 				a.Deposit = o.PaymentIntent
 			}
+			s.notify(id, "payment")
 		} else if o.Subscription != "" {
 			sb := s.subFor(id, a, it.Key, o.Subscription)
 			if sb.Started.IsZero() {
@@ -133,6 +134,7 @@ func (s *Service) apply(ev event) {
 			if sb.Payment == "" && o.PaymentIntent != "" {
 				sb.Payment = o.PaymentIntent
 			}
+			s.notify(id, "payment")
 		}
 		s.dirty[id] = true
 
@@ -206,6 +208,9 @@ func (s *Service) apply(ev event) {
 		sb.CancelAtEnd = o.CancelAtPeriodEnd
 		switch {
 		case ev.Type == "customer.subscription.deleted", o.Status == "canceled", o.Status == "incomplete_expired", o.Status == "unpaid":
+			if sb.Status != "canceled" {
+				s.notify(id, "plan_ended")
+			}
 			sb.Status = "canceled"
 			if sb.PeriodEnd.After(now) || sb.PeriodEnd.IsZero() {
 				sb.PeriodEnd = now
@@ -214,6 +219,22 @@ func (s *Service) apply(ev event) {
 			sb.Status = o.Status
 		}
 		s.dirty[id] = true
+
+	case "invoice.upcoming":
+		// Sent by the processor ahead of renewal (configured to at least 7 days, 03 §10). The
+		// processor also emails the billing address; TRYST holds no email to send from.
+		var o struct {
+			Subscription        string `json:"subscription"`
+			SubscriptionDetails struct {
+				Metadata meta `json:"metadata"`
+			} `json:"subscription_details"`
+		}
+		if json.Unmarshal(ev.Data.Object, &o) != nil {
+			return
+		}
+		if id, _, sb := s.findSub(o.Subscription, o.SubscriptionDetails.Metadata); sb != nil && !sb.CancelAtEnd {
+			s.notify(id, "renewal")
+		}
 
 	case "charge.refunded", "charge.dispute.created":
 		var o struct {
@@ -248,6 +269,12 @@ func (s *Service) apply(ev event) {
 			a.Deposit = ""
 		}
 		s.dirty[id] = true
+	}
+}
+
+func (s *Service) notify(account, kind string) {
+	if s.cfg.Notify != nil {
+		s.cfg.Notify(account, kind, "/billing")
 	}
 }
 

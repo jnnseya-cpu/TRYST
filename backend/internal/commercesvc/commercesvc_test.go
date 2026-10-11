@@ -482,3 +482,18 @@ func TestExportAndErase(t *testing.T) {
 		t.Fatal("erase not idempotent")
 	}
 }
+
+func TestBillingNotices(t *testing.T) {
+	g := newRig(t, store.NewMemory())
+	var got []string
+	g.svc.cfg.Notify = func(acc, kind, _ string) { got = append(got, acc+":"+kind) }
+	ref := g.ref("ana")
+	md := map[string]string{"billing_ref": ref, "item": "tryst_plus"}
+	g.send("evt_1", "checkout.session.completed", map[string]any{"mode": "subscription", "client_reference_id": ref, "metadata": md, "subscription": "sub_n", "amount_total": 2499})
+	g.send("evt_2", "invoice.upcoming", map[string]any{"subscription": "sub_n"})
+	g.send("evt_3", "customer.subscription.deleted", map[string]any{"id": "sub_n", "status": "canceled"})
+	g.send("evt_3b", "customer.subscription.deleted", map[string]any{"id": "sub_n", "status": "canceled"})
+	if strings.Join(got, ",") != "ana:payment,ana:renewal,ana:plan_ended" {
+		t.Fatalf("notices: %v", got)
+	}
+}

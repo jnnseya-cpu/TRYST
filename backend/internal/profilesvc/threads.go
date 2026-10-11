@@ -174,6 +174,8 @@ func (s *Service) ensureThread(ctx context.Context, a, b, origin string) *thread
 	t := &thread{ID: id, Members: [2]string{a, b}, Created: s.now(), Retention: map[string]int{}, State: "normal", Origin: origin}
 	s.th.threads[id] = t
 	s.saveThread(ctx, t)
+	s.notify(a, "match", "/messages/"+id)
+	s.notify(b, "match", "/messages/"+id)
 	return t
 }
 
@@ -358,6 +360,7 @@ func (s *Service) handleSend(w http.ResponseWriter, r *http.Request) {
 	_ = s.st.Put(r.Context(), key+":client", acc.ID+"|"+in.ClientID, []byte(strconv.FormatInt(m.Seq, 10)))
 	t.LastAt = now
 	s.saveThread(r.Context(), t)
+	s.notify(t.other(acc.ID), "message", "/messages/"+t.ID)
 	writeJSON(w, 201, map[string]any{"seq": m.Seq})
 }
 

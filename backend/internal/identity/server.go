@@ -46,6 +46,8 @@ type Config struct {
 	ContactPepper []byte // HSM-held in production
 	Liveness      LivenessProvider
 	Sender        Sender
+	// Notify records a masked notice for a member (notification service). May be nil.
+	Notify        func(account, kind, link string)
 	Jurisdictions gate.Jurisdictions
 	Now           func() time.Time
 	// TrustedProxies are the addresses (e.g. the web app's proxy, the edge gateway) whose
@@ -579,8 +581,12 @@ func (s *Server) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	surface, kind := surfaceForRegistration(r, parsed.AuthenticatorAttachment)
+	first := len(id.Credentials) == 0
 	id.Credentials = append(id.Credentials, &StoredCredential{Cred: *cred, Surface: surface, Kind: kind, CreatedAt: s.cfg.Now()})
 	id.record(s.cfg.Now(), "passkey_added", string(surface))
+	if !first && s.cfg.Notify != nil {
+		s.cfg.Notify(id.ID(), "new_device", "/account") // masked notice to the member's other devices (03 §6.7)
+	}
 	writeJSON(w, 201, map[string]any{"registered": true, "surface": surface, "kind": kind, "passkeys": len(id.Credentials)})
 }
 

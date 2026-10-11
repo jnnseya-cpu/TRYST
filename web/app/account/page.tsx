@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { api, getToken, setToken } from "@/lib/api";
 import { forgetDevice } from "@/lib/e2ee";
+import { notices } from "@/lib/notify";
 import { DataRights } from "./DataRights";
+import { Notifications } from "./Notifications";
 import { Standing } from "./Standing";
 
 type Me = { session_kind: string; surface: string; tier: string; passkeys: number; expires_at: string };
@@ -12,12 +14,14 @@ type Me = { session_kind: string; surface: string; tier: string; passkeys: numbe
 export default function Account() {
   const [me, setMe] = useState<Me | null>(null);
   const [checked, setChecked] = useState(false);
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     api<Me>("/v1/me", { token: getToken() }).then((r) => {
       if (r.status === 200) setMe(r.data);
       setChecked(true);
     });
+    notices().then((r) => r.status === 200 && setUnread(r.data.unread));
   }, []);
 
   async function signOut() {
@@ -57,6 +61,7 @@ export default function Account() {
         <p className="note">Passkeys registered: {me.passkeys} · Verification: {me.tier}</p>
       </section>
       <Standing />
+      <a className="button ghost" href="/notices" style={{ marginBottom: "0.8rem" }} data-testid="notices-link">Notices{unread > 0 ? ` (${unread})` : ""}</a>
       <a className="button" href="/tonight" style={{ marginBottom: "0.8rem" }}>Free tonight?</a>
       <a className="button ghost" href="/messages" style={{ marginBottom: "0.8rem" }}>Messages</a>
       <a className="button ghost" href="/profile" style={{ marginBottom: "0.8rem" }}>Your profile and photos</a>
@@ -64,6 +69,7 @@ export default function Account() {
       <button type="button" className="button ghost" onClick={signOut}>Sign out</button>
       <p />
       <button type="button" className="button ghost" onClick={burn}>Burn: sign out everywhere and wipe this device</button>
+      <Notifications />
       <DataRights />
     </Shell>
   );

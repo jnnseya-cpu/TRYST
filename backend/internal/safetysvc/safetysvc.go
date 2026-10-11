@@ -188,6 +188,8 @@ type Service struct {
 	cases   map[string]*Case
 	chain   []AuditEntry
 	mux     *http.ServeMux
+	// Notify records a masked notice for a member. May be nil.
+	Notify func(account, kind, link string)
 	// pending standing changes, applied after s.mu is released: the member platform calls
 	// FromSignal while holding its own lock, so we never call into it while holding ours.
 	pending [][2]string
@@ -224,6 +226,12 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	s.mux.ServeHTTP(w, r)
 	s.applyPending()
+}
+
+func (s *Service) notify(account, kind string) {
+	if s.Notify != nil {
+		s.Notify(account, kind, "/account")
+	}
 }
 
 func (s *Service) applyPending() {
@@ -724,6 +732,7 @@ func (s *Service) handleDecision(w http.ResponseWriter, r *http.Request) {
 	} else {
 		c.State, c.Interim = "closed", false
 		s.audit(r.Context(), st.ID, "decide_"+c.Decision.Action, c.ID, in.Reason)
+		s.notify(c.Subject, "safety")
 		s.closeRelated(r.Context(), c, st.ID)
 	}
 	s.save(r.Context(), c)
@@ -766,6 +775,7 @@ func (s *Service) handleConfirm(w http.ResponseWriter, r *http.Request) {
 	c.State, c.Interim = "closed", false
 	s.save(r.Context(), c)
 	s.audit(r.Context(), st.ID, "confirm_permanent", c.ID, in.Reason)
+	s.notify(c.Subject, "safety")
 	s.closeRelated(r.Context(), c, st.ID)
 	s.restand(c.Subject)
 	writeJSON(w, 200, map[string]any{"decision": c.Decision})
@@ -805,6 +815,7 @@ func (s *Service) handleAppealDecision(w http.ResponseWriter, r *http.Request) {
 	}
 	s.save(r.Context(), c)
 	s.audit(r.Context(), st.ID, "appeal_"+c.Appeal.Outcome, c.ID, in.Reason)
+	s.notify(c.Subject, "appeal")
 	s.restand(c.Subject)
 	writeJSON(w, 200, map[string]any{"appeal": c.Appeal})
 }

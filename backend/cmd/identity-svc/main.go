@@ -27,11 +27,18 @@
 //	STRIPE_PRICE_<KEY>  Stripe Price id per catalogue key, e.g. STRIPE_PRICE_TRYST_PLUS
 //	DSR_SIGNING_KEY hex, 32-byte Ed25519 seed for deletion completion proofs (KMS in
 //	                production; required outside dev)
+//	VAPID_PRIVATE_KEY base64url P-256 scalar for content-free Web Push; VAPID_SUBJECT
+//	                mailto: or https contact for push services (push is off without a key
+//	                outside dev)
+//	POSTMARK_SERVER_TOKEN, OTP_EMAIL_FROM  sign-up codes by email (neutral sender name)
+//	TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_MESSAGING_SERVICE (or TWILIO_FROM)
+//	                sign-up codes by SMS. Production needs at least one channel.
 //	PUBLIC_URL      member site origin for checkout return links (default first RP origin)
 package main
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -46,6 +53,8 @@ import (
 	"github.com/jnnseya-cpu/tryst/backend/internal/dsr"
 	"github.com/jnnseya-cpu/tryst/backend/internal/gate"
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
+	"github.com/jnnseya-cpu/tryst/backend/internal/notify"
+	"github.com/jnnseya-cpu/tryst/backend/internal/outbound"
 	"github.com/jnnseya-cpu/tryst/backend/internal/payments"
 	"github.com/jnnseya-cpu/tryst/backend/internal/profilesvc"
 	"github.com/jnnseya-cpu/tryst/backend/internal/safetysvc"
@@ -139,12 +148,26 @@ func main() {
 		}
 		log.Printf("DEV MODE: liveness auto-approves and OTPs are returned in X-Dev-OTP. Never use in production.")
 	}
+	if out := otpSender(); out != nil {
+		cfg.Sender = out
+	} else if mode != "dev" {
+		log.Fatal("sign-up codes can't be delivered: set POSTMARK_SERVER_TOKEN and/or TWILIO_* (see the header of this file)")
+	}
 	ctx := context.Background()
 	idStore := openStore(ctx, mode, "DATABASE_URL_IDENTITY")
 	profStore := openStore(ctx, mode, "DATABASE_URL_PROFILE")
 	keyStore := openStore(ctx, mode, "DATABASE_URL_KEYS")
 	vault := openVault(mode, keyStore)
 	cfg.Persist = idStore
+	// Notifications are created after identity (they authenticate through it); producers
+	// reach them through this indirection.
+	var notifier *notify.Service
+	notifyFn := func(account, kind, link string) {
+		if notifier != nil {
+			notifier.Notify(account, kind, link)
+		}
+	}
+	cfg.Notify = notifyFn
 	srv, err := identity.New(cfg, identity.NewStore())
 	if err != nil {
 		log.Fatal(err)
@@ -158,6 +181,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	prof.Notify = notifyFn
+	notifier = openNotify(mode, srv, profStore)
 	if mode == "dev" {
 		prof.Alerts = &profilesvc.LogAlerting{}
 		log.Printf("DEV MODE: safety alerts go to the log, not to real contacts or the alarm-receiving centre.")
@@ -181,8 +206,9 @@ func main() {
 		log.Fatal(err)
 	}
 	prof.OnSignal = safety.FromSignal
+	safety.Notify = notifyFn
 
-	commerce := openCommerce(ctx, mode, srv, staff, cfg.RPOrigins[0])
+	commerce := openCommerce(ctx, mode, srv, staff, cfg.RPOrigins[0], notifyFn)
 
 	// Data rights: export and erasure. Order matters: the profile part destroys the member's
 	// data key and removes them from discovery first; identity goes last.
@@ -198,7 +224,7 @@ func main() {
 	rights, err := dsr.New(func(r *http.Request) (string, bool) {
 		a, ok := srv.Authenticate(r)
 		return a.ID, ok
-	}, idStore, seed, prof, safety, commerce, srv)
+	}, idStore, seed, prof, safety, commerce, notifier, srv)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -231,6 +257,9 @@ func main() {
 	root.Handle("/v1/account", rights)
 	root.Handle("/v1/account/export", rights)
 	root.Handle("/v1/deletion-proofs/", rights)
+	root.Handle("/v1/notices", notifier)
+	root.Handle("/v1/notices/", notifier)
+	root.Handle("/v1/notifications/", notifier)
 	for _, p := range []string{"/v1/entitlements", "/v1/deposit", "/v1/keys/", "/v1/subscription", "/v1/subscription/", "/v1/vouchers/", "/v1/billing/"} {
 		root.Handle(p, commerce)
 	}
@@ -243,8 +272,8 @@ func main() {
 
 // openCommerce builds the commerce service: Stripe when configured, the local test checkout
 // in dev, and no processor otherwise (purchases answer 503 until Stripe is approved).
-func openCommerce(ctx context.Context, mode string, members *identity.Server, staff safetysvc.StaffAuth, origin string) *commercesvc.Service {
-	cfg := commercesvc.Config{Members: members, Store: openStore(ctx, mode, "DATABASE_URL_COMMERCE"), Env: mode, MinTier: gate.V1,
+func openCommerce(ctx context.Context, mode string, members *identity.Server, staff safetysvc.StaffAuth, origin string, notifyFn func(string, string, string)) *commercesvc.Service {
+	cfg := commercesvc.Config{Members: members, Store: openStore(ctx, mode, "DATABASE_URL_COMMERCE"), Env: mode, MinTier: gate.V1, Notify: notifyFn,
 		StaffLead: func(r *http.Request) (string, bool) {
 			st, ok := staff.Authenticate(r)
 			if !ok {
@@ -286,4 +315,48 @@ func openCommerce(ctx context.Context, mode string, members *identity.Server, st
 		stripe.SubscriptionFor = svc.SubscriptionFor
 	}
 	return svc
+}
+
+// openNotify builds the notification service. Push needs a VAPID key; dev generates one.
+func openNotify(mode string, members *identity.Server, st store.Store) *notify.Service {
+	var push notify.Pusher
+	var key *ecdsa.PrivateKey
+	var err error
+	if v := os.Getenv("VAPID_PRIVATE_KEY"); v != "" {
+		if key, err = notify.ParseVAPIDKey(v); err != nil {
+			log.Fatal(err)
+		}
+	} else if mode == "dev" {
+		key, _ = notify.GenerateVAPIDKey()
+		log.Printf("DEV MODE: VAPID_PRIVATE_KEY not set; push subscriptions won't survive a restart")
+	} else {
+		log.Printf("VAPID_PRIVATE_KEY not set: push notifications are unavailable (in-app notices still work)")
+	}
+	if key != nil {
+		push = &notify.WebPush{Key: key, Subject: env("VAPID_SUBJECT", "mailto:privacy@example.invalid"), AllowHost: notify.HostAllowed(notify.DefaultPushHosts)}
+	}
+	n, err := notify.New(members, st, push)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return n
+}
+
+// otpSender returns the configured email/SMS code sender, or nil if none is configured.
+func otpSender() identity.Sender {
+	var out outbound.Sender
+	if t := os.Getenv("POSTMARK_SERVER_TOKEN"); t != "" {
+		out.Email = &outbound.Postmark{Token: t, From: env("OTP_EMAIL_FROM", "Member services <codes@example.invalid>")}
+	}
+	if sid := os.Getenv("TWILIO_ACCOUNT_SID"); sid != "" {
+		out.SMS = &outbound.Twilio{AccountSID: sid, AuthToken: os.Getenv("TWILIO_AUTH_TOKEN"),
+			MessagingService: os.Getenv("TWILIO_MESSAGING_SERVICE"), From: os.Getenv("TWILIO_FROM")}
+		if out.SMS.AuthToken == "" || (out.SMS.MessagingService == "" && out.SMS.From == "") {
+			log.Fatal("TWILIO_ACCOUNT_SID needs TWILIO_AUTH_TOKEN and TWILIO_MESSAGING_SERVICE or TWILIO_FROM")
+		}
+	}
+	if out.Email == nil && out.SMS == nil {
+		return nil
+	}
+	return out
 }

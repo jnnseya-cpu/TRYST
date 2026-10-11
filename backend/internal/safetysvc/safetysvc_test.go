@@ -519,3 +519,21 @@ func TestExportAndErase(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDecisionNotices(t *testing.T) {
+	g := newRig(t, store.NewMemory())
+	var mu sync.Mutex
+	var got []string
+	g.svc.Notify = func(acc, kind, _ string) { mu.Lock(); got = append(got, acc+":"+kind); mu.Unlock() }
+	id := g.report("alice", "th_ab", "harassment")
+	g.do("POST", "/ops/v1/cases/"+id+"/decision", "", tokMod1, map[string]any{"outcome": "uphold", "reason": "Pressure after a clear no"})
+	_, st := g.do("GET", "/v1/me/standing", "bob", "", nil)
+	dec := st["decisions"].([]any)[0].(map[string]any)["decision_id"].(string)
+	g.do("POST", "/v1/appeals", "bob", "", map[string]any{"decision_id": dec, "text": "It was a misunderstanding about timing."})
+	g.do("POST", "/ops/v1/cases/"+id+"/appeal", "", tokLead, map[string]any{"member_wins": false, "reason": "The messages are clear"})
+	mu.Lock()
+	defer mu.Unlock()
+	if strings.Join(got, ",") != "bob:safety,bob:appeal" {
+		t.Fatalf("notices: %v", got)
+	}
+}
