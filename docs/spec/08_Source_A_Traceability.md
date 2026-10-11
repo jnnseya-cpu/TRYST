@@ -27,4 +27,4 @@ Source A is the top-precedence source ([00 §2](00_README.md#2-sources-and-prece
 | 19. Admission control | [01 §8](01_Product.md#8-trust-verification-and-admission-policy), [03 §8](03_Backend.md#8-admission-control-l1l5) | `backend/internal/admission` (anchors, silent refusal, human-only bans, appeal lifts) | Anchor candidates at V2 ([E-02](06_Decisions_and_Changes.md#3-errata-fixed-in-v11)); biometric anchor off ([D-08](06_Decisions_and_Changes.md#2-decision-log)) |
 | 20. Liability & disclaimer architecture | [01 §15](01_Product.md#15-liability-claims-and-insurance) | `web/` safety copy | — |
 | 21. Guardian classifier spec | [03 §7](03_Backend.md#7-guardian--safety-models-m6am6e) | Reason codes in the OpenAPI contract; on-device only | — |
-| Part B — Terms of Service draft 0.9 | [05](05_Terms_of_Service_draft.md) (draft 0.9.4) | — | cl. 3.5, 6.5, 15.2–15.3, 17.3, protected-trait rule; Q11–Q15 |
+| Part B — Terms of Service draft 0.9 | [05](05_Terms_of_Service_draft.md) (draft 0.9.5) | — | cl. 3.5, 6.5, 15.2–15.3, 17.3, protected-trait rule; Q11–Q15 |

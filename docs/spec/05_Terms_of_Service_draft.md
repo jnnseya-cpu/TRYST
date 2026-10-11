@@ -1,4 +1,4 @@
-# 05 — TRYST Terms of Service — Draft 0.9.4
+# 05 — TRYST Terms of Service — Draft 0.9.5
 
 Part of the [TRYST v1.1 baseline](00_README.md).
 
@@ -85,6 +85,8 @@ Part of the [TRYST v1.1 baseline](00_README.md).
 
 ## 7. Couple Profiles, and our agent features
 
+7.0 You can join TRYST on your own. If you are in a relationship, your partner does not need to join, agree or know, and we will never contact them. A Couple Profile is optional and only for partners who want to use TRYST together. **[v1.3]**
+
 7.1 A Couple Profile requires both partners to hold their own verified accounts and each to confirm the link from their own device. We will not create a Couple Profile on one person's say-so. Either partner may dissolve the link at any time, and we will act on that immediately without telling the other partner why.
 
 7.2 Some features use automated agents. Before you and another Member speak, our agents may exchange structured information about intentions, boundaries, availability and verification, and produce a Brief for each of you.
@@ -163,6 +165,10 @@ You must not, on TRYST or in any contact that begins on TRYST:
 14.2 Our Privacy Notice explains what we collect, why, how long we keep it, and your rights. It is not a summary — it is the operative document, and it prevails over anything in these terms about personal data.
 
 14.3 We do not sell your data, we do not show advertising, and we do not embed third-party tracking in our apps.
+
+14.4 We will never confirm or deny to anyone else, including your partner, family or employer, whether you have an account. We share account information only with you, when the law requires it (for example, a court order), or in an emergency under clause 20. You can ask us to hide you from your partner if they ever join (the partner shield), and we will do so without telling either of you about the other. **[v1.3]**
+
+> **REVIEW (Q16):** if a partner makes a data subject access request, the partner-shield entry is a keyed hash of their contact details. We intend to withhold it under the third-party exemption (DPA 2018 Sch 2 para 16), because disclosing it would reveal information about the member. Please confirm.
 
 ## 15. Keeping and deleting your information
 
@@ -325,10 +331,11 @@ You must not, on TRYST or in any contact that begins on TRYST:
 | Q10 | Review the Community Rules and Safety Policy as incorporated documents for consistency with these terms. | 1.4 |
 | Q11 **[v1.1]** | Is scarce-side seeding that offers free paid features to women-identifying members lawful under the Equality Act 2010 (services), or must it be segment-based? (Spec D-06.) | 16 |
 | Q12 **[v1.1]** | Does gating all discovery, Intents, conversations and media at age assurance (V2), with no other members' content visible before then, satisfy Ofcom's highly-effective-age-assurance expectations for dating services, including the May 2026 dating guidance? | 3.1, 5.1 |
+| Q13 **[v1.1]** | Is creating Exclusion Identifier codes for **every** verified member at verification (destroyed on deletion unless the member is removed) proportionate, and does it need its own Art. 9/10 and Sch. 1 analysis separate from post-removal retention? Should a biometric code ever be used (spec D-08)? | 15.3 |
 | Q14 **[v1.2]** | Biometric login (clause 6.5) processes biometric data to identify the account holder. Is explicit consent valid (freely given) when login requires it, given the accessible alternative? Is a provider-held face reference compatible with clause 15's erasure promise if the provider's deletion completes after our 60-second erasure? | 6.5, 15 |
 | Q15 **[v1.2]** | Does requiring biometrics to sign in, with the alternative path, meet the Equality Act 2010 reasonable-adjustment duty for disabled members? | 6.5 |
-| Q13 **[v1.1]** | Is creating Exclusion Identifier codes for **every** verified member at verification (destroyed on deletion unless the member is removed) proportionate, and does it need its own Art. 9/10 and Sch. 1 analysis separate from post-removal retention? Should a biometric code ever be used (spec D-08)? | 15.3 |
+| Q16 **[v1.3]** | Partner shield: may we withhold a partner-shield entry from a partner's subject access request under the third-party exemption (DPA 2018 Sch 2 para 16), and is never confirming or denying an account's existence consistent with our transparency duties? | 14.4 |
 
 ---
 
-*TRYST — Terms of Service · Draft 0.9.4 · 4 October 2026 · Prepared by Product for legal review · Not legal advice · Not for publication.*
+*TRYST — Terms of Service · Draft 0.9.5 · 4 October 2026 · Prepared by Product for legal review · Not legal advice · Not for publication.*

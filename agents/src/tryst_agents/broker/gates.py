@@ -76,6 +76,14 @@ def valid_entity(e: Entity) -> bool:
     return e.entity_type == "solo" and e.segment in SOLO_SEGMENTS
 
 
+def partner_secret_clear(a: Entity, b: Entity) -> bool:
+    """Nobody is shown their own other profile, their partner's profiles, or anyone on
+    their partner shield, in either direction. Neither side is ever told why."""
+    if a.owners & b.owners:
+        return False
+    return not (a.owners & b.shielded_accounts) and not (b.owners & a.shielded_accounts)
+
+
 def mutual_eligible(a: Entity, b: Entity) -> tuple[bool, str]:
     """Symmetric Stage 0 gates. Returns (eligible, first failing gate)."""
     if a.id == b.id:
@@ -86,6 +94,7 @@ def mutual_eligible(a: Entity, b: Entity) -> tuple[bool, str]:
         ("hard_limits", hard_limits_clear(a, b)),
         ("structure", structure_compatible(a, b)),
         ("exclusion_ring", b.id not in a.excluded and a.id not in b.excluded),
+        ("partner_secret", partner_secret_clear(a, b)),
         ("geofence", geofence_clear(a, b)),
         ("block", b.id not in a.blocked and a.id not in b.blocked),
         ("safety", a.safety_state == "normal" and b.safety_state == "normal"),

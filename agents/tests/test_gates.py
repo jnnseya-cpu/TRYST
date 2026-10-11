@@ -15,6 +15,7 @@ IDS = ["a", "b", "c", "d"]
 SHAPES = ["one_off", "recurring", "ongoing", "exploratory", "third", "couple"]
 TAGS = ["t1", "t2", "t3"]
 CELLS = ["gcpvj", "gcpuv", "u10hb"]
+ACCOUNTS = ["acc1", "acc2", "acc3", "acc4"]
 
 
 @st.composite
@@ -40,6 +41,8 @@ def entities(draw, eid=None):
         blocked=frozenset(draw(st.sets(st.sampled_from(IDS), max_size=2))),
         excluded=frozenset(draw(st.sets(st.sampled_from(IDS), max_size=2))),
         outbound_intents=frozenset(draw(st.sets(st.sampled_from(IDS), max_size=2))),
+        owners=frozenset(draw(st.sets(st.sampled_from(ACCOUNTS), min_size=1, max_size=1 if etype == "solo" else 2))),
+        shielded_accounts=frozenset(draw(st.sets(st.sampled_from(ACCOUNTS), max_size=2))),
     )
 
 
@@ -60,6 +63,10 @@ def _violations(a: Entity, b: Entity) -> list[str]:
         v.append("exclusion ring")
     if a.id in b.blocked or b.id in a.blocked:
         v.append("block")
+    if a.owners & b.owners:
+        v.append("same person on both sides")
+    if a.owners & b.shielded_accounts or b.owners & a.shielded_accounts:
+        v.append("partner secret")
     if any(z.startswith(b.location_cell) for z in a.zones) or any(z.startswith(a.location_cell) for z in b.zones):
         v.append("geofence")
     if a.safety_state != "normal" or b.safety_state != "normal":
@@ -115,3 +122,32 @@ def test_unsigned_couple_never_eligible():
                     modes=frozenset({"third"}), couple_valid=False)
     solo = Entity(id="s", entity_type="solo", segment="S4", tier=Tier.V2, modes=frozenset({"third"}))
     assert mutual_eligible(couple, solo) == (False, "entity_valid")
+
+
+def test_secret_affair_stays_secret():
+    """Alice and Bob have a couple profile together. Alice also has a private solo profile.
+    Bob never sees it, Alice's solo profile never sees the couple or Bob's own solo
+    profile, and a stranger can still match Alice's solo profile."""
+    base = {"tier": Tier.V2, "location_cell": "gcpvj", "modes": frozenset({"one_off", "third", "exploratory"})}
+    alice_solo = Entity(id="alice-solo", entity_type="solo", segment="S1", owners=frozenset({"alice"}),
+                        shielded_accounts=frozenset({"bob"}), **base)
+    bob_solo = Entity(id="bob-solo", entity_type="solo", segment="S1", owners=frozenset({"bob"}),
+                      shielded_accounts=frozenset({"alice"}), **base)
+    couple = Entity(id="ab", entity_type="couple", segment="S3", owners=frozenset({"alice", "bob"}), **base)
+    stranger = Entity(id="s", entity_type="solo", segment="S4", owners=frozenset({"carol"}), **base)
+    assert mutual_eligible(alice_solo, bob_solo) == (False, "partner_secret")
+    assert mutual_eligible(alice_solo, couple) == (False, "partner_secret")
+    assert mutual_eligible(couple, alice_solo) == (False, "partner_secret")
+    assert mutual_eligible(alice_solo, stranger) == (True, "")
+    assert mutual_eligible(couple, stranger) == (True, "")
+
+
+def test_partner_shield_without_partner_on_tryst_yet():
+    """Dan added his wife's number to his partner shield. If she ever joins, PSI marks her
+    account and neither ever sees the other, whatever their settings."""
+    base = {"entity_type": "solo", "segment": "S1", "tier": Tier.V2, "modes": frozenset({"one_off"}),
+            "location_cell": "gcpvj"}
+    dan = Entity(id="dan", owners=frozenset({"dan"}), shielded_accounts=frozenset({"erin"}), **base)
+    erin = Entity(id="erin", owners=frozenset({"erin"}), **base)
+    assert mutual_eligible(dan, erin) == (False, "partner_secret")
+    assert mutual_eligible(erin, dan) == (False, "partner_secret")

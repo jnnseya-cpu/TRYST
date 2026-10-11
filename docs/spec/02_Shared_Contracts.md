@@ -890,6 +890,9 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-103 | Before a first meet: an in-app video call is offered and can be set as a hard limit; a private-address venue triggers an on-device warning; Panic shows the UK Silent Solution (999, then 55) | FE | P1 | Founder v1.3 |
 | FR-104 | Private aftercare asks whether the member felt safe; two independent "felt unsafe" answers about the same member within 90 days trigger review; never shown to the counterparty | Both | P1 | Founder v1.3 |
 | FR-105 | Law-enforcement cooperation: lawful-request process, emergency disclosure (DPO + Head of T&S), preservation, mandatory CSAM reporting to NCA/IWF, counts in the transparency report | BE | P1 | Founder v1.3, OSA |
+| FR-106 | Partner shield: a member may add their partner's phone number or email, blinded on device (hashed match in P1, PSI in P2 with FR-010); if the partner joins, both are permanently and silently invisible to each other; couple partners on TRYST and household signals are shielded the same way | Both | P1 | Founder v1.3, D-45 |
+| FR-107 | A member may hold a private solo profile and a joint couple profile under one account; the partner never sees the solo profile or any of its activity, notifications or payments, and the couple profile shows only couple activity; enforced as the Stage 0 `partner_secret` gate | Both | P1 | Founder v1.3, D-45 |
+| FR-108 | Never confirm or deny: support, legal and every other channel answer only "We can't say whether any person has an account"; account information goes only to the signed-in holder, a court order or lawful request reviewed by counsel, or the emergency rule (P7) | BE | P1 | Founder v1.3, ToS 14.4 |
 
 ### 10.2 Non-functional requirements
 

@@ -190,6 +190,7 @@ STAGE 0  HARD GATES (non-scored, non-bypassable, bidirectional)
   ├─ hard-limit intersection: zero collisions
   ├─ structure compatibility matrix (02 §2.3) and couple VC validity
   ├─ ExclusionRing (PSI + heuristics)
+  ├─ partner_secret: never own other profile, partner's profiles or partner shield (FR-107)
   ├─ geofence exclusion zones (both sides)
   ├─ block graph / report holds / safety_state
   ├─ jurisdiction gate

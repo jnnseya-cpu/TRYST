@@ -36,6 +36,13 @@ class Entity:
     blocked: frozenset[str] = frozenset()
     excluded: frozenset[str] = frozenset()  # ExclusionRing partners
     outbound_intents: frozenset[str] = frozenset()
+    # Secret-keeping (FR-106, FR-107, D-45). Accounts behind this profile: one for a solo
+    # profile, two for a couple. A person may hold a private solo profile and a couple
+    # profile; the gate below keeps them apart from each other and from the partner.
+    owners: frozenset[str] = frozenset()
+    # Accounts these owners must never see or be seen by: their couple partners on TRYST
+    # and partner-shield matches (PSI on the partner's phone/email, heuristics). Silent.
+    shielded_accounts: frozenset[str] = frozenset()
 
     def __hash__(self) -> int:  # dict field makes the default hash unusable
         return hash(self.id)

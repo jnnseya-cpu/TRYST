@@ -341,6 +341,18 @@ The design starts from the eight adversaries in [03 §6.1](03_Backend.md#61-thre
 
 Member-facing controls are in [04 §5](04_Frontend.md#5-client-discretion-controls). Retention defaults are canonical in [02 §7](02_Shared_Contracts.md#7-retention-and-erasure).
 
+### 9.1 Keeping a member's secret (founder, v1.3)
+
+*Founder: "One person in a couple can want a secret affair without the other partner knowing, and the platform must keep people's secrets buried."* ([D-45](06_Decisions_and_Changes.md#2-decision-log))
+
+1. **Joining alone is the default.** A person in a relationship joins on their own. Their partner is never needed, asked, contacted or told. Couple verification (FR-095) applies **only** to the optional joint couple profile, for partners who want to meet others together.
+2. **Partner shield** (FR-106). A member can add their partner's phone number or email; it is blinded on the phone before it leaves. If the partner ever joins TRYST, each becomes invisible to the other, in both directions, permanently, and neither is ever told. The same silent suppression applies to couple partners on TRYST, to the member's contacts (ExclusionRing) and to household signals (shared home area, card, phone or Wi-Fi).
+3. **A private solo profile alongside a joint couple profile** (FR-107). Still one account per person (D-41). The partner never sees the solo profile, and nothing from it (intents, Briefs, threads, matches, notifications, payments, activity) appears in the couple profile or on the partner's phone. Enforced as a Stage 0 gate (`partner_secret`, property-tested).
+4. **We never confirm or deny** (FR-108). To anyone (a partner, family member, employer, private investigator, journalist or caller claiming an emergency) TRYST says only: "We can't say whether any person has an account." Account information goes only to the signed-in account holder, to a court order or lawful police request reviewed by counsel, or under the emergency rule (P7).
+5. **Nothing internal leaks out.** Review signals such as a shared card or phone never notify or visibly affect another member; members are known by pseudonym only; real names are never collected.
+6. **The phone and the bank** (04 §5): decoy app icon, notifications off by default and always masked, duress PIN for the app, Burn, a neutral card descriptor that never says TRYST, vouchers and a separate billing email.
+7. **The honest limits** (P9): TRYST cannot protect a secret from someone who unlocks the member's phone, reads their bank statement closely, is shown a screenshot by the other person, or obtains a court order. The main photo shows the member's face (D-38) to other verified members, so a stranger who knows them could recognise them; the partner shield and contact exclusion hide them from the people they choose.
+
 ---
 
 ## 10. Business model and unit economics
