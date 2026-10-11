@@ -14,6 +14,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/jnnseya-cpu/tryst/backend/internal/metrics"
 	"io"
 	"log"
 	"net/http"
@@ -194,6 +195,7 @@ func (s *Service) Notify(account, kind, link string) {
 				s.dropEndpoint(account, ep)
 			} else if err != nil {
 				log.Printf("push failed: %v", err) // no endpoint or account logged
+				metrics.Default.Inc("tryst_push_failures_total")
 			}
 		}
 	}()

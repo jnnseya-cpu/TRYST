@@ -12,6 +12,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"regexp"
 	"strings"
 	"time"
@@ -257,18 +258,33 @@ func decode(r *http.Request, v any) error {
 // clientIP is the caller's address. Behind a trusted proxy it is the last address the proxy
 // appended to X-Forwarded-For (the one the proxy itself saw); a client cannot spoof it by
 // sending its own header, because only the right-most entry from a trusted hop is used.
+// TrustedAddr reports whether ip is in list, whose entries are addresses or CIDR ranges
+// (a container network, for example).
+func TrustedAddr(list []string, ip string) bool {
+	a, err := netip.ParseAddr(ip)
+	if err != nil {
+		return false
+	}
+	a = a.Unmap()
+	for _, p := range list {
+		p = strings.TrimSpace(p)
+		if pre, err := netip.ParsePrefix(p); err == nil {
+			if pre.Contains(a) {
+				return true
+			}
+		} else if b, err := netip.ParseAddr(p); err == nil && b.Unmap() == a {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Server) clientIP(r *http.Request) string {
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		ip = r.RemoteAddr
 	}
-	trusted := false
-	for _, p := range s.cfg.TrustedProxies {
-		if p == ip {
-			trusted = true
-		}
-	}
-	if !trusted {
+	if !TrustedAddr(s.cfg.TrustedProxies, ip) {
 		return ip
 	}
 	xff := r.Header.Get("X-Forwarded-For")

@@ -83,7 +83,9 @@ type Service struct {
 	th    *threadState
 	mt    *meetState
 	// Alerts delivers safety escalations (trusted contact, safety line, emergency).
-	Alerts Alerting
+	Alerts     Alerting
+	alertWG    sync.WaitGroup
+	alertRetry time.Duration
 	// OnSignal is called when an on-device Guardian signal arrives (safety case queue).
 	OnSignal func(threadID, reporter, subject, kind string)
 	// standing holds enforcement outcomes other than good (see standing.go).
@@ -112,7 +114,7 @@ func NewWithStore(auth Authenticator, mod Moderator, env string, st store.Store,
 		return nil, errors.New("DevModerator is forbidden outside the dev environment")
 	}
 	s := &Service{auth: auth, mod: mod, now: time.Now, data: map[string]*memberProfile{}, mux: http.NewServeMux(),
-		tn: newTonight(), MinDiscoveryTier: "V2", st: st, vault: vault, dirty: map[string]bool{}, th: newThreadState(), mt: newMeetState(), standing: map[string]string{}}
+		tn: newTonight(), MinDiscoveryTier: "V2", st: st, vault: vault, dirty: map[string]bool{}, th: newThreadState(), mt: newMeetState(), standing: map[string]string{}, alertRetry: 5 * time.Second}
 	if err := s.load(context.Background()); err != nil {
 		return nil, err
 	}

@@ -159,11 +159,9 @@ func (a StaffAuth) Authenticate(r *http.Request) (Staff, bool) {
 	if err != nil {
 		ip = r.RemoteAddr
 	}
-	for _, p := range a.TrustedProxies {
-		if p == ip {
-			if id := r.Header.Get("X-Staff-Identity"); id != "" {
-				return Staff{ID: id, Roles: strings.Split(r.Header.Get("X-Staff-Roles"), ",")}, true
-			}
+	if identity.TrustedAddr(a.TrustedProxies, ip) {
+		if id := r.Header.Get("X-Staff-Identity"); id != "" {
+			return Staff{ID: id, Roles: strings.Split(r.Header.Get("X-Staff-Roles"), ",")}, true
 		}
 	}
 	if a.Env == "dev" {
@@ -828,6 +826,28 @@ func (s *Service) handleAuditVerify(w http.ResponseWriter, r *http.Request) {
 	defer s.mu.Unlock()
 	err := VerifyChain(s.chain)
 	writeJSON(w, 200, map[string]any{"ok": err == nil, "entries": len(s.chain)})
+}
+
+// QueueStats returns open cases, overdue cases, and overdue cases in the 15-minute and 1-hour
+// categories, for the on-call alert rules.
+func (s *Service) QueueStats() (open, overdue, overdueUrgent int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, c := range s.cases {
+		pending := c.State != "closed" || (c.Appeal != nil && c.Appeal.Outcome == "")
+		if !pending {
+			continue
+		}
+		open++
+		sm := s.summary(c)
+		if sm.Overdue {
+			overdue++
+			if cat, _ := category(c.Category); cat.Deadline <= time.Hour && c.State != "closed" {
+				overdueUrgent++
+			}
+		}
+	}
+	return
 }
 
 // handleStats is the transparency-report input: counts only, no member data.

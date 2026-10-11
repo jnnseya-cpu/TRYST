@@ -6,6 +6,10 @@ import { defineConfig } from "@playwright/test";
 // console is routed (OPS_CONSOLE=1) with dev staff tokens.
 const chromium = process.env.CHROMIUM_PATH; // e.g. /opt/pw-browsers/chromium-1194/chrome-linux/chrome
 
+// E2E_BASE_URL=http://localhost:3000 runs against an already-running stack (for example
+// deploy/docker-compose.yml) instead of starting the services.
+const external = process.env.E2E_BASE_URL;
+
 export default defineConfig({
   testDir: "e2e",
   // Screenshot capture runs only on request: SCREENSHOTS=1 npx playwright test screens
@@ -13,10 +17,10 @@ export default defineConfig({
   timeout: 60_000,
   retries: 0,
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: external ?? "http://localhost:3000",
     launchOptions: chromium ? { executablePath: chromium } : {},
   },
-  webServer: [
+  webServer: external ? [] : [
     {
       command: "cd ../backend && go build -o ../web/.e2e-identity-svc ./cmd/identity-svc && TRYST_ENV=dev RP_ID=localhost RP_ORIGINS=http://localhost:3000 PORT=8081 RATE_LIMIT_PER_MIN=2000 STAFF_DEV_TOKENS=mod1:moderator:e2e-mod-one-token-0001,mod2:moderator:e2e-mod-two-token-0002,lead1:lead:e2e-lead-token-00000003 ../web/.e2e-identity-svc",
       url: "http://localhost:8081/healthz",

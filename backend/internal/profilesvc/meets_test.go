@@ -2,7 +2,10 @@ package profilesvc
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/jnnseya-cpu/tryst/backend/internal/meet"
+	"github.com/jnnseya-cpu/tryst/backend/internal/metrics"
 	"strings"
 	"testing"
 	"time"
@@ -62,16 +65,19 @@ func TestMissedCheckInEscalates(t *testing.T) {
 	// Check-ins start at the meet start (1 h from now). 30 min + 10 min grace after that.
 	w.now = w.now.Add(time.Hour + 35*time.Minute)
 	w.s.SweepSafety(context.Background())
+	w.s.WaitAlerts()
 	if len(al.Trusted) != 0 {
 		t.Fatal("alerted inside grace")
 	}
 	w.now = w.now.Add(6 * time.Minute)
 	w.s.SweepSafety(context.Background())
+	w.s.WaitAlerts()
 	if len(al.Trusted) != 1 || al.Trusted[0] != "+447700900111" {
 		t.Fatalf("trusted contact not alerted: %v", al.Trusted)
 	}
 	w.now = w.now.Add(16 * time.Minute)
 	w.s.SweepSafety(context.Background())
+	w.s.WaitAlerts()
 	if len(al.Line) != 1 || al.Line[0].MemberAlias != "Ana" || al.Line[0].CallbackPhone != "" {
 		t.Fatalf("safety line: %+v", al.Line)
 	}
@@ -86,6 +92,7 @@ func TestDuressLooksNormalAndCannotEndTheMeet(t *testing.T) {
 	if c1 != 200 || c2 != 200 || fmt.Sprint(normal) != fmt.Sprint(duress) {
 		t.Fatalf("duress reply differs: %v vs %v", normal, duress)
 	}
+	w.s.WaitAlerts()
 	if len(al.Trusted) != 1 || len(al.Line) != 1 {
 		t.Fatalf("duress must alert at once: trusted=%v line=%v", al.Trusted, al.Line)
 	}
@@ -117,6 +124,7 @@ func TestPanic(t *testing.T) {
 	if out["call"] != "999" || !strings.Contains(out["silent_solution"].(string), "55") {
 		t.Fatalf("panic reply: %v", out)
 	}
+	w.s.WaitAlerts()
 	if len(al.Panics) != 1 || al.Panics[0].Location != "51.5362,-0.1033" || al.Panics[0].MemberAlias != "Ben" {
 		t.Fatalf("emergency alert: %+v", al.Panics)
 	}
@@ -125,4 +133,62 @@ func TestPanic(t *testing.T) {
 	if c, _ := w.do("ana", "POST", "/v1/meets/"+id+"/safety", `{"every_minutes":30,"pin":"2468","duress_pin":"1357","safety_line":true}`); c != 409 {
 		t.Fatal("check-ins on a cancelled meet")
 	}
+}
+
+type slowAlerting struct {
+	release chan struct{}
+	calls   chan string
+}
+
+func (a *slowAlerting) TrustedContact(context.Context, string, string, string, bool) error {
+	return nil
+}
+func (a *slowAlerting) SafetyLine(context.Context, meet.Alert) error { return nil }
+func (a *slowAlerting) Emergency(context.Context, meet.Alert) error {
+	a.calls <- "emergency"
+	<-a.release
+	return errors.New("centre unavailable")
+}
+
+func TestStalledSafetyLineBlocksNothingAndIsRetried(t *testing.T) {
+	w, _, id := confirmedMeet(t)
+	sa := &slowAlerting{release: make(chan struct{}), calls: make(chan string, 4)}
+	w.s.Alerts = sa
+	w.s.alertRetry = time.Millisecond
+	before := failures()
+	if c, _ := w.do("ben", "POST", "/v1/safety/panic", fmt.Sprintf(`{"meet_id":"%s"}`, id)); c != 200 {
+		t.Fatalf("panic: %d", c)
+	}
+	<-sa.calls
+	// The centre is stuck, but members are still served.
+	done := make(chan int)
+	go func() { c, _ := w.do("ana", "GET", "/v1/meets/"+id, ""); done <- c }()
+	select {
+	case c := <-done:
+		if c != 200 {
+			t.Fatalf("request during stalled alert: %d", c)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("a stalled alert blocked the service")
+	}
+	close(sa.release)
+	w.s.WaitAlerts()
+	if len(sa.calls) != 1 { // the retry
+		t.Fatalf("retries = %d, want 1", len(sa.calls))
+	}
+	if failures() != before+1 {
+		t.Fatal("failure not counted")
+	}
+}
+
+func failures() int {
+	var b strings.Builder
+	metrics.Default.Write(&b)
+	n := 0
+	for _, l := range strings.Split(b.String(), "\n") {
+		if strings.HasPrefix(l, `tryst_safety_alert_failures_total{cause="delivery",channel="emergency"}`) {
+			fmt.Sscanf(l[strings.LastIndex(l, " ")+1:], "%d", &n)
+		}
+	}
+	return n
 }

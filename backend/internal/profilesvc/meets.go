@@ -21,9 +21,11 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/meet"
+	"github.com/jnnseya-cpu/tryst/backend/internal/metrics"
 )
 
 type meetRecord struct {
@@ -59,24 +61,61 @@ type Alerting interface {
 	Emergency(ctx context.Context, a meet.Alert) error
 }
 
+// dispatch delivers an alert outside the service lock (the alarm-receiving centre may be
+// slow), retrying once; failures are counted for the on-call alert rule (deploy/monitoring).
+func (s *Service) dispatch(channel string, send func(ctx context.Context) error) {
+	if s.Alerts == nil {
+		metrics.Default.Inc("tryst_safety_alert_failures_total", "channel", channel, "cause", "not_configured")
+		return
+	}
+	s.alertWG.Add(1)
+	go func() {
+		defer s.alertWG.Done()
+		for attempt := 0; attempt < 2; attempt++ {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			err := send(ctx)
+			cancel()
+			if err == nil {
+				metrics.Default.Inc("tryst_safety_alerts_total", "channel", channel)
+				return
+			}
+			log.Printf("safety alert (%s) failed: %v", channel, err)
+			if attempt == 0 {
+				time.Sleep(s.alertRetry)
+			}
+		}
+		metrics.Default.Inc("tryst_safety_alert_failures_total", "channel", channel, "cause", "delivery")
+	}()
+}
+
+// WaitAlerts blocks until dispatched alerts finish (tests, shutdown).
+func (s *Service) WaitAlerts() { s.alertWG.Wait() }
+
 // LogAlerting records alerts in memory and the log (dev and tests).
 type LogAlerting struct {
+	mu      sync.Mutex
 	Trusted []string
 	Line    []meet.Alert
 	Panics  []meet.Alert
 }
 
 func (l *LogAlerting) TrustedContact(_ context.Context, to, alias, window string, duress bool) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.Trusted = append(l.Trusted, to)
 	log.Printf("ALERT trusted contact (dev sink): alias=%s window=%s duress=%v", alias, window, duress)
 	return nil
 }
 func (l *LogAlerting) SafetyLine(_ context.Context, a meet.Alert) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.Line = append(l.Line, a)
 	log.Printf("ALERT safety line (dev sink): %s %s", a.ID, a.Reason)
 	return nil
 }
 func (l *LogAlerting) Emergency(_ context.Context, a meet.Alert) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.Panics = append(l.Panics, a)
 	log.Printf("ALERT emergency (dev sink): %s", a.ID)
 	return nil
@@ -361,9 +400,7 @@ func (s *Service) handlePanic(w http.ResponseWriter, r *http.Request) {
 		ss.sess.Panic()
 		s.tickSession(r.Context(), ss, s.now())
 	}
-	if s.Alerts != nil {
-		_ = s.Alerts.Emergency(r.Context(), a)
-	}
+	s.dispatch("emergency", func(ctx context.Context) error { return s.Alerts.Emergency(ctx, a) })
 	writeJSON(w, 200, map[string]any{"alert": a.ID, "call": "999", "silent_solution": "If you can't speak, dial 999, then press 55 when asked."})
 }
 
@@ -390,17 +427,15 @@ func (s *Service) tickSession(ctx context.Context, ss *safetySession, now time.T
 		a := meet.Alert{ID: "al_" + randHex(8), Reason: reason, MemberAlias: ss.Alias, MeetWindow: window, Started: now}
 		switch act {
 		case meet.AlertTrusted:
-			if s.Alerts != nil && ss.Trusted != "" {
-				_ = s.Alerts.TrustedContact(ctx, ss.Trusted, ss.Alias, window, duress)
+			if to, alias := ss.Trusted, ss.Alias; to != "" {
+				s.dispatch("trusted_contact", func(ctx context.Context) error {
+					return s.Alerts.TrustedContact(ctx, to, alias, window, duress)
+				})
 			}
 		case meet.AlertSafetyLine:
-			if s.Alerts != nil {
-				_ = s.Alerts.SafetyLine(ctx, a)
-			}
+			s.dispatch("safety_line", func(ctx context.Context) error { return s.Alerts.SafetyLine(ctx, a) })
 		case meet.Emergency:
-			if s.Alerts != nil {
-				_ = s.Alerts.Emergency(ctx, a)
-			}
+			s.dispatch("emergency", func(ctx context.Context) error { return s.Alerts.Emergency(ctx, a) })
 		}
 	}
 }

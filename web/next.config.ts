@@ -18,6 +18,7 @@ const IDENTITY_URL = process.env.IDENTITY_URL ?? "http://localhost:8081";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  output: "standalone", // container image (web/Dockerfile)
   async rewrites() {
     return [
       { source: "/v1/:path*", destination: `${IDENTITY_URL}/v1/:path*` },

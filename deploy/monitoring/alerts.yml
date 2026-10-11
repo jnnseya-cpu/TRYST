@@ -1,0 +1,51 @@
+# On-call alert rules (D-57; docs/runbooks/oncall.md). Every page names its runbook section.
+groups:
+  - name: tryst-safety
+    rules:
+      - alert: UrgentSafetyCaseOverdue
+        expr: tryst_safety_cases_overdue_urgent > 0
+        for: 1m
+        labels: { severity: page }
+        annotations:
+          summary: "A suspected-minor, image-abuse, sextortion or threat case is past its deadline"
+          runbook: "docs/runbooks/oncall.md#urgent-safety-case-overdue"
+      - alert: SafetyAlertDeliveryFailing
+        expr: increase(tryst_safety_alert_failures_total[5m]) > 0
+        labels: { severity: page }
+        annotations:
+          summary: "A safety-line, trusted-contact or Panic alert could not be delivered"
+          runbook: "docs/runbooks/oncall.md#safety-alert-delivery-failing"
+      - alert: SafetyCasesOverdue
+        expr: tryst_safety_cases_overdue > 0
+        for: 30m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Safety cases are past their deadline"
+          runbook: "docs/runbooks/oncall.md#safety-cases-overdue"
+  - name: tryst-platform
+    rules:
+      - alert: HighServerErrorRate
+        expr: sum(rate(tryst_http_requests_total{code=~"5.."}[5m])) / clamp_min(sum(rate(tryst_http_requests_total[5m])), 1) > 0.02
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "More than 2% of requests are failing"
+          runbook: "docs/runbooks/oncall.md#high-server-error-rate"
+      - alert: ErasureSlow
+        expr: histogram_quantile(0.99, sum(rate(tryst_erasure_seconds_bucket[1h])) by (le)) > 60
+        labels: { severity: page }
+        annotations:
+          summary: "Account erasure p99 is over 60 s (NFR-01)"
+          runbook: "docs/runbooks/oncall.md#erasure-slow-or-incomplete"
+      - alert: ErasureIncomplete
+        expr: increase(tryst_erasure_incomplete_total[15m]) > 0
+        labels: { severity: ticket }
+        annotations:
+          summary: "An erasure didn't finish first time; the sweep is retrying"
+          runbook: "docs/runbooks/oncall.md#erasure-slow-or-incomplete"
+      - alert: BillingWebhookErrors
+        expr: increase(tryst_billing_webhooks_total{outcome=~"error|bad_signature"}[15m]) > 3
+        labels: { severity: ticket }
+        annotations:
+          summary: "Payment events are failing or arriving unsigned"
+          runbook: "docs/runbooks/oncall.md#billing-webhook-errors"

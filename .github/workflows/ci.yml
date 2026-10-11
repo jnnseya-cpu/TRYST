@@ -109,3 +109,22 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e
+
+  images:
+    name: Container images and infrastructure
+    runs-on: ubuntu-latest
+    needs: [backend, web]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t tryst-api:ci backend
+      - run: docker build -f web/Dockerfile -t tryst-web:ci .
+      - name: API container starts and answers its health check
+        run: |
+          docker run -d --name api -e TRYST_ENV=dev -p 8081:8081 tryst-api:ci
+          for i in $(seq 1 30); do curl -sf localhost:8081/readyz && break; sleep 1; done
+          docker exec api /identity-svc healthcheck
+          docker inspect -f '{{.Config.User}}' tryst-api:ci | grep -q nonroot
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform -chdir=deploy/terraform fmt -check -recursive
+      - run: terraform -chdir=deploy/terraform init -backend=false -input=false
+      - run: terraform -chdir=deploy/terraform validate

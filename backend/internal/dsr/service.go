@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/jnnseya-cpu/tryst/backend/internal/metrics"
 	"io"
 	"log"
 	"net/http"
@@ -77,6 +78,16 @@ type Service struct {
 	now     func() time.Time
 	mu      sync.Mutex // one erasure runner at a time
 	mux     *http.ServeMux
+	// Ledger, if set, receives one record per completed erasure: the subject code and time,
+	// no personal data. It is kept and backed up apart from the service databases so that
+	// erasures can be applied again after a restore.
+	Ledger store.Store
+}
+
+// LedgerEntry is one completed erasure.
+type LedgerEntry struct {
+	Subject     string    `json:"subject"`
+	CompletedAt time.Time `json:"completed_at"`
 }
 
 // New wires the service. parts run in order on erasure.
@@ -159,19 +170,32 @@ func (s *Service) handleDelete(w http.ResponseWriter, r *http.Request) {
 		fail(w, 422, "confirm_required", `Type "delete my account" to confirm.`)
 		return
 	}
-	j := &job{ID: "del_" + randHex(12), Account: acc, Started: s.now().UTC()}
-	if err := s.saveJob(r.Context(), j); err != nil {
+	id, proof, err := s.EraseAccount(r.Context(), acc)
+	switch {
+	case id == "":
 		fail(w, 503, "unavailable", "Please try again.")
-		return
+	case err != nil:
+		writeJSON(w, 202, map[string]any{"deletion_job_id": id, "status": "in_progress"})
+	default:
+		writeJSON(w, 200, map[string]any{"deletion_job_id": id, "status": "complete", "completion_proof": proof})
 	}
-	proof, err := s.run(r.Context(), j)
+}
+
+// EraseAccount records an erasure job and runs it. If it can't finish now, it returns the
+// job id with an error and the sweep completes it later. An empty id means nothing started.
+func (s *Service) EraseAccount(ctx context.Context, account string) (string, *Proof, error) {
+	j := &job{ID: "del_" + randHex(12), Account: account, Started: s.now().UTC()}
+	if err := s.saveJob(ctx, j); err != nil {
+		return "", nil, err
+	}
+	proof, err := s.run(ctx, j)
 	if err != nil {
 		// Each part is idempotent; the sweeper finishes the job.
 		log.Printf("erasure %s incomplete, will retry: %v", j.ID, err)
-		writeJSON(w, 202, map[string]any{"deletion_job_id": j.ID, "status": "in_progress"})
-		return
+		metrics.Default.Inc("tryst_erasure_incomplete_total")
+		return j.ID, nil, err
 	}
-	writeJSON(w, 200, map[string]any{"deletion_job_id": j.ID, "status": "complete", "completion_proof": proof})
+	return j.ID, proof, nil
 }
 
 // run erases every remaining part of a job and issues the proof.
@@ -196,6 +220,12 @@ func (s *Service) run(ctx context.Context, j *job) (*Proof, error) {
 	}
 	pr := Proof{JobID: j.ID, Subject: SubjectCode(j.Account), Started: j.Started, CompletedAt: s.now().UTC(), Receipts: j.Done, KeyID: s.keyID}
 	pr.Signature = base64.StdEncoding.EncodeToString(ed25519.Sign(s.key, pr.signed()))
+	if s.Ledger != nil {
+		lb, _ := json.Marshal(LedgerEntry{Subject: pr.Subject, CompletedAt: pr.CompletedAt})
+		if err := s.Ledger.Put(ctx, "erasure", j.ID, lb); err != nil {
+			return nil, err // retried by the sweep; the ledger must not miss an erasure
+		}
+	}
 	b, _ := json.Marshal(pr)
 	if err := s.st.Put(ctx, "proof", j.ID, b); err != nil {
 		return nil, err
@@ -205,6 +235,7 @@ func (s *Service) run(ctx context.Context, j *job) (*Proof, error) {
 		return nil, err
 	}
 	log.Printf("erasure %s complete in %s", j.ID, pr.CompletedAt.Sub(j.Started).Round(time.Millisecond))
+	metrics.Default.Observe("tryst_erasure_seconds", pr.CompletedAt.Sub(j.Started).Seconds())
 	return &pr, nil
 }
 

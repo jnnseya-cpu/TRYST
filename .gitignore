@@ -15,3 +15,8 @@ next-env.d.ts
 .e2e-identity-svc
 test-results/
 playwright-report/
+
+# local deployment secrets
+deploy/.env
+**/.terraform/
+*.tfstate*

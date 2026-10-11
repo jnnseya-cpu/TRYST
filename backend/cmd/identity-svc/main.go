@@ -39,6 +39,7 @@
 //	                (and LIVENESS_URL) every photo waits for a person
 //	ARC_URL, ARC_API_KEY, ARC_SECRET  the alarm-receiving centre (safety line, Panic);
 //	                required in production (D-48)
+//	METRICS_ADDR    internal listener for /metrics (default 127.0.0.1:9090); never public
 //	PUBLIC_URL      member site origin for checkout return links (default first RP origin)
 package main
 
@@ -51,14 +52,17 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/commercesvc"
 	"github.com/jnnseya-cpu/tryst/backend/internal/dsr"
 	"github.com/jnnseya-cpu/tryst/backend/internal/gate"
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
+	"github.com/jnnseya-cpu/tryst/backend/internal/metrics"
 	"github.com/jnnseya-cpu/tryst/backend/internal/notify"
 	"github.com/jnnseya-cpu/tryst/backend/internal/outbound"
 	"github.com/jnnseya-cpu/tryst/backend/internal/payments"
@@ -119,7 +123,38 @@ func openVault(mode string, keys store.Store) *store.Vault {
 	return v
 }
 
+// app is the wired service set, shared by the server and the admin commands.
+type app struct {
+	mode     string
+	srv      *identity.Server
+	prof     *profilesvc.Service
+	safety   *safetysvc.Service
+	commerce *commercesvc.Service
+	notifier *notify.Service
+	rights   *dsr.Service
+	stores   map[string]store.Store // by database name, for readiness and admin
+	vault    *store.Vault
+}
+
 func main() {
+	// Container health check (the runtime image has no shell or curl).
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		c := &http.Client{Timeout: 3 * time.Second}
+		resp, err := c.Get("http://127.0.0.1:" + env("PORT", "8081") + "/readyz")
+		if err != nil || resp.StatusCode != 200 {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+	a := build()
+	if len(os.Args) > 1 && os.Args[1] == "admin" {
+		os.Exit(runAdmin(a, os.Args[2:]))
+	}
+	serve(a)
+}
+
+// build reads the environment and wires every service. It starts nothing.
+func build() *app {
 	mode := env("TRYST_ENV", "prod")
 	cfg := identity.Config{
 		RPID:          env("RP_ID", "localhost"),
@@ -222,14 +257,16 @@ func main() {
 			staff.DevTokens[hex.EncodeToString(h[:])] = safetysvc.Staff{ID: parts[0], Roles: []string{parts[1]}}
 		}
 	}
-	safety, err := safetysvc.New(srv, staff, prof, openStore(ctx, mode, "DATABASE_URL_SAFETY"))
+	safetyStore := openStore(ctx, mode, "DATABASE_URL_SAFETY")
+	safety, err := safetysvc.New(srv, staff, prof, safetyStore)
 	if err != nil {
 		log.Fatal(err)
 	}
 	prof.OnSignal = safety.FromSignal
 	safety.Notify = notifyFn
 
-	commerce := openCommerce(ctx, mode, srv, staff, cfg.RPOrigins[0], notifyFn)
+	commerceStore := openStore(ctx, mode, "DATABASE_URL_COMMERCE")
+	commerce := openCommerce(mode, srv, staff, cfg.RPOrigins[0], notifyFn, commerceStore)
 
 	// Data rights: export and erasure. Order matters: the profile part destroys the member's
 	// data key and removes them from discovery first; identity goes last.
@@ -249,6 +286,17 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// The erasure ledger lives in its own database with its own backups: after any restore,
+	// erasures newer than the backup are applied again (admin reapply-erasures, D-57).
+	ledger := openStore(ctx, mode, "DATABASE_URL_LEDGER")
+	rights.Ledger = ledger
+	return &app{mode: mode, srv: srv, prof: prof, safety: safety, commerce: commerce, notifier: notifier, rights: rights, vault: vault,
+		stores: map[string]store.Store{"identity": idStore, "profile": profStore, "keys": keyStore, "safety": safetyStore, "commerce": commerceStore, "ledger": ledger}}
+}
+
+// serve runs the HTTP server, background sweeps and the metrics listener.
+func serve(a *app) {
+	mode, srv, prof, safety, commerce, notifier, rights := a.mode, a.srv, a.prof, a.safety, a.commerce, a.notifier, a.rights
 	go func() {
 		for range time.Tick(time.Minute) {
 			rights.Sweep(context.Background())
@@ -285,16 +333,70 @@ func main() {
 		root.Handle(p, commerce)
 	}
 	root.Handle("/", srv)
+	// Readiness: every database answers.
+	stores := a.stores
+	root.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		for name, st := range stores {
+			if p, ok := st.(interface{ Ping(context.Context) error }); ok {
+				if err := p.Ping(ctx); err != nil {
+					log.Printf("readyz: %s database unreachable", name)
+					http.Error(w, "not ready", http.StatusServiceUnavailable)
+					return
+				}
+			}
+		}
+		w.Write([]byte("ok"))
+	})
+
+	m := metrics.Default
+	m.Help("tryst_http_requests_total", "Requests by route shape, method and status.")
+	m.Help("tryst_safety_cases_overdue_urgent", "Open suspected-minor, image-abuse, sextortion and threat cases past their deadline.")
+	m.Help("tryst_safety_alert_failures_total", "Safety alerts that could not be delivered after a retry.")
+	m.Help("tryst_erasure_seconds", "Account erasure duration (NFR-01: < 60 s p99).")
+	m.Gauge("tryst_safety_cases_open", func() float64 { o, _, _ := safety.QueueStats(); return float64(o) })
+	m.Gauge("tryst_safety_cases_overdue", func() float64 { _, od, _ := safety.QueueStats(); return float64(od) })
+	m.Gauge("tryst_safety_cases_overdue_urgent", func() float64 { _, _, u := safety.QueueStats(); return float64(u) })
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("GET /metrics", m.Handler())
+		ms := &http.Server{Addr: env("METRICS_ADDR", "127.0.0.1:9090"), Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+		if err := ms.ListenAndServe(); err != nil {
+			log.Printf("metrics listener: %v", err)
+		}
+	}()
+
 	addr := ":" + env("PORT", "8081")
 	log.Printf("identity-svc (%s) listening on %s", mode, addr)
-	hs := &http.Server{Addr: addr, Handler: root, ReadHeaderTimeout: 5 * time.Second}
-	log.Fatal(hs.ListenAndServe())
+	hs := &http.Server{Addr: addr, Handler: m.Middleware(root), ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout: 60 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 120 * time.Second}
+
+	// Graceful shutdown (container stop, deploys): stop taking requests, finish in-flight
+	// ones, and let dispatched safety alerts and pushes complete.
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+	drained := make(chan struct{})
+	go func() {
+		<-stop
+		log.Printf("shutting down")
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		defer cancel()
+		_ = hs.Shutdown(ctx) // returns when in-flight requests are done
+		prof.WaitAlerts()
+		notifier.Wait()
+		close(drained)
+	}()
+	if err := hs.ListenAndServe(); err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
+	<-drained
 }
 
 // openCommerce builds the commerce service: Stripe when configured, the local test checkout
 // in dev, and no processor otherwise (purchases answer 503 until Stripe is approved).
-func openCommerce(ctx context.Context, mode string, members *identity.Server, staff safetysvc.StaffAuth, origin string, notifyFn func(string, string, string)) *commercesvc.Service {
-	cfg := commercesvc.Config{Members: members, Store: openStore(ctx, mode, "DATABASE_URL_COMMERCE"), Env: mode, MinTier: gate.V1, Notify: notifyFn,
+func openCommerce(mode string, members *identity.Server, staff safetysvc.StaffAuth, origin string, notifyFn func(string, string, string), st store.Store) *commercesvc.Service {
+	cfg := commercesvc.Config{Members: members, Store: st, Env: mode, MinTier: gate.V1, Notify: notifyFn,
 		StaffLead: func(r *http.Request) (string, bool) {
 			st, ok := staff.Authenticate(r)
 			if !ok {

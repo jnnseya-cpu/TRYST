@@ -59,3 +59,13 @@ func TestExportAndErase(t *testing.T) {
 	// The same contact can join again (its hash went with the account).
 	h.signUp("erase@example.com")
 }
+
+func TestTrustedAddr(t *testing.T) {
+	list := []string{"10.0.0.5", "172.16.0.0/12", "::1"}
+	for ip, want := range map[string]bool{"10.0.0.5": true, "10.0.0.6": false, "172.20.3.4": true, "172.32.0.1": false,
+		"::1": true, "::ffff:172.20.3.4": true, "not-an-ip": false} {
+		if got := TrustedAddr(list, ip); got != want {
+			t.Errorf("TrustedAddr(%q) = %v, want %v", ip, got, want)
+		}
+	}
+}

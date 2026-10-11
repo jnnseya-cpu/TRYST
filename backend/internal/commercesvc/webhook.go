@@ -3,6 +3,7 @@ package commercesvc
 import (
 	"context"
 	"encoding/json"
+	"github.com/jnnseya-cpu/tryst/backend/internal/metrics"
 	"io"
 	"log"
 	"net/http"
@@ -10,6 +11,10 @@ import (
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/keys"
 )
+
+var handledEvents = map[string]bool{"checkout.session.completed": true, "invoice.paid": true, "invoice.upcoming": true,
+	"customer.subscription.created": true, "customer.subscription.updated": true, "customer.subscription.deleted": true,
+	"charge.refunded": true, "charge.dispute.created": true}
 
 // event is the part of a Stripe event TRYST reads.
 type event struct {
@@ -35,6 +40,7 @@ func (s *Service) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.cfg.Provider.VerifyWebhook(body, r.Header.Get("Stripe-Signature"), s.now()); err != nil {
 		log.Printf("webhook rejected: %v", err)
+		metrics.Default.Inc("tryst_billing_webhooks_total", "type", "unknown", "outcome", "bad_signature")
 		fail(w, 400, "bad_signature", "Bad signature")
 		return
 	}
@@ -44,6 +50,18 @@ func (s *Service) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	dup, err := s.process(r.Context(), ev)
+	typ := ev.Type
+	if !handledEvents[typ] {
+		typ = "other"
+	}
+	switch {
+	case err != nil:
+		metrics.Default.Inc("tryst_billing_webhooks_total", "type", typ, "outcome", "error")
+	case dup:
+		metrics.Default.Inc("tryst_billing_webhooks_total", "type", typ, "outcome", "duplicate")
+	default:
+		metrics.Default.Inc("tryst_billing_webhooks_total", "type", typ, "outcome", "applied")
+	}
 	if err != nil {
 		log.Printf("webhook %s failed: %v", ev.Type, err)
 		fail(w, 500, "retry", "Retry later")

@@ -537,3 +537,18 @@ func TestDecisionNotices(t *testing.T) {
 		t.Fatalf("notices: %v", got)
 	}
 }
+
+func TestQueueStats(t *testing.T) {
+	g := newRig(t, store.NewMemory())
+	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
+	g.svc.now = func() time.Time { return now }
+	g.report("alice", "th_ab", "minor")
+	g.report("carol", "th_cb", "harassment")
+	if o, od, u := g.svc.QueueStats(); o != 2 || od != 0 || u != 0 {
+		t.Fatalf("fresh: %d %d %d", o, od, u)
+	}
+	now = now.Add(20 * time.Minute)
+	if o, od, u := g.svc.QueueStats(); o != 2 || od != 1 || u != 1 {
+		t.Fatalf("minor overdue: %d %d %d", o, od, u)
+	}
+}

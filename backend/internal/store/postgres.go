@@ -45,6 +45,9 @@ func OpenPostgres(ctx context.Context, dsn string) (*Postgres, error) {
 
 func (p *Postgres) Close() { p.pool.Close() }
 
+// Ping checks the database is reachable (readiness).
+func (p *Postgres) Ping(ctx context.Context) error { return p.pool.Ping(ctx) }
+
 func (p *Postgres) Put(ctx context.Context, kind, id string, doc []byte) error {
 	_, err := p.pool.Exec(ctx, `INSERT INTO documents (kind, id, doc, updated_at) VALUES ($1, $2, $3, now())
 		ON CONFLICT (kind, id) DO UPDATE SET doc = EXCLUDED.doc, updated_at = now()`, kind, id, doc)

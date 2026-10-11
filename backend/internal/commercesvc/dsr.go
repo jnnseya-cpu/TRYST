@@ -72,6 +72,10 @@ func (s *Service) Erase(ctx context.Context, account string) (dsr.Receipt, error
 	s.mu.Unlock()
 
 	// Processor calls without the lock (the adapter resolves subscriptions through us).
+	// Re-applying an erasure after a restore skips them: they happened the first time.
+	if s.SkipProcessor {
+		stops, depositRefund = nil, ""
+	}
 	if s.cfg.Provider != nil {
 		for _, st := range stops {
 			var err error

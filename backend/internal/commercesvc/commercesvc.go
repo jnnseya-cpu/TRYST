@@ -172,6 +172,9 @@ type Service struct {
 	mux      *http.ServeMux
 	dirty    map[string]bool
 	dev      *DevProvider
+	// SkipProcessor makes Erase leave the payment processor alone (re-applying erasures
+	// after a restore; admin only).
+	SkipProcessor bool
 }
 
 func New(cfg Config) (*Service, error) {

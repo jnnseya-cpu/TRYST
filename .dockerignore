@@ -1,0 +1,10 @@
+**/node_modules
+**/.next
+**/test-results
+**/playwright-report
+web/.e2e-identity-svc
+**/__pycache__
+**/.venv
+crypto-core/target
+.git
+docs/**/*.pdf
