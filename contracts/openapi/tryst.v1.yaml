@@ -879,17 +879,18 @@ paths:
                 text: { type: string, maxLength: 2000 }
       responses:
         '200':
-          description: Cartographer reply and proposed structured fields
-          content: { application/json: { schema: { type: object } } }
+          description: Cartographer reply and proposed structured fields (P2; not built in P1, D-65)
+          content: { application/json: { schema: { $ref: '#/components/schemas/IntentVector' } } }
   /intake/vector:
     get:
       tags: [intake]
       operationId: getIntentVector
       x-min-tier: V0
+      summary: The member's confirmed intake (P1 uses structured choices; the conversational Cartographer comes later, D-65) and the controlled vocabularies.
       responses:
         '200':
-          description: Proposed IntentVector
-          content: { application/json: { schema: { $ref: '#/components/schemas/IntentVector' } } }
+          description: Current vector, number of confirmed versions and the vocabularies
+          content: { application/json: { schema: { type: object, properties: { vector: { $ref: '#/components/schemas/MatchVector' }, history: { type: integer }, vocab: { type: object } } } } }
   /intake/vector/confirm:
     post:
       tags: [intake]
@@ -898,8 +899,10 @@ paths:
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/IntentVector' } } }
-      responses: { '200': { description: Confirmed; new history version (FR-079) } }
+        content: { application/json: { schema: { $ref: '#/components/schemas/MatchVector' } } }
+      responses:
+        '200': { description: Confirmed; new history version (FR-079) }
+        '422': { $ref: '#/components/responses/Problem' }
   /profile:
     get:
       tags: [intake]
@@ -1229,7 +1232,11 @@ paths:
       operationId: coupleInvite
       x-min-tier: V2
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [device_id], properties: { device_id: { type: string, minLength: 8 } } } } }
       responses:
+        '409': { $ref: '#/components/responses/Problem' }
         '201':
           description: Co-sign token (24 h)
           content:
@@ -1243,7 +1250,7 @@ paths:
     post:
       tags: [couple]
       operationId: coupleCosign
-      summary: Must come from a device distinct from the inviter's (422 same_device_cosign).
+      summary: Must come from a device distinct from the inviter's (409 same_device_cosign) and approve the exact intake version shown (409 version_changed).
       x-min-tier: V2
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
@@ -1252,18 +1259,46 @@ paths:
           application/json:
             schema:
               type: object
-              required: [token, approved_version]
+              required: [token, device_id, approved_version]
               properties:
                 token: { type: string }
+                device_id: { type: string, minLength: 8 }
                 approved_version: { type: integer, minimum: 1 }
       responses:
         '201': { description: Couple link created }
-        '422': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /couple:
+    get:
+      tags: [couple]
+      operationId: getCouple
+      summary: The caller's couple link, veto mode, pending changes and reconfirmation (every 90 days; out of introductions 14 days after it is due).
+      x-min-tier: V0
+      responses: { '200': { description: '{couple} or {couple: null}' } }
+  /couple/invite-preview:
+    get:
+      tags: [couple]
+      operationId: previewCoupleInvite
+      summary: What the invitee is approving (inviter's name and exact intake version).
+      x-min-tier: V2
+      parameters: [{ name: token, in: query, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Preview }
+        '404': { $ref: '#/components/responses/Problem' }
+  /couple/{id}/reconfirm:
+    post:
+      tags: [couple]
+      operationId: reconfirmCouple
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses: { '200': { description: Reconfirmed } }
   /couple/{id}/veto-mode:
     put:
       tags: [couple]
       operationId: setVetoMode
-      x-min-tier: VC
+      summary: Takes effect only when both partners have asked for the same mode.
+      x-min-tier: V2
       parameters:
         - { $ref: '#/components/parameters/Id' }
         - { $ref: '#/components/parameters/IdempotencyKey' }
@@ -1276,7 +1311,7 @@ paths:
               required: [veto_mode]
               properties:
                 veto_mode: { type: string, enum: [either, both] }
-      responses: { '202': { description: Pending the other partner's confirmation } }
+      responses: { '200': { description: 'Current state: changed, or pending the other partner' } }
   /couple/{id}:
     delete:
       tags: [couple]
@@ -1285,7 +1320,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/Id' }
         - { $ref: '#/components/parameters/IdempotencyKey' }
-      responses: { '204': { description: Dissolved immediately } }
+      responses: { '200': { description: Dissolved immediately; the partner is told only that it ended } }
 
   # ---------------------------------------------------------------- discovery (02 §5.5)
   /slate:
@@ -1301,10 +1336,26 @@ paths:
               schema:
                 type: object
                 properties:
-                  items:
+                  cards:
                     type: array
                     maxItems: 18
                     items: { $ref: '#/components/schemas/SlateCard' }
+                  free_left: { type: integer }
+                  unlimited: { type: boolean }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /slate/photos/{handle}/{n}:
+    get:
+      tags: [discovery]
+      operationId: getSlatePhoto
+      summary: The n-th photo the viewer may see of a member who still passes Stage 0 (blurred photos never served).
+      x-min-tier: V2
+      parameters:
+        - { name: handle, in: path, required: true, schema: { type: string } }
+        - { name: n, in: path, required: true, schema: { type: integer, minimum: 0 } }
+      responses:
+        '200': { description: Image, content: { image/jpeg: {}, image/png: {} } }
+        '404': { $ref: '#/components/responses/Problem' }
   /intent:
     post:
       tags: [discovery]
@@ -1319,19 +1370,42 @@ paths:
               type: object
               required: [target]
               properties:
-                target: { type: string, format: uuid }
-                keys_spent: { type: integer, minimum: 0 }
+                target: { type: string, description: The card's per-viewer handle }
       responses:
         '202':
-          description: Accepted. Inbound-cap overflow is queued and never revealed.
+          description: Accepted. 3 free a week; unlimited on TRYST+, DUO or ENVOY; otherwise Keys are held (5, or 15 from a couple to a single member) and refunded on reply. Inbound-cap overflow is queued and never revealed; a decline is never shown. mutual means the other side already wanted to meet and a handshake was opened.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  intent_id: { type: string, format: uuid }
-                  state: { type: string, enum: [sent] }
+                  intent_id: { type: string }
+                  state: { type: string, enum: [sent, mutual] }
+                  handshake: { type: string }
+                  free_left: { type: integer }
         '402': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /intents:
+    get:
+      tags: [discovery]
+      operationId: listIntents
+      summary: Intents received (delivered, still passing Stage 0), the caller's sent intents (as the sender sees them) and their handshakes. Releases queued intents as the inbound cap allows.
+      x-min-tier: V2
+      responses: { '200': { description: '{inbound, outbound, handshakes, free_left, unlimited}' } }
+  /intents/{id}/reply:
+    post:
+      tags: [discovery]
+      operationId: replyToIntent
+      summary: accept opens a handshake; decline is never shown to the sender. Either reply refunds the sender's Keys.
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [decision], properties: { decision: { type: string, enum: [accept, decline] } } } } }
+      responses:
+        '200': { description: Handshake view }
+        '204': { description: Declined }
+        '404': { $ref: '#/components/responses/Problem' }
   /pass:
     post:
       tags: [discovery]
@@ -1497,9 +1571,11 @@ paths:
               type: object
               required: [decision]
               properties:
-                decision: { type: string, enum: [accept, decline, amend] }
-                amend: { type: object }
-      responses: { '204': { description: Recorded } }
+                decision: { type: string, enum: [accept, decline] }
+      responses:
+        '200': { description: "The caller's view: state, and thread_id once both accepted" }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /envoy/proposals:
     get:
       tags: [handshake]
@@ -1514,7 +1590,7 @@ paths:
     post:
       tags: [handshake]
       operationId: approveEnvoyProposal
-      summary: One-tap human approval; no intent exists without it (D-04).
+      summary: One-tap human approval; no intent exists without it (D-04). id is the proposal card's handle.
       x-min-tier: V2
       x-entitlement: envoy
       parameters:
@@ -2347,19 +2423,35 @@ components:
         modes: { type: array, items: { $ref: '#/components/schemas/IntentShape' } }
         visibility: { type: string, enum: [public, matched, incognito] }
     RevealScope: { type: string, enum: [alias, blurred_gallery, photo_set, voice, video] }
+    MatchVector:
+      type: object
+      required: [identity, seeking, intent_shape]
+      properties:
+        version: { type: integer, readOnly: true }
+        identity: { type: string, enum: [woman, man, nonbinary] }
+        seeking: { type: array, items: { type: string, enum: [women, men, nonbinary, couples] } }
+        intent_shape: { type: array, items: { $ref: '#/components/schemas/IntentShape' } }
+        hard_limits: { type: array, items: { $ref: '#/components/schemas/IntentShape' } }
+        interests: { type: array, maxItems: 6, items: { type: string } }
+        confirmed_at: { type: string, format: date-time, readOnly: true }
     SlateCard:
       type: object
-      required: [candidate_id, explanation_codes, paid_label, exploration]
+      required: [handle, explanation_codes, paid_label, exploration]
       properties:
-        candidate_id: { type: string, format: uuid }
+        handle: { type: string, description: Per-viewer handle; the account id never appears }
         display_name: { type: string }
-        age_band: { type: string }
-        distance_band_km: { type: integer }
-        modes: { type: array, items: { $ref: '#/components/schemas/IntentShape' } }
-        tier: { $ref: '#/components/schemas/Tier' }
-        explanation_codes: { type: array, minItems: 2, maxItems: 4, items: { type: string } }
+        age: { type: [integer, 'null'] }
+        area: { type: string }
+        distance: { type: string, description: Approximate band only }
+        couple: { type: boolean }
+        shared_intent: { type: array, items: { $ref: '#/components/schemas/IntentShape' } }
+        shared_interests: { type: array, items: { type: string } }
+        photos: { type: integer }
+        explanation_codes: { type: array, minItems: 2, maxItems: 4, items: { type: string, enum: [intent_match, shared_interests, nearby, same_city, both_verified] } }
         paid_label: { type: boolean }
         exploration: { type: boolean }
+        saved: { type: boolean }
+        intent_sent: { type: boolean }
     Brief:
       type: object
       required: [label, compatibility, aligned, friction, blocking, recommended_next]

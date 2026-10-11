@@ -41,6 +41,9 @@ var texts = map[string]string{
 	"plan_ended":    "Your plan has ended.",
 	"new_device":    "A new device signed in to your account. If this wasn't you, use Burn.",
 	"payment":       "Payment received.",
+	"intent":        "Someone would like to meet you.",
+	"intro":         "You have a new introduction.",
+	"couple":        "There's an update about your couple link.",
 	// Account recovery (FR-061): the member can cancel from any signed-in device.
 	"recovery_started": "Someone started recovering your account. If this wasn't you, cancel it in your account.",
 	"recovery_hold":    "Your account will be recovered in 24 hours. If this wasn't you, cancel it in your account now.",

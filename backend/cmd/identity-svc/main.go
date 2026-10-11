@@ -337,6 +337,8 @@ func build() *app {
 
 	commerceStore := openStore(ctx, mode, "DATABASE_URL_COMMERCE")
 	commerce := openCommerce(mode, srv, staff, cfg.RPOrigins[0], notifyFn, commerceStore)
+	prof.Plan = func(account string) string { return commerce.Entitled(account).Plan }
+	prof.SpendKeys, prof.RefundKeys = commerce.SpendKeys, commerce.RefundKeys
 
 	// Data rights: export and erasure. Order matters: the profile part destroys the member's
 	// data key and removes them from discovery first; identity goes last.
@@ -559,6 +561,10 @@ func routes(a *app) *http.ServeMux {
 	// service (cmd/safety-svc); the web proxy routes them there.
 	root.Handle("/ops/v1/vouchers", commerce)
 	root.Handle("/v1/consents", a.consents)
+	for _, p := range []string{"/v1/intake/", "/v1/slate", "/v1/slate/", "/v1/pass", "/v1/save", "/v1/intent", "/v1/intents",
+		"/v1/intents/", "/v1/handshake/", "/v1/envoy/", "/v1/couple", "/v1/couple/"} {
+		root.Handle(p, prof) // introductions and couples (FR-128)
+	}
 	root.Handle("/v1/discretion", prof)
 	root.Handle("/v1/discretion/", prof)
 	root.Handle("/v1/account/pause", prof)

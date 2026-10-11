@@ -67,6 +67,9 @@ type memberProfile struct {
 	Policy        *Policy  `json:",omitempty"`
 	PolicyHistory []Policy `json:",omitempty"`
 	Shield        []string `json:",omitempty"` // keyed partner-shield values
+	// Introductions (intro.go).
+	Vector        *Vector  `json:",omitempty"`
+	VectorHistory []Vector `json:",omitempty"`
 }
 
 // Service is the HTTP handler.
@@ -106,6 +109,11 @@ type Service struct {
 	// device-hashed contact. Nil: shield matching off (unit tests).
 	ShieldKeyOf func(account string) string
 	BlindShield func(digest string) string
+	// Commerce (nil in unit tests): the member's plan, and holding / refunding Keys.
+	Plan       func(account string) string
+	SpendKeys  func(ctx context.Context, account, intent string, n int) error
+	RefundKeys func(ctx context.Context, account, intent string)
+	in         *introState
 }
 
 // New returns the service. env "prod" refuses DevModerator.
@@ -126,7 +134,7 @@ func NewWithStore(auth Authenticator, mod Moderator, env string, st store.Store,
 		return nil, errors.New("DevModerator is forbidden outside the dev environment")
 	}
 	s := &Service{auth: auth, mod: mod, now: time.Now, data: map[string]*memberProfile{}, mux: http.NewServeMux(),
-		tn: newTonight(), MinDiscoveryTier: "V2", st: st, vault: vault, dirty: map[string]bool{}, th: newThreadState(), mt: newMeetState(), standing: map[string]string{}, alertRetry: 5 * time.Second}
+		tn: newTonight(), MinDiscoveryTier: "V2", st: st, vault: vault, dirty: map[string]bool{}, th: newThreadState(), mt: newMeetState(), in: newIntroState(), standing: map[string]string{}, alertRetry: 5 * time.Second}
 	if err := s.load(context.Background()); err != nil {
 		return nil, err
 	}
@@ -137,6 +145,9 @@ func NewWithStore(auth Authenticator, mod Moderator, env string, st store.Store,
 		return nil, err
 	}
 	if err := s.loadStanding(context.Background()); err != nil {
+		return nil, err
+	}
+	if err := s.loadIntro(context.Background()); err != nil {
 		return nil, err
 	}
 	m := s.mux
@@ -173,6 +184,26 @@ func NewWithStore(auth Authenticator, mod Moderator, env string, st store.Store,
 	m.HandleFunc("POST /v1/account/pause", s.handlePause)
 	m.HandleFunc("POST /v1/account/vanish", s.handleVanish)
 	m.HandleFunc("POST /v1/account/resume", s.handleResume)
+	m.HandleFunc("GET /v1/intake/vector", s.handleVector)
+	m.HandleFunc("POST /v1/intake/vector/confirm", s.handleVectorConfirm)
+	m.HandleFunc("GET /v1/slate", s.handleSlate)
+	m.HandleFunc("GET /v1/slate/photos/{handle}/{n}", s.handleSlatePhoto)
+	m.HandleFunc("POST /v1/pass", s.handleMark("pass"))
+	m.HandleFunc("POST /v1/save", s.handleMark("save"))
+	m.HandleFunc("POST /v1/intent", s.handleIntent)
+	m.HandleFunc("GET /v1/intents", s.handleIntents)
+	m.HandleFunc("POST /v1/intents/{id}/reply", s.handleReply)
+	m.HandleFunc("GET /v1/handshake/{id}/brief", s.handleBrief)
+	m.HandleFunc("POST /v1/handshake/{id}/decision", s.handleDecision)
+	m.HandleFunc("GET /v1/envoy/proposals", s.handleEnvoyProposals)
+	m.HandleFunc("POST /v1/envoy/proposals/{handle}/approve", s.handleEnvoyApprove)
+	m.HandleFunc("GET /v1/couple", s.handleCouple)
+	m.HandleFunc("POST /v1/couple/invite", s.handleCoupleInvite)
+	m.HandleFunc("GET /v1/couple/invite-preview", s.handleInvitePreview)
+	m.HandleFunc("POST /v1/couple/cosign", s.handleCosign)
+	m.HandleFunc("PUT /v1/couple/{id}/veto-mode", s.handleVetoMode)
+	m.HandleFunc("POST /v1/couple/{id}/reconfirm", s.handleReconfirm)
+	m.HandleFunc("DELETE /v1/couple/{id}", s.handleDissolve)
 	m.HandleFunc("GET /v1/tonight", s.handleTonight)
 	m.HandleFunc("PUT /v1/tonight", s.handleTonightStart)
 	m.HandleFunc("DELETE /v1/tonight", s.handleTonightStop)

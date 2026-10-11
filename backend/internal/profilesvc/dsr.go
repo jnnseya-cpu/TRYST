@@ -70,6 +70,21 @@ func (s *Service) Export(ctx context.Context, account string) (any, error) {
 	if st := s.standing[account]; st != "" {
 		out["standing"] = st
 	}
+	if p != nil {
+		out["intake"] = map[string]any{"current": p.Vector, "history": p.VectorHistory}
+	}
+	var sent, received []map[string]any
+	for _, i := range s.in.intents {
+		if i.From == account {
+			sent = append(sent, map[string]any{"at": i.At, "state": senderState(i), "keys": i.Keys, "via": i.Via})
+		} else if i.To == account && i.State != "queued" {
+			received = append(received, map[string]any{"at": i.At, "state": i.State})
+		}
+	}
+	out["intents_sent"], out["intents_received"] = sent, received
+	if c := s.coupleOf(account); c != nil {
+		out["couple"] = map[string]any{"since": c.CosignedAt, "veto_mode": c.VetoMode}
+	}
 	s.mu.Unlock()
 
 	var ph []map[string]any
@@ -133,6 +148,33 @@ func (s *Service) Erase(ctx context.Context, account string) (dsr.Receipt, error
 	}
 	delete(s.th.devices, account)
 	delete(s.th.blocked, account)
+	// Introductions: intents, handshakes, couple links and slate marks involving them.
+	var intents, handshakes, couples []string
+	for id, i := range s.in.intents {
+		if i.From == account || i.To == account {
+			intents = append(intents, id)
+			delete(s.in.intents, id)
+		}
+	}
+	for id, h := range s.in.handshakes {
+		if h.side(account) >= 0 {
+			handshakes = append(handshakes, id)
+			delete(s.in.handshakes, id)
+		}
+	}
+	for id, c := range s.in.couples {
+		if c.ProfileA == account || c.ProfileB == account {
+			couples = append(couples, id)
+			delete(s.in.couples, id)
+		}
+	}
+	for k, inv := range s.in.invites {
+		if inv.Inviter == account {
+			delete(s.in.invites, k)
+		}
+	}
+	delete(s.in.passed, account)
+	delete(s.in.saved, account)
 	keepStanding := s.standing[account] == "permanent"
 	if !keepStanding {
 		delete(s.standing, account)
@@ -164,6 +206,16 @@ func (s *Service) Erase(ctx context.Context, account string) (dsr.Receipt, error
 	for _, m := range meets {
 		del("meet", m)
 	}
+	for _, id := range intents {
+		del("intent", id)
+	}
+	for _, id := range handshakes {
+		del("handshake", id)
+	}
+	for _, id := range couples {
+		del("couple", id)
+	}
+	del("slate_marks", account)
 	if keepStanding {
 		rc.Retained = append(rc.Retained, "Permanent-removal standing (ToS 15.3): kept so the person can't rejoin; no profile, photos or messages are kept with it")
 	} else {

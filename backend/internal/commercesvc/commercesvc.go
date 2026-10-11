@@ -747,3 +747,34 @@ func isPlan(k string) bool {
 }
 
 var errProviderNeeded = errors.New("a live subscription can't be stopped without the payment processor")
+
+// SpendKeys holds n Keys for an intent (FR-013). Idempotent per intent; fails with
+// keys.ErrInsufficient when the balance is short.
+func (s *Service) SpendKeys(ctx context.Context, accountID, intentID string, n int) error {
+	s.mu.Lock()
+	a := s.acct(accountID)
+	l := keys.Restore(a.Ledger)
+	err := l.Spend(intentID, n)
+	if err == nil {
+		a.Ledger = l.Entries()
+		s.dirty[accountID] = true
+	}
+	s.mu.Unlock()
+	s.flush(ctx)
+	return err
+}
+
+// RefundKeys returns an intent's Keys in full when the recipient replies. Idempotent.
+func (s *Service) RefundKeys(ctx context.Context, accountID, intentID string) {
+	s.mu.Lock()
+	a := s.acct(accountID)
+	l := keys.Restore(a.Ledger)
+	before := len(a.Ledger)
+	l.RefundOnReply(intentID)
+	a.Ledger = l.Entries()
+	if len(a.Ledger) != before {
+		s.dirty[accountID] = true
+	}
+	s.mu.Unlock()
+	s.flush(ctx)
+}

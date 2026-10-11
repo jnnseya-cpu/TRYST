@@ -532,3 +532,28 @@ func TestOnlyItemsOnSaleCanBeBought(t *testing.T) {
 		t.Fatalf("tryst_plus voucher: %d", c)
 	}
 }
+
+func TestIntentKeysSpendAndRefund(t *testing.T) {
+	g := newRig(t, store.NewMemory())
+	g.do("POST", "/v1/keys/purchase", "ana", map[string]any{"pack": "keys_60"})
+	ref := g.ref("ana")
+	g.send("evt_k", "checkout.session.completed", map[string]any{"mode": "payment", "payment_status": "paid", "client_reference_id": ref,
+		"metadata": map[string]string{"billing_ref": ref, "item": "keys_60"}, "payment_intent": "pi_k", "amount_total": 999})
+	acct := g.svc.byRef[ref]
+	ctx := context.Background()
+	if err := g.svc.SpendKeys(ctx, acct, "in_1", 5); err != nil {
+		t.Fatal(err)
+	}
+	_ = g.svc.SpendKeys(ctx, acct, "in_1", 5) // idempotent
+	if k := g.ent("ana")["keys"].(float64); k != 55 {
+		t.Fatalf("after spend: %v", k)
+	}
+	g.svc.RefundKeys(ctx, acct, "in_1")
+	g.svc.RefundKeys(ctx, acct, "in_1")
+	if k := g.ent("ana")["keys"].(float64); k != 60 {
+		t.Fatalf("after refund: %v", k)
+	}
+	if err := g.svc.SpendKeys(ctx, acct, "in_2", 61); err == nil {
+		t.Fatal("overspent")
+	}
+}

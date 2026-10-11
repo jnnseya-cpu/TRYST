@@ -555,9 +555,9 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 
 | Method | Path | Min | Contract |
 |---|---|---|---|
-| POST | `/v1/intake/turn` | V0 | Cartographer conversational turn |
-| GET | `/v1/intake/vector` | V0 | Proposed IntentVector (structured) |
-| POST | `/v1/intake/vector/confirm` | V0 | Member confirms or edits each field; stored with `confirmed_at` |
+| POST | `/v1/intake/turn` | V0 | Cartographer conversational turn (**P2**; P1 intake is structured choices, [D-65](06_Decisions_and_Changes.md#2-decision-log)) |
+| GET | `/v1/intake/vector` | V0 | The confirmed vector (`identity`, `seeking`, `intent_shape`, `hard_limits`, `interests`), its version count and the controlled vocabularies |
+| POST | `/v1/intake/vector/confirm` | V0 | Member confirms every field; stored with `confirmed_at` as a new version (FR-079). A hard limit can't also be a wanted shape |
 | GET / PUT | `/v1/profile` | V0 | Owner view and pseudonymous fields only: display name (screened, FR-098), area chosen from `/v1/profile/areas` (never GPS), city-only option. The owner view lists what still blocks publication |
 | GET | `/v1/profile/areas` | V0 | Selectable launch-city areas; the profile stores only the area's geohash-5 cell |
 | GET | `/v1/profile/card` | V0 | The member's card exactly as another verified member sees it (FR-092) |
@@ -578,18 +578,24 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 
 | Method | Path | Min | Contract |
 |---|---|---|---|
-| POST | `/v1/couple/invite` | V2 | → co-sign token (24 h) |
-| POST | `/v1/couple/cosign` | V2 | **Must come from a device whose hash differs from the inviter's.** Both partners must approve the exact profile `version` before publication |
-| PUT | `/v1/couple/{id}/veto-mode` | VC | Change requires both partners' confirmation |
-| DELETE | `/v1/couple/{id}` | V2 | Either partner dissolves immediately; no reason shown to the other |
+| GET | `/v1/couple` | V0 | The caller's link: partner's display name, veto mode, pending changes, reconfirmation due |
+| POST | `/v1/couple/invite` | V2 | `{device_id}` → co-sign token (24 h). Needs a confirmed intake |
+| GET | `/v1/couple/invite-preview?token=` | V2 | What the invitee approves: the inviter's name and exact intake version |
+| POST | `/v1/couple/cosign` | V2 | `{token, device_id, approved_version}`. **Must come from a device whose hash differs from the inviter's** (409 `same_device_cosign`). Both partners must approve the exact version (409 `version_changed`) |
+| PUT | `/v1/couple/{id}/veto-mode` | V2 | `either\|both`; takes effect only when both partners have asked for the same mode |
+| POST | `/v1/couple/{id}/reconfirm` | V2 | Every 90 days each partner reconfirms; 14 days after it's due the couple leaves introductions until both have (FR-096) |
+| DELETE | `/v1/couple/{id}` | V2 | Either partner dissolves immediately; the other is told only that it ended |
 
 ### 5.5 Discovery and learning
 
 | Method | Path | Min | Contract |
 |---|---|---|---|
-| GET | `/v1/slate` | V2 | Up to 18 cards incl. 15% exploration; each with `explanation_codes` (2–4) and `paid_label`. Re-authorised against the current Discretion Policy and block graph on every read |
-| POST | `/v1/intent` | V2 | `{target, keys_spent}` → `202 {intent_id, state}`. Inbound-cap overflow returns `state=sent` to the sender and is queued (the cap is never revealed) |
-| POST | `/v1/pass` · `/v1/save` | V2 | Private |
+| GET | `/v1/slate` | V2 | Up to 18 cards incl. 15% exploration (a stable daily draw from below the cut); each with `explanation_codes` (2–4), `paid_label` (always false) and a per-viewer `handle`. Stage 0 first: both want each other's group, no hard limit crossed, blocks, discretion, partner shield, hidden areas, tier floors, Article 9 consent, same city within both distances, couple partners never paired; then the weighted baseline (intent 0.4, interests 0.3, distance 0.2, verification parity 0.1). Re-authorised on every read |
+| GET | `/v1/slate/photos/{handle}/{n}` | V2 | The n-th photo the viewer may see (blurred never served) |
+| POST | `/v1/intent` | V2 | `{target: handle}` → `202 {intent_id, state: sent\|mutual, handshake?}`. 3 free a week; unlimited on TRYST+, DUO or ENVOY; otherwise Keys held (5, or 15 couple→single), refunded on reply (402 `keys_insufficient`). Inbound cap 12 a day: overflow is queued and released later; the sender always sees `sent`, and never sees a decline |
+| GET | `/v1/intents` | V2 | `{inbound, outbound, handshakes, free_left, unlimited}` |
+| POST | `/v1/intents/{id}/reply` | V2 | `accept` (opens a handshake) or `decline`; either refunds the sender's Keys |
+| POST | `/v1/pass` · `/v1/save` | V2 | `{handle}`; private |
 | GET / PUT / DELETE | `/v1/tonight` | V2 | **Tonight** (FR-109): view; go free for 1–6 hours within about 5/10/25/50 km; stop. Needs a complete profile. Lists only members who are also free, within both members' radius, inside the Stage 0 gates; each identified by a per-viewer handle; approximate distance only |
 | POST | `/v1/tonight/interest/{handle}` | V2 | Private interest; shown to neither side until mutual; at most 10 per evening |
 | GET | `/v1/tonight/photos/{handle}/{n}` | V2 | The n-th photo the viewer may see (main + shown; blurred never served) while both are free |
@@ -605,9 +611,9 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 |---|---|---|---|
 | — | *(system)* handshake created on mutual intent | — | Not client-callable in v1.1 ([E-29](06_Decisions_and_Changes.md#3-errata-fixed-in-v11)) |
 | GET | `/v1/handshake/{id}/brief` | V2 | The caller's own asymmetric Brief only (§6.2) |
-| POST | `/v1/handshake/{id}/decision` | V2 | `accept|decline|amend` (+ amend fields). Thread opens **only** when both are `accept` (couples: per `veto_mode`) |
-| GET | `/v1/envoy/proposals` | V2 + `envoy` | Agent-proposed intents with rationale |
-| POST | `/v1/envoy/proposals/{id}/approve` | V2 + `envoy` | **One-tap human approval required for every outbound intent ([D-04](06_Decisions_and_Changes.md#2-decision-log))** |
+| POST | `/v1/handshake/{id}/decision` | V2 | `accept\|decline` (`amend` is P2). Thread opens **only** when both sides accept and Stage 0 still passes; a couple's side follows its `veto_mode`, and partners see each other's choice. Nobody is told who declined |
+| GET | `/v1/envoy/proposals` | V2 + `envoy` | Up to 3 proposals from the top of the slate (never exploration cards, never someone already sent an intent) with plain-language reasons |
+| POST | `/v1/envoy/proposals/{handle}/approve` | V2 + `envoy` | **One-tap human approval required for every outbound intent ([D-04](06_Decisions_and_Changes.md#2-decision-log))**; then the normal intent rules apply |
 | POST | `/v1/reveal-grants` | V2 | `{recipient, scope, media_id?, expires_at}` |
 | DELETE | `/v1/reveal-grants/{id}` | V2 | Destroys the wrapped key; access ends at once (p95 < 5 s, including CDN) |
 
@@ -950,6 +956,7 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-113 | Everything a member creates survives restarts: identities, credentials, sessions and profiles persist in per-domain PostgreSQL databases; photos are stored encrypted under the member's own key and unreadable without the key vault; services refuse to start in production without their databases and key-encryption key | BE | P1 | D-50 |
 | FR-114 | End-to-end encrypted conversations: a thread opens only after mutual interest; every message is encrypted on the sender's device separately for each device of both members; the server stores and relays ciphertext only, with expiry from retention; the on-device Guardian warns on fraud, refuses to send child-safety content and freezes threads on child-safety or extortion signals; either member can block, which closes the thread for both and hides them from each other | Both | P1 | A §9.2, D-51 |
 | FR-124 | Identity and age assurance: liveness (V1) and photo-ID (V2) checks at a certified provider through a signed hand-off and callback; V2 also needs the conduct declaration; TRYST re-checks over-18 itself and locks out anyone under 18; one account per ID document and banned documents refused, using a one-way document code; discovery needs V2 in every environment; checks refused while no provider holds a valid certificate | Both | P1 | A §8.1, FR-094, FR-097, D-39, D-41, D-44, D-61 |
+| FR-128 | Introductions and couples: structured intake with every version kept; a daily slate of up to 18 behind the Stage 0 gates with a weighted baseline, about 15% exploration and 2–4 reason codes, nothing paid; private intents (3 free a week, unlimited on TRYST+, otherwise Keys refunded on reply) with a silent inbound cap; mutual interest opens a handshake with each side's own brief and a conversation only when both accept; ENVOY proposals that send nothing without the member's tap; couple links co-signed from two devices on the exact version, a veto mode both must agree to, instant dissolution and 90-day reconfirmation | Both | P1 | FR-003, FR-006, FR-013, FR-014, FR-079, FR-096, D-04, D-65 |
 | FR-127 | Discretion controls: pause and vanish (vanish also closes every conversation), coming back only after step-up; a versioned Discretion Policy (visibility, distance, counterpart tier) where any broadening needs step-up; hidden areas and the partner shield applied both ways and silently; an emergency lock with a one-time code from sign-up that works without signing in, ends sessions, refuses sign-in and hides the profile and its photos until recovery, with uniform answers | Both | P1 | FR-005, FR-011, FR-046, FR-064, FR-106, D-45, D-64 |
 | FR-126 | Consent ledger: one append-only, hash-chained chain per member (the hash covers the account, so a chain can't be moved), verified on load and continuously (metric and on-call page); Article 9 consent asked separately from the Terms and needed for discovery, with withdrawal taking effect at once; biometric consent before any face check; the conduct declaration recorded with its wording version; the whole ledger in the member's export and erased with the account | Both | P1 | FR-039, FR-040, D-63 |
 | FR-125 | Step-up and recovery: step-up repeats both sign-in checks inside the session and allows sensitive actions for 5 minutes (device list, adding or removing a passkey, data export); never for Burn, Panic, report, block, cancel or deletion. Recovery for a member with no device: provider face check and an ID check on the same document (matched by its one-way code), a 24-hour hold the member is told about and can cancel from any signed-in device, then every old passkey and session revoked and a 15-minute session to register a new passkey; uniform answers, rate-limited, no staff bypass | Both | P1 | FR-060, FR-061, D-16, D-62 |

@@ -122,7 +122,7 @@ func (s *Service) incognitoOK(viewer, member string) bool {
 		return true
 	}
 	e := s.tn.entries[member]
-	return e != nil && e.interests[viewer]
+	return (e != nil && e.interests[viewer]) || s.sentTo(member, viewer) != nil
 }
 
 func (s *Service) discretionView(p *memberProfile) map[string]any {
