@@ -5,7 +5,9 @@ CREATE TABLE identity (
   contact_ct       BYTEA,                   -- encrypted under root key; for OTP/notices only
   age_assured      BOOLEAN NOT NULL DEFAULT FALSE,
   assurance_tier   TEXT CHECK (assurance_tier IN ('V0','V1','V2','V3')),
-  assurance_token  TEXT,                    -- provider ref. NO ID image, NO DOB
+  assurance_token  TEXT,                    -- provider ref. NO ID image, NO full DOB
+  assurance_method TEXT CHECK (assurance_method IN ('id_document_nfc','id_document','id_document_assisted')),
+  birth_ym         CHAR(7) CHECK (birth_ym ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'), -- from the ID document; day never stored (D-37)
   assurance_at     TIMESTAMPTZ,
   billing_ref      TEXT,                    -- PSP token. No PAN, ever
   jurisdiction     CHAR(2) NOT NULL,

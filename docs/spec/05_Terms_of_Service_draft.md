@@ -1,4 +1,4 @@
-# 05 — TRYST Terms of Service — Draft 0.9.3
+# 05 — TRYST Terms of Service — Draft 0.9.4
 
 Part of the [TRYST v1.1 baseline](00_README.md).
 
@@ -52,7 +52,7 @@ Part of the [TRYST v1.1 baseline](00_README.md).
 
 ## 5. What we verify — and what we do not
 
-5.1 We do verify, before a Member can send an Intent or exchange media: that they are an adult; that they are a real, living person, by liveness check; that their photographs are of them; and, for a Couple Profile, that both partners have independently confirmed the link from their own separate devices.
+5.1 We do verify, before a Member can send an Intent or exchange media: that they are an adult, by an identity-document check matched to their face; that they are a real, living person, by liveness check; that their photographs are real photographs of them; and, for a Couple Profile, that both partners are two different verified adults who have each confirmed the link from their own device, have been photographed together live in the app, and reconfirm the link every 90 days. **[v1.3]**
 
 5.2 We do not verify, and cannot verify:
 - your relationship or marital status;
@@ -71,7 +71,7 @@ Part of the [TRYST v1.1 baseline](00_README.md).
 
 ## 6. Your account
 
-6.1 Everything you tell us about yourself must be accurate, and your photographs must be current and of you. Profiles that misrepresent who you are will be removed.
+6.1 Everything you tell us about yourself must be accurate, and your photographs must be current and of you. Your profile shows your main photo, which must clearly show your face (both faces, for a Couple Profile), your age, your area and an approximate distance, to Members who are allowed to see it. You may show up to 10 photographs. **You must not upload images that are generated or altered by artificial intelligence, images of anyone other than you (and your partner, for a Couple Profile), or images taken from elsewhere.** We check every photograph and remove any that break these rules. Profiles that misrepresent who you are will be removed. **[v1.3]**
 
 6.2 Keep your access credentials, PIN and device secure. Tell us immediately if you think someone else has access to your account.
 
@@ -331,4 +331,4 @@ You must not, on TRYST or in any contact that begins on TRYST:
 
 ---
 
-*TRYST — Terms of Service · Draft 0.9.3 · 4 October 2026 · Prepared by Product for legal review · Not legal advice · Not for publication.*
+*TRYST — Terms of Service · Draft 0.9.4 · 4 October 2026 · Prepared by Product for legal review · Not legal advice · Not for publication.*

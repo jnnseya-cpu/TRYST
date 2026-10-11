@@ -16,7 +16,7 @@ Start at [`docs/spec/00_README.md`](docs/spec/00_README.md).
 | [02 Shared Contracts](docs/spec/02_Shared_Contracts.md) | Backend **and** frontend — data model, API, enums, schemas, FR/NFR catalogue |
 | [03 Backend](docs/spec/03_Backend.md) | Backend, ML, security, SRE, T&S engineering |
 | [04 Frontend](docs/spec/04_Frontend.md) | iOS, Android, web, design |
-| [05 Terms of Service — draft 0.9.3](docs/spec/05_Terms_of_Service_draft.md) | Counsel (not for publication) |
+| [05 Terms of Service — draft 0.9.4](docs/spec/05_Terms_of_Service_draft.md) | Counsel (not for publication) |
 | [06 Decisions, errata, change log](docs/spec/06_Decisions_and_Changes.md) | Product owner, tech leads |
 | [07 Source B — founder brief (verbatim)](docs/spec/07_Source_B_Founder_Brief.md) | Everyone — the founder's specification word for word, with traceability |
 | [08 Source A — traceability](docs/spec/08_Source_A_Traceability.md) | Everyone — where each section of the consolidated Spec + ToS lives in the spec and code |
@@ -33,7 +33,7 @@ Consistency check (runs in CI): `python3 scripts/check_spec.py`
 |---|---|---|
 | `contracts/openapi/` | Edge API contract (OpenAPI 3.1), generated from spec 02 §5 | Redocly lint |
 | `contracts/proto/` | Agent bus and event schemas (Protobuf) | `protoc` compile |
-| `backend/` | Go: jurisdiction and V2 tier gates, two-factor login state machine, couple co-sign (VC), Keys ledger and inbound cap, cryptographic erasure, ban anchors, enforcement ladder and appeals (ToS 17–18), Stripe webhook verification, public sign-up with city-by-city matching (London first), gender-neutral balance waitlist and paid-acquisition brake, BitriPay adapter (sandbox only), AI Governance gate (agent registry, always-human actions, kill switch, hash-chained audit); SQL migrations generated from spec 02 §4 | `go vet`, `go test -race`, migration drift check |
+| `backend/` | Go: jurisdiction and V2 tier gates, two-factor login state machine, couple co-sign (VC), Keys ledger and inbound cap, cryptographic erasure, ban anchors, enforcement ladder and appeals (ToS 17–18), profile rules (main photo, age from verified ID, area and approximate distance, up to 10 photos, AI-image rejection), couple verification, Stripe webhook verification, public sign-up with city-by-city matching (London first), gender-neutral balance waitlist and paid-acquisition brake, BitriPay adapter (sandbox only), AI Governance gate (agent registry, always-human actions, kill switch, hash-chained audit); SQL migrations generated from spec 02 §4 | `go vet`, `go test -race`, migration drift check |
 | `agents/` | Python: Broker Stage 0 hard gates (property-tested), slate assembly, Envoy schemas and Briefs, Mirror maths | `ruff`, `pytest` + Hypothesis |
 | `crypto-core/` | Rust: per-media keys, per-recipient wrapping, revoke | `cargo fmt`, `clippy`, `test` |
 | `web/` | Next.js PWA: brand tokens, logo (checksum-verified), two-factor sign-in steps, quick exit, `noindex` | `tsc`, `vitest`, `next build` |

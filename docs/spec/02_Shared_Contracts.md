@@ -13,7 +13,7 @@ Part of the [TRYST v1.1 baseline](00_README.md). This document is the **single s
 | Time | RFC 3339 UTC on the wire. Availability windows carry an IANA `tz`. |
 | Money | Integer minor units + ISO 4217 (`{"amount": 2499, "currency": "GBP"}`). |
 | Location | **Geohash-5 (~5 km) or coarser** on the wire and at rest. Exact coordinates are sent to the server **only** by the Panic flow (§5.8). |
-| Age | `age_band` only (`18-24`, `25-29`, `30-34`, `35-39`, `40-44`, `45-49`, `50-59`, `60+`). No DOB anywhere. |
+| Age | Shown to members **in whole years**, from the verified birth **year and month** (`identity.birth_ym`, read from the ID document at V2). The full date of birth is never stored. `age_band` (`18-24` … `60+`) is kept for matching filters ([D-37](06_Decisions_and_Changes.md#2-decision-log)). |
 | Free text | Everything a counterparty writes (bios, messages, agent turns) is **untrusted input**: schema-validated, never executed or interpreted as instructions. |
 | Versioning | URL major version (`/v1`). Additive changes only within a major version. Enum additions are additive; clients must tolerate unknown values. |
 
@@ -85,9 +85,9 @@ Part of the [TRYST v1.1 baseline](00_README.md). This document is the **single s
 |---|---|---|---|
 | **V0** | Email or phone OTP; device attestation | HMAC contact hash; device key | A §8.1 |
 | **V1** | Liveness selfie with randomised challenge, matched to profile photos | Boolean + match score. **No biometric template.** | A §8.1, §19.3 |
-| **V2** | Highly effective age assurance through a third-party provider (one of two, abstracted), including an ID-document match | `is_adult` boolean + provider token + ban-anchor candidates (§4.1). **No ID image, no DOB.** | A §8.1, §19.3 L1 |
+| **V2** | Highly effective age assurance through a third-party provider (one of two, abstracted): photo-ID document (NFC chip read where the document has one) + liveness + face match to the document photo; over-18 decided by the provider and re-checked by TRYST (FR-094, [D-39](06_Decisions_and_Changes.md#2-decision-log)) | `is_adult` boolean + birth year-month + method + provider token + ban-anchor candidates (§4.1). **No ID image, no full DOB.** | A §8.1, §19.3 L1 |
 | **V3** | Optional open banking or digital ID | Boolean + token | A §8.1 |
-| **VC** | Couple co-signature: both partners at V2, each confirming from their own distinct device | Link record, both profile IDs, device hashes | A §8.1 |
+| **VC** | Couple verification: two different verified adults (distinct ID documents and faces), each co-signing from their own device, a live in-app photo of both together matched to each partner, in-person phone pairing, and reconfirmation every 90 days (FR-095, FR-096, [D-40](06_Decisions_and_Changes.md#2-decision-log)) | Link record, both profile IDs, device hashes, verified and confirmation dates | A §8.1 |
 
 ### 3.2 Capability gates (enforced server-side; mirrored in UI)
 
@@ -179,7 +179,9 @@ CREATE TABLE identity (
   contact_ct       BYTEA,                   -- encrypted under root key; for OTP/notices only
   age_assured      BOOLEAN NOT NULL DEFAULT FALSE,
   assurance_tier   TEXT CHECK (assurance_tier IN ('V0','V1','V2','V3')),
-  assurance_token  TEXT,                    -- provider ref. NO ID image, NO DOB
+  assurance_token  TEXT,                    -- provider ref. NO ID image, NO full DOB
+  assurance_method TEXT CHECK (assurance_method IN ('id_document_nfc','id_document','id_document_assisted')),
+  birth_ym         CHAR(7) CHECK (birth_ym ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'), -- from the ID document; day never stored (D-37)
   assurance_at     TIMESTAMPTZ,
   billing_ref      TEXT,                    -- PSP token. No PAN, ever
   jurisdiction     CHAR(2) NOT NULL,
@@ -265,6 +267,8 @@ CREATE TABLE profile (
   seeking          TEXT[],
   modes            TEXT[],                  -- intent_shape values enabled
   age_band         TEXT,
+  age_years        SMALLINT CHECK (age_years >= 18), -- shown to members; refreshed monthly from identity.birth_ym
+  area_label_mode  TEXT DEFAULT 'district' CHECK (area_label_mode IN ('district','city')),
   city_geohash5    TEXT,
   bio_ct           BYTEA,
   visibility       TEXT CHECK (visibility IN ('public','matched','incognito')),
@@ -293,6 +297,9 @@ CREATE TABLE couple_link (
   b_device_hash    BYTEA NOT NULL,
   approved_version INT NOT NULL,            -- profile version both approved (B FR-005)
   veto_mode        TEXT DEFAULT 'either' CHECK (veto_mode IN ('either','both')),
+  verified_at      TIMESTAMPTZ,              -- couple verification passed (FR-095)
+  a_confirmed_at   TIMESTAMPTZ,              -- 90-day reconfirmation (FR-096)
+  b_confirmed_at   TIMESTAMPTZ,
   dissolved_at     TIMESTAMPTZ,
   CONSTRAINT distinct_devices CHECK (a_device_hash <> b_device_hash),
   CONSTRAINT distinct_members CHECK (profile_a <> profile_b)
@@ -337,10 +344,18 @@ CREATE TABLE media (
   object_key       TEXT NOT NULL,           -- client-encrypted ciphertext
   tier             TEXT CHECK (tier IN ('profile_public','profile_private','thread')),
   explicit         BOOLEAN DEFAULT FALSE,   -- web surface only, V2 only
+  is_main          BOOLEAN NOT NULL DEFAULT FALSE, -- the main photo: face-matched, always shown (FR-092)
+  position         SMALLINT CHECK (position BETWEEN 1 AND 10), -- gallery order; at most 10 photos
+  revealed         BOOLEAN NOT NULL DEFAULT TRUE,  -- false = blurred until a reveal grant
+  provenance       TEXT,                    -- c2pa_capture | none | (rejected uploads are never stored)
   moderation_state TEXT DEFAULT 'pending',
   expires_at       TIMESTAMPTZ,             -- thread media: 7d default
   created_at       TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE UNIQUE INDEX media_one_main ON media (owner_profile) WHERE is_main AND tier = 'profile_public';
+CREATE UNIQUE INDEX media_position ON media (owner_profile, position) WHERE tier IN ('profile_public','profile_private');
+ALTER TABLE media ADD CONSTRAINT main_is_shown CHECK (NOT is_main OR (revealed AND NOT explicit));
 
 CREATE TABLE reveal_grant (
   grant_id         UUID PRIMARY KEY,
@@ -816,7 +831,7 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-044 | Conduct attestation at V2, logged separately | Both | P1 | A §19.3 L3 |
 | FR-045 | Basic DBS self-submission shown as a dated fact; Clare's Law explainer before the first meet (outcome never requested or stored) | Both | P3 | A §19.3 L3 |
 | FR-046 | Pause and vanish | Both | P1 | B §3 |
-| FR-047 | Profile-photo protection: EXIF strip, face-blur default, AI-generation and reverse-image checks on every upload, adversarial perturbation on public-tier photos | Both | P1 | A §9.1 A8, §19.4 |
+| FR-047 | Profile-photo protection: EXIF strip, face-blur default for photos other than the main photo (D-38), AI-generation and reverse-image checks on every upload, adversarial perturbation on public-tier photos | Both | P1 | A §9.1 A8, §19.4 |
 | FR-048 | ENVOY tier: agent-proposed outreach, each intent approved by the human with one tap | Both | P3 | A §15.2, D-04 |
 | FR-049 | Couple `veto_mode` (`either`/`both`); THIRD and QUAD matching and MLS group threads | Both | P1 | A §3, §10 |
 | FR-050 | Exposure-fairness monitor (M9) adjusts the fairness penalty when inbound Gini > 0.55 per city/segment | BE | P1 | A §7.4 |
@@ -861,6 +876,11 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-089 | Public sign-up in the launch cities (London, Manchester, Birmingham, Brighton) with no invitation required; matching opens one city at a time in that order, each at 2,000 verified members once the previous city is live, and never closes again; members see how many more are needed | Both | P1 | Founder v1.3, D-35 |
 | FR-090 | Demand-balance waitlist per city, gender-neutral: a member waits only if a group they seek would exceed the load cap (2.2 seekers per group member in P1, 2.0 from P3); the rule never reads the applicant's own characteristics; waiting is first come, first served per sought groups, shows position and the busy group, and releases automatically as supply grows; departures never reopen seeding; nothing here affects price or ranking | BE | P1 | A §16, D-35, D-36 |
 | FR-091 | Paid-acquisition brake per city: blended cost per verified sign-up checked weekly against break-even (contribution per payer × payer rate × V2 rate); paid spend stops automatically after 2 weeks above it or 1 week above 1.5×; only a named approver can restart it | BE | P1 | E-03, D-35 |
+| FR-092 | Profile seen by other eligible members: the main photo (always shown, never blurred, must clearly show the member's face, or both partners' faces for a couple), age in whole years, area name (district or city, the member's choice) and an approximate distance; up to 10 photos in total, in the member's order, others optionally blurred behind the reveal ladder. Only V2 members inside the Stage 0 gates (blocks, ExclusionRing, jurisdiction, hard limits) ever see it; there are no public profile URLs (FR-076) | Both | P1 | Founder v1.3, D-37, D-38 |
+| FR-093 | No AI-generated, AI-altered, borrowed or third-party images: every upload passes provenance reading (IPTC digital source type, C2PA), a synthetic-image detector (reject ≥ 0.90, human review ≥ 0.50, review if unavailable), reverse-image search, CSAM hash matching and face matching, where every face must be the member (or partner) and the main photo must match them; metadata is stripped after the check; rejected images are never stored | Both | P1 | Founder v1.3, FR-047 |
+| FR-094 | Under-18s cannot join: V2 requires a photo-ID document (NFC chip read where available), liveness and a face match to the document; the provider's over-18 decision is re-checked by TRYST from the birth year-month, never admitting anyone whose 18th birthday could still be ahead; every mobile sign-in repeats the face match (B2), so an account cannot be handed to someone else; a Guardian minor signal or a credible report holds the account and forces re-verification | Both | P1 | Founder v1.3, D-39 |
+| FR-095 | Couple verification before a couple profile is published: both partners V2 and adult; different accounts, phones, ID documents and faces (partner face match < 0.50); a live in-app photo of both together with liveness, exactly two faces, each matched ≥ 0.90; in-person phone pairing approved by both within 2 minutes, in the same session as the photo; neither partner in another active couple. The profile then shows a dated "both partners verified" statement | Both | P1 | Founder v1.3, D-40 |
+| FR-096 | Couples stay true: either partner can dissolve the couple instantly; both reconfirm every 90 days with their own sign-in, after which the profile is flagged for 14 days and then paused from discovery until both confirm | Both | P1 | Founder v1.3, D-40 |
 
 ### 10.2 Non-functional requirements
 

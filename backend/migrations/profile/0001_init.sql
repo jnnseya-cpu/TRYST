@@ -11,6 +11,8 @@ CREATE TABLE profile (
   seeking          TEXT[],
   modes            TEXT[],                  -- intent_shape values enabled
   age_band         TEXT,
+  age_years        SMALLINT CHECK (age_years >= 18), -- shown to members; refreshed monthly from identity.birth_ym
+  area_label_mode  TEXT DEFAULT 'district' CHECK (area_label_mode IN ('district','city')),
   city_geohash5    TEXT,
   bio_ct           BYTEA,
   visibility       TEXT CHECK (visibility IN ('public','matched','incognito')),
@@ -39,6 +41,9 @@ CREATE TABLE couple_link (
   b_device_hash    BYTEA NOT NULL,
   approved_version INT NOT NULL,            -- profile version both approved (B FR-005)
   veto_mode        TEXT DEFAULT 'either' CHECK (veto_mode IN ('either','both')),
+  verified_at      TIMESTAMPTZ,              -- couple verification passed (FR-095)
+  a_confirmed_at   TIMESTAMPTZ,              -- 90-day reconfirmation (FR-096)
+  b_confirmed_at   TIMESTAMPTZ,
   dissolved_at     TIMESTAMPTZ,
   CONSTRAINT distinct_devices CHECK (a_device_hash <> b_device_hash),
   CONSTRAINT distinct_members CHECK (profile_a <> profile_b)
@@ -83,10 +88,18 @@ CREATE TABLE media (
   object_key       TEXT NOT NULL,           -- client-encrypted ciphertext
   tier             TEXT CHECK (tier IN ('profile_public','profile_private','thread')),
   explicit         BOOLEAN DEFAULT FALSE,   -- web surface only, V2 only
+  is_main          BOOLEAN NOT NULL DEFAULT FALSE, -- the main photo: face-matched, always shown (FR-092)
+  position         SMALLINT CHECK (position BETWEEN 1 AND 10), -- gallery order; at most 10 photos
+  revealed         BOOLEAN NOT NULL DEFAULT TRUE,  -- false = blurred until a reveal grant
+  provenance       TEXT,                    -- c2pa_capture | none | (rejected uploads are never stored)
   moderation_state TEXT DEFAULT 'pending',
   expires_at       TIMESTAMPTZ,             -- thread media: 7d default
   created_at       TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE UNIQUE INDEX media_one_main ON media (owner_profile) WHERE is_main AND tier = 'profile_public';
+CREATE UNIQUE INDEX media_position ON media (owner_profile, position) WHERE tier IN ('profile_public','profile_private');
+ALTER TABLE media ADD CONSTRAINT main_is_shown CHECK (NOT is_main OR (revealed AND NOT explicit));
 
 CREATE TABLE reveal_grant (
   grant_id         UUID PRIMARY KEY,

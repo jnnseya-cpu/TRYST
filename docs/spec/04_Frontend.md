@@ -88,7 +88,7 @@ Implements [02 §3.3](02_Shared_Contracts.md#33-login-assurance--account-holder-
 5. **Age assurance (V2)** with the ID match, then the **conduct declaration** (separate screen, logged) and the **Article 9 explicit consent** (separate from the ToS accept).
 6. **Cartographer interview** (~7 min, conversational). Each proposed structured field is shown as an editable chip; the member confirms (FR-003). Desire tags offer three levels: yes / curious / no. Hard limits come from a controlled list with plain-language descriptions.
 7. **ExclusionRing enrolment** (P2+). Opt-in. Explains that contacts are blinded on the device and that nobody learns who matched. Runs the OPRF client.
-8. **Profile:** pseudonym, pronouns, free-text gender, age band (from assurance), photos. EXIF is stripped on device and face-blur is on by default; reveal ladder defaults come from the Discretion Policy.
+8. **Profile:** pseudonym, pronouns, free-text gender, age (from the verified ID, D-37), area (district or city), and 1–10 photos: a main photo that clearly shows the member's face (both faces for a couple) and is always shown, plus up to 9 more, each shown or blurred (D-38). Location and device data are stripped on device before upload; provenance metadata is kept for the AI check and stripped on the server (FR-093). Uploads that are AI-generated, AI-edited, borrowed or show other people are refused with a plain reason; reveal ladder defaults come from the Discretion Policy.
 9. **Safety notice** (FR-054) → first slate, or the waitlist if the city is gated.
 
 **Couples (VC).** Partner A creates the couple and shows a QR or link (24 h). Partner B must complete V2 **on their own device**. Both review and approve the exact profile version. Veto mode is chosen jointly. The UI explains that either partner can dissolve the couple at any time without giving a reason.
@@ -96,7 +96,7 @@ Implements [02 §3.3](02_Shared_Contracts.md#33-login-assurance--account-holder-
 ### 4.2 Loop B — Discovery
 
 - **Slate view:** up to 18 cards; no infinite scroll, no swipe mechanic.
-- **Each card shows:** pseudonym, age band, distance band, modes, verification tier, and 2–4 reason chips with a "not quite" correction control (FR-025). Paid placement is labelled visibly.
+- **Each card shows:** main photo, pseudonym, age, area and approximate distance ("About 10 km away"), modes, verification tier (and the dated "both partners verified" statement for couples), and 2–4 reason chips with a "not quite" correction control (FR-025). Paid placement is labelled visibly.
 - **Actions:** Send Intent (shows the Keys cost and the "refunded if they reply" promise), Pass, Save.
 - Intent sending is **never** blocked by the counterparty's inbound cap, and the UI never reveals it.
 - **My Signals** (P2): categories the system has learned, with correct, reset and personalisation on/off (FR-024).
