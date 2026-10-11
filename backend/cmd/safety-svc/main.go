@@ -41,9 +41,11 @@ import (
 )
 
 type app struct {
-	mode   string
-	safety *safetysvc.Service
-	st     store.Store
+	mode       string
+	safety     *safetysvc.Service
+	st         store.Store
+	staff      staffauth.Auth
+	toPlatform *svcauth.Client
 }
 
 func main() {
@@ -89,13 +91,13 @@ func build() *app {
 		log.Fatal(err)
 	}
 	svc.Notices = safetysvc.RemoteNotices(toPlatform)
-	return &app{mode: mode, safety: svc, st: st}
+	return &app{mode: mode, safety: svc, st: st, staff: staff, toPlatform: toPlatform}
 }
 
 func serve(a *app) {
 	svc := a.safety
 	// Internal API for the member platform.
-	internal := &svcauth.Verifier{Secrets: map[string][]byte{"profile": svcenv.InternalSecret(a.mode, "INTERNAL_SECRET_SAFETY")}}
+	internal := svcenv.Verifier(a.mode, "profile", "INTERNAL_SECRET_SAFETY")
 	svcenv.ServeInternal(svcenv.Env("INTERNAL_ADDR", "127.0.0.1:8092"), internal.Wrap(svc.InternalHandler()))
 
 	// Deliver queued standing changes and notices; retry what failed.
@@ -169,7 +171,7 @@ func routes(a *app) *http.ServeMux {
 // "reapply-erasures" erases again every account in the erasure ledger after a restore.
 func runAdmin(a *app, args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: safety-svc admin verify|reapply-erasures")
+		fmt.Fprintln(os.Stderr, "usage: safety-svc admin preflight|check-token|verify|reapply-erasures")
 		return 2
 	}
 	ctx := context.Background()
@@ -185,6 +187,16 @@ func runAdmin(a *app, args []string) int {
 		o, od, u := a.safety.QueueStats()
 		out = map[string]any{"ok": true, "audit_chain": "verified on load", "records": map[string]int{"case": len(cases), "audit": len(audit)},
 			"open": o, "overdue": od, "overdue_urgent": u, "outbox_pending": a.safety.OutboxPending(ctx)}
+	case "preflight":
+		res, ok := preflight(ctx, a)
+		b, _ := json.MarshalIndent(res, "", "  ")
+		fmt.Println(string(b))
+		if !ok {
+			return 1
+		}
+		return 0
+	case "check-token":
+		return checkToken(a)
 	case "reapply-erasures":
 		ledger := svcenv.OpenStore(ctx, a.mode, "DATABASE_URL_LEDGER")
 		entries, err := ledger.All(ctx, "erasure")

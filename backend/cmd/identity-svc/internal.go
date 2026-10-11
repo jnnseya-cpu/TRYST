@@ -18,6 +18,7 @@ import (
 // way to apply standing and send masked notices.
 func internalAPI(srv *identity.Server, prof *profilesvc.Service, notifier *notify.Service) http.Handler {
 	m := http.NewServeMux()
+	m.HandleFunc("GET /internal/v1/ping", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })
 	m.HandleFunc("POST /internal/v1/authenticate", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			Authorization string `json:"authorization"`

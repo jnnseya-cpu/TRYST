@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/dsr"
+	"github.com/jnnseya-cpu/tryst/backend/internal/svcenv"
 )
 
 // runAdmin runs an operator command against the configured databases (same environment
@@ -20,7 +23,7 @@ import (
 // Output is JSON with counts only; no member data is printed.
 func runAdmin(a *app, args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: identity-svc admin verify|reapply-erasures")
+		fmt.Fprintln(os.Stderr, "usage: identity-svc admin preflight|verify|reapply-erasures")
 		return 2
 	}
 	ctx := context.Background()
@@ -31,6 +34,14 @@ func runAdmin(a *app, args []string) int {
 		out, err = verify(ctx, a)
 	case "reapply-erasures":
 		out, err = reapplyErasures(ctx, a)
+	case "preflight":
+		var ok bool
+		out, ok = preflightPlatform(ctx, a)
+		if !ok {
+			b, _ := json.MarshalIndent(out, "", "  ")
+			fmt.Println(string(b))
+			return 1
+		}
 	default:
 		err = fmt.Errorf("unknown command %q", args[0])
 	}
@@ -134,4 +145,23 @@ func reapplyErasures(ctx context.Context, a *app) (any, error) {
 		}
 	}
 	return map[string]any{"ledger_entries": len(erased), "accounts_checked": len(candidates), "erased_again": len(ids)}, nil
+}
+
+// preflightPlatform checks the member platform's side of the safety-service link: two
+// distinct internal secrets and a signed round trip to the safety service.
+func preflightPlatform(ctx context.Context, a *app) (map[string]any, bool) {
+	s1, s2 := svcenv.InternalSecret(a.mode, "INTERNAL_SECRET_SAFETY"), svcenv.InternalSecret(a.mode, "INTERNAL_SECRET_PLATFORM")
+	pctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	err := a.toSafety.Do(pctx, "GET", "/internal/v1/ping", nil, nil)
+	pending := a.signals.Pending(ctx)
+	out := map[string]any{
+		"internal_secrets_distinct": !bytes.Equal(s1, s2),
+		"safety_service_reachable":  err == nil,
+		"signals_queued":            pending,
+	}
+	if err != nil {
+		out["safety_service_error"] = err.Error()
+	}
+	return out, !bytes.Equal(s1, s2) && err == nil
 }

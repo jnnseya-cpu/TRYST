@@ -145,13 +145,15 @@ func HashToken(tok string) string {
 // FromEnv builds the staff sign-in from the environment:
 //
 //	STAFF_ACCESS_ISSUER, STAFF_ACCESS_AUDIENCE, STAFF_ACCESS_JWKS_URL  verified proxy token
+//	STAFF_ACCESS_REQUIRE_AMR  optional sign-in method the token must show (e.g. hwk)
 //	STAFF_TRUSTED_PROXIES  addresses of a header-asserting proxy (alternative)
 //	STAFF_ROSTER           email:role[,role];...  (required outside dev)
 //	STAFF_DEV_TOKENS       id:role:token,...       (dev only)
 func FromEnv(mode string, getenv func(string) string) (Auth, error) {
 	a := Auth{Env: mode, DevTokens: map[string]Staff{}}
 	if iss := getenv("STAFF_ACCESS_ISSUER"); iss != "" {
-		a.Access = &Access{Issuer: iss, Audience: getenv("STAFF_ACCESS_AUDIENCE"), JWKSURL: getenv("STAFF_ACCESS_JWKS_URL")}
+		a.Access = &Access{Issuer: iss, Audience: getenv("STAFF_ACCESS_AUDIENCE"), JWKSURL: getenv("STAFF_ACCESS_JWKS_URL"),
+			RequireAMR: getenv("STAFF_ACCESS_REQUIRE_AMR")}
 		if a.Access.Audience == "" || !strings.HasPrefix(a.Access.JWKSURL, "https://") {
 			return a, errors.New("STAFF_ACCESS_AUDIENCE and an https STAFF_ACCESS_JWKS_URL are required with STAFF_ACCESS_ISSUER")
 		}

@@ -23,8 +23,12 @@ type Access struct {
 	Issuer   string // e.g. https://<team>.cloudflareaccess.com
 	Audience string // the Access application's AUD tag
 	JWKSURL  string // e.g. https://<team>.cloudflareaccess.com/cdn-cgi/access/certs
-	HTTP     *http.Client
-	Now      func() time.Time
+	// RequireAMR, if set, is an authentication method the token must report in its "amr"
+	// claim, e.g. "hwk" for a hardware security key. Whether the claim arrives depends on
+	// the identity provider; check a real token with "safety-svc admin check-token".
+	RequireAMR string
+	HTTP       *http.Client
+	Now        func() time.Time
 
 	mu      sync.Mutex
 	keys    map[string]crypto.PublicKey
@@ -133,41 +137,56 @@ func (a *Access) fetch() (map[string]crypto.PublicKey, error) {
 	return out, nil
 }
 
+// Claims is what a verified token says about the staff member.
+type Claims struct {
+	Email string
+	AMR   []string
+}
+
 // Verify checks a token and returns the staff email.
 func (a *Access) Verify(token string) (string, error) {
+	c, err := a.Inspect(token)
+	return c.Email, err
+}
+
+// ErrAMR means the token is valid but doesn't show the required sign-in method.
+var ErrAMR = errors.New("staff token doesn't show the required sign-in method")
+
+// Inspect verifies a token and returns its claims.
+func (a *Access) Inspect(token string) (Claims, error) {
 	if len(token) > maxTokenLen {
-		return "", ErrToken
+		return Claims{}, ErrToken
 	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return "", ErrToken
+		return Claims{}, ErrToken
 	}
 	hb, err1 := b64(parts[0])
 	cb, err2 := b64(parts[1])
 	sig, err3 := b64(parts[2])
 	if err1 != nil || err2 != nil || err3 != nil {
-		return "", ErrToken
+		return Claims{}, ErrToken
 	}
 	var h struct{ Alg, Kid string }
 	if json.Unmarshal(hb, &h) != nil {
-		return "", ErrToken
+		return Claims{}, ErrToken
 	}
 	key, err := a.keyFor(h.Kid)
 	if err != nil {
-		return "", err
+		return Claims{}, err
 	}
 	d := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
 	switch k := key.(type) {
 	case *rsa.PublicKey:
 		if h.Alg != "RS256" || rsa.VerifyPKCS1v15(k, crypto.SHA256, d[:], sig) != nil {
-			return "", ErrToken
+			return Claims{}, ErrToken
 		}
 	case *ecdsa.PublicKey:
 		if h.Alg != "ES256" || len(sig) != 64 || !ecdsa.Verify(k, d[:], new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:])) {
-			return "", ErrToken
+			return Claims{}, ErrToken
 		}
 	default:
-		return "", ErrToken
+		return Claims{}, ErrToken
 	}
 	var c struct {
 		Iss   string          `json:"iss"`
@@ -175,16 +194,29 @@ func (a *Access) Verify(token string) (string, error) {
 		Exp   int64           `json:"exp"`
 		Nbf   int64           `json:"nbf"`
 		Email string          `json:"email"`
+		AMR   []string        `json:"amr"`
 	}
 	if json.Unmarshal(cb, &c) != nil {
-		return "", ErrToken
+		return Claims{}, ErrToken
 	}
 	now := a.now()
 	if c.Iss != a.Issuer || !audOK(c.Aud, a.Audience) || c.Exp == 0 || now.After(time.Unix(c.Exp, 0).Add(leeway)) ||
 		(c.Nbf != 0 && now.Add(leeway).Before(time.Unix(c.Nbf, 0))) || !strings.Contains(c.Email, "@") {
-		return "", ErrToken
+		return Claims{}, ErrToken
 	}
-	return strings.ToLower(c.Email), nil
+	out := Claims{Email: strings.ToLower(c.Email), AMR: c.AMR}
+	if a.RequireAMR != "" {
+		ok := false
+		for _, m := range c.AMR {
+			if m == a.RequireAMR {
+				ok = true
+			}
+		}
+		if !ok {
+			return out, ErrAMR
+		}
+	}
+	return out, nil
 }
 
 func audOK(raw json.RawMessage, want string) bool {
@@ -201,4 +233,16 @@ func audOK(raw json.RawMessage, want string) bool {
 		}
 	}
 	return false
+}
+
+// CheckKeys fetches the published keys now and reports how many are usable (preflight).
+func (a *Access) CheckKeys() (int, error) {
+	keys, err := a.fetch()
+	if err != nil {
+		return 0, err
+	}
+	a.mu.Lock()
+	a.keys, a.fetched = keys, a.now()
+	a.mu.Unlock()
+	return len(keys), nil
 }

@@ -212,6 +212,7 @@ resource "aws_ecs_task_definition" "safety" {
       { name = "STAFF_ACCESS_ISSUER", value = var.staff_access.issuer },
       { name = "STAFF_ACCESS_AUDIENCE", value = var.staff_access.audience },
       { name = "STAFF_ACCESS_JWKS_URL", value = var.staff_access.jwks_url },
+      { name = "STAFF_ACCESS_REQUIRE_AMR", value = var.staff_access.require_amr },
     ]
     secrets                = [for k in local.safety_secrets : { name = k, valueFrom = aws_secretsmanager_secret.s[k].arn }]
     readonlyRootFilesystem = true

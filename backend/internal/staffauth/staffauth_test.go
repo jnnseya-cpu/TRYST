@@ -147,3 +147,25 @@ func TestHeadersRosterAndDevTokens(t *testing.T) {
 		t.Fatal("dev token accepted outside dev")
 	}
 }
+
+func TestRequireHardwareKey(t *testing.T) {
+	rk, _ := rsa.GenerateKey(rand.Reader, 2048)
+	jwks := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"keys": []map[string]string{
+			{"kid": "r1", "kty": "RSA", "n": enc.EncodeToString(rk.N.Bytes()), "e": enc.EncodeToString(big.NewInt(int64(rk.E)).Bytes())}}})
+	}))
+	defer jwks.Close()
+	now := time.Unix(1_800_000_000, 0)
+	acc := &Access{Issuer: "https://t.example", Audience: "aud", JWKSURL: jwks.URL, RequireAMR: "hwk", Now: func() time.Time { return now }}
+	claims := func(amr []string) map[string]any {
+		return map[string]any{"iss": "https://t.example", "aud": "aud", "exp": now.Add(time.Hour).Unix(), "email": "mod@corp.example", "amr": amr}
+	}
+	if c, err := acc.Inspect(sign(t, rk, "r1", claims([]string{"pwd", "hwk"}))); err != nil || c.Email != "mod@corp.example" {
+		t.Fatalf("hardware key sign-in refused: %v", err)
+	}
+	for _, amr := range [][]string{{"pwd", "otp"}, {"pwd"}, nil} {
+		if _, err := acc.Inspect(sign(t, rk, "r1", claims(amr))); err != ErrAMR {
+			t.Fatalf("amr %v accepted: %v", amr, err)
+		}
+	}
+}

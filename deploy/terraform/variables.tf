@@ -35,6 +35,6 @@ variable "ops_host" {
   description = "Staff-only console host name, fronted by the company sign-in proxy (Cloudflare Access)"
 }
 variable "staff_access" {
-  type        = object({ issuer = string, audience = string, jwks_url = string })
+  type        = object({ issuer = string, audience = string, jwks_url = string, require_amr = optional(string, "") })
   description = "Sign-in proxy token settings for the safety service (STAFF_ACCESS_*)"
 }

@@ -24,6 +24,7 @@ type fakeSafety struct {
 func startFakeSafety(t *testing.T) (*fakeSafety, string) {
 	f := &fakeSafety{}
 	m := http.NewServeMux()
+	m.HandleFunc("GET /internal/v1/ping", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })
 	m.HandleFunc("POST /internal/v1/signals", func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()

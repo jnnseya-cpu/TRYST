@@ -85,3 +85,17 @@ func TestPlatformInternalAPI(t *testing.T) {
 		t.Fatalf("wrong caller: %v", err)
 	}
 }
+
+func TestPlatformPreflight(t *testing.T) {
+	devEnv(t)
+	_, url := startFakeSafety(t)
+	a := build()
+	out, ok := preflightPlatform(context.Background(), a)
+	if !ok || out["safety_service_reachable"] != true {
+		t.Fatalf("preflight: %v", out)
+	}
+	a.toSafety.BaseURL = url + "/nowhere"
+	if _, ok := preflightPlatform(context.Background(), a); ok {
+		t.Fatal("unreachable safety service passed")
+	}
+}

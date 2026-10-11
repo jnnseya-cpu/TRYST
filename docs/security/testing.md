@@ -16,6 +16,7 @@ first run on 11 October 2026, and what is still needed before launch.
 | Restore safety | `TestRestoreDrill` | A restored backup can't bring back a deleted member, in either service's databases |
 | Safety service surface | `cmd/safety-svc` route test, `TestProductionRefusesUnsafeConfig` | Every console and safety member operation refuses unauthenticated and forged callers; production refuses dev tokens, a missing roster, missing staff sign-in or missing internal secrets |
 | Staff sign-in | `internal/staffauth` tests | Proxy token verification: wrong key, tampered signature, algorithm swap, expired, not-yet-valid, wrong issuer or audience, off-roster email; roles never taken from the request; key fetching rate-limited |
+| Production setup | `admin preflight` (both services), `TestPreflight`, `TestProvisionScript` | Roster can run the two-person rule and independent appeals, proxy keys reachable, hardware key enforced, internal secrets distinct and rotatable, services reach each other; secrets generated and stored without being printed |
 | Internal APIs | `internal/svcauth` and cross-service tests | Signature bound to caller, time, method, path and body; wrong secret, unknown caller, stale or replayed-elsewhere calls refused |
 | Feature security | service tests and browser tests | Crypto-erasure, E2EE relay of ciphertext only, staff-only console, two-person removal, signed webhooks, SSRF-proof push endpoints, fail-closed vendors |
 

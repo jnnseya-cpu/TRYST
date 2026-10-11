@@ -58,6 +58,29 @@ func InternalSecret(mode, envVar string) []byte {
 	return h[:]
 }
 
+// PreviousSecret reads an optional rotation secret (<envVar>_PREVIOUS); nil if unset.
+func PreviousSecret(envVar string) []byte {
+	v := os.Getenv(envVar + "_PREVIOUS")
+	if v == "" || v == "none" { // "none": provisioned placeholder outside a rotation
+		return nil
+	}
+	b, err := svcauth.Secret(v)
+	if err != nil {
+		log.Fatalf("%s_PREVIOUS: %v", envVar, err)
+	}
+	return b
+}
+
+// Verifier accepts calls from caller signed with envVar's secret (or, during a rotation,
+// with <envVar>_PREVIOUS).
+func Verifier(mode, caller, envVar string) *svcauth.Verifier {
+	v := &svcauth.Verifier{Secrets: map[string][]byte{caller: InternalSecret(mode, envVar)}}
+	if p := PreviousSecret(envVar); p != nil {
+		v.Previous = map[string][]byte{caller: p}
+	}
+	return v
+}
+
 // ServeInternal runs an internal listener (never exposed publicly).
 func ServeInternal(addr string, h http.Handler) {
 	go func() {

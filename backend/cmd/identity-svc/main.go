@@ -135,6 +135,7 @@ type app struct {
 	// signals is the outbox of on-device safety signals for the safety service.
 	signals    *outbox.Box
 	signalKick chan struct{}
+	toSafety   *svcauth.Client
 	commerce   *commercesvc.Service
 	notifier   *notify.Service
 	rights     *dsr.Service
@@ -303,7 +304,7 @@ func build() *app {
 	ledger := openStore(ctx, mode, "DATABASE_URL_LEDGER")
 	rights.Ledger = ledger
 	return &app{mode: mode, srv: srv, prof: prof, commerce: commerce, notifier: notifier, rights: rights, vault: vault,
-		signals: signals, signalKick: signalKick,
+		signals: signals, signalKick: signalKick, toSafety: toSafety,
 		stores: map[string]store.Store{"identity": idStore, "profile": profStore, "keys": keyStore, "commerce": commerceStore, "ledger": ledger}}
 }
 
@@ -323,7 +324,7 @@ func serve(a *app) {
 		}
 	}()
 	// Internal API for the safety service (private listener, signed calls only).
-	internal := &svcauth.Verifier{Secrets: map[string][]byte{"safety": svcenv.InternalSecret(mode, "INTERNAL_SECRET_PLATFORM")}}
+	internal := svcenv.Verifier(mode, "safety", "INTERNAL_SECRET_PLATFORM")
 	svcenv.ServeInternal(svcenv.Env("INTERNAL_ADDR", "127.0.0.1:8091"), internal.Wrap(internalAPI(a.srv, prof, notifier)))
 	go func() {
 		for range time.Tick(time.Minute) {

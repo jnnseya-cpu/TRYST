@@ -51,3 +51,19 @@ func TestSignedCalls(t *testing.T) {
 		t.Fatal("short secret accepted")
 	}
 }
+
+func TestRotation(t *testing.T) {
+	oldS, newS := bytes.Repeat([]byte{1}, 32), bytes.Repeat([]byte{2}, 32)
+	v := &Verifier{Secrets: map[string][]byte{"safety": newS}, Previous: map[string][]byte{"safety": oldS}}
+	srv := httptest.NewServer(v.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) })))
+	defer srv.Close()
+	for name, sec := range map[string][]byte{"new": newS, "old": oldS} {
+		if err := (&Client{BaseURL: srv.URL, Caller: "safety", Secret: sec}).Do(context.Background(), "GET", "/x", nil, nil); err != nil {
+			t.Errorf("%s secret refused during rotation: %v", name, err)
+		}
+	}
+	v.Previous = nil // rotation finished
+	if err := (&Client{BaseURL: srv.URL, Caller: "safety", Secret: oldS}).Do(context.Background(), "GET", "/x", nil, nil); !IsStatus(err, 401) {
+		t.Fatalf("old secret accepted after rotation: %v", err)
+	}
+}

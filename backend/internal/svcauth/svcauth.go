@@ -123,7 +123,19 @@ func (c *Client) Raw(ctx context.Context, method, path string, in any) ([]byte, 
 type Verifier struct {
 	// Secrets by caller name.
 	Secrets map[string][]byte
-	Now     func() time.Time
+	// Previous secrets, still accepted during a rotation (set the new secret on the
+	// receiver with the old one here, then switch the sender, then remove this).
+	Previous map[string][]byte
+	Now      func() time.Time
+}
+
+func (v *Verifier) valid(caller, sig, ts, method, target string, body []byte) bool {
+	for _, set := range []map[string][]byte{v.Secrets, v.Previous} {
+		if sec, ok := set[caller]; ok && hmac.Equal([]byte(sig), []byte(digest(sec, caller, ts, method, target, body))) {
+			return true
+		}
+	}
+	return false
 }
 
 // Wrap returns a handler that rejects unsigned, mis-signed or stale calls with 401 and
@@ -131,7 +143,6 @@ type Verifier struct {
 func (v *Verifier) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		caller := r.Header.Get(headerCaller)
-		secret, ok := v.Secrets[caller]
 		ts := r.Header.Get(headerTime)
 		n, err := strconv.ParseInt(ts, 10, 64)
 		now := time.Now
@@ -140,8 +151,8 @@ func (v *Verifier) Wrap(next http.Handler) http.Handler {
 		}
 		body, rerr := io.ReadAll(io.LimitReader(r.Body, maxBody))
 		d := now().Sub(time.Unix(n, 0))
-		if !ok || err != nil || rerr != nil || d > window || d < -window ||
-			!hmac.Equal([]byte(r.Header.Get(headerSig)), []byte(digest(secret, caller, ts, r.Method, r.URL.RequestURI(), body))) {
+		if err != nil || rerr != nil || d > window || d < -window ||
+			!v.valid(caller, r.Header.Get(headerSig), ts, r.Method, r.URL.RequestURI(), body) {
 			w.Header().Set("Cache-Control", "no-store")
 			http.Error(w, "unauthorised", http.StatusUnauthorized)
 			return
