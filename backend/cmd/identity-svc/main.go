@@ -296,7 +296,7 @@ func build() *app {
 
 // serve runs the HTTP server, background sweeps and the metrics listener.
 func serve(a *app) {
-	mode, srv, prof, safety, commerce, notifier, rights := a.mode, a.srv, a.prof, a.safety, a.commerce, a.notifier, a.rights
+	mode, prof, safety, notifier, rights := a.mode, a.prof, a.safety, a.notifier, a.rights
 	go func() {
 		for range time.Tick(time.Minute) {
 			rights.Sweep(context.Background())
@@ -307,48 +307,7 @@ func serve(a *app) {
 			prof.SweepSafety(context.Background())
 		}
 	}()
-	root := http.NewServeMux()
-	root.Handle("/v1/profile", prof)
-	root.Handle("/v1/profile/", prof)
-	root.Handle("/v1/tonight", prof)
-	root.Handle("/v1/tonight/", prof)
-	root.Handle("/v1/threads", prof)
-	root.Handle("/v1/threads/", prof)
-	root.Handle("/v1/devices/", prof)
-	root.Handle("/v1/meets/", prof)
-	root.Handle("/v1/safety/", prof)
-	root.Handle("/v1/reports", safety)
-	root.Handle("/v1/reports/", safety)
-	root.Handle("/v1/appeals", safety)
-	root.Handle("/v1/me/standing", safety)
-	root.Handle("/ops/v1/", safety)
-	root.Handle("/ops/v1/vouchers", commerce)
-	root.Handle("/v1/account", rights)
-	root.Handle("/v1/account/export", rights)
-	root.Handle("/v1/deletion-proofs/", rights)
-	root.Handle("/v1/notices", notifier)
-	root.Handle("/v1/notices/", notifier)
-	root.Handle("/v1/notifications/", notifier)
-	for _, p := range []string{"/v1/entitlements", "/v1/deposit", "/v1/keys/", "/v1/subscription", "/v1/subscription/", "/v1/vouchers/", "/v1/billing/"} {
-		root.Handle(p, commerce)
-	}
-	root.Handle("/", srv)
-	// Readiness: every database answers.
-	stores := a.stores
-	root.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
-		for name, st := range stores {
-			if p, ok := st.(interface{ Ping(context.Context) error }); ok {
-				if err := p.Ping(ctx); err != nil {
-					log.Printf("readyz: %s database unreachable", name)
-					http.Error(w, "not ready", http.StatusServiceUnavailable)
-					return
-				}
-			}
-		}
-		w.Write([]byte("ok"))
-	})
+	root := routes(a)
 
 	m := metrics.Default
 	m.Help("tryst_http_requests_total", "Requests by route shape, method and status.")
@@ -369,7 +328,7 @@ func serve(a *app) {
 
 	addr := ":" + env("PORT", "8081")
 	log.Printf("identity-svc (%s) listening on %s", mode, addr)
-	hs := &http.Server{Addr: addr, Handler: m.Middleware(root), ReadHeaderTimeout: 5 * time.Second,
+	hs := &http.Server{Addr: addr, Handler: m.Middleware(apiHeaders(root)), ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout: 60 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 120 * time.Second}
 
 	// Graceful shutdown (container stop, deploys): stop taking requests, finish in-flight
@@ -494,4 +453,66 @@ func gateway(prefix string) *vendors.Gateway {
 		log.Fatalf("%s_URL must be https and %s_SECRET is required", prefix, prefix)
 	}
 	return &vendors.Gateway{BaseURL: u, APIKey: os.Getenv(prefix + "_API_KEY"), Secret: os.Getenv(prefix + "_SECRET")}
+}
+
+// routes is the public HTTP surface. Every route here is covered by the route security
+// test (routes_test.go), driven from the OpenAPI contracts.
+func routes(a *app) *http.ServeMux {
+	srv, prof, safety, commerce, notifier, rights, stores := a.srv, a.prof, a.safety, a.commerce, a.notifier, a.rights, a.stores
+	root := http.NewServeMux()
+	root.Handle("/v1/profile", prof)
+	root.Handle("/v1/profile/", prof)
+	root.Handle("/v1/tonight", prof)
+	root.Handle("/v1/tonight/", prof)
+	root.Handle("/v1/threads", prof)
+	root.Handle("/v1/threads/", prof)
+	root.Handle("/v1/devices/", prof)
+	root.Handle("/v1/meets/", prof)
+	root.Handle("/v1/safety/", prof)
+	root.Handle("/v1/reports", safety)
+	root.Handle("/v1/reports/", safety)
+	root.Handle("/v1/appeals", safety)
+	root.Handle("/v1/me/standing", safety)
+	root.Handle("/ops/v1/", safety)
+	root.Handle("/ops/v1/vouchers", commerce)
+	root.Handle("/v1/account", rights)
+	root.Handle("/v1/account/export", rights)
+	root.Handle("/v1/deletion-proofs/", rights)
+	root.Handle("/v1/notices", notifier)
+	root.Handle("/v1/notices/", notifier)
+	root.Handle("/v1/notifications/", notifier)
+	for _, p := range []string{"/v1/entitlements", "/v1/deposit", "/v1/keys/", "/v1/subscription", "/v1/subscription/", "/v1/vouchers/", "/v1/billing/"} {
+		root.Handle(p, commerce)
+	}
+	root.Handle("/", srv)
+	// Readiness: every database answers.
+	root.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		for name, st := range stores {
+			if p, ok := st.(interface{ Ping(context.Context) error }); ok {
+				if err := p.Ping(ctx); err != nil {
+					log.Printf("readyz: %s database unreachable", name)
+					http.Error(w, "not ready", http.StatusServiceUnavailable)
+					return
+				}
+			}
+		}
+		_, _ = w.Write([]byte("ok"))
+	})
+
+	return root
+}
+
+// apiHeaders adds a locked-down content policy to every API response: the API serves JSON
+// and images only, so nothing it returns may run script or be framed, even if opened
+// directly in a browser.
+func apiHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; sandbox")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "no-referrer")
+		next.ServeHTTP(w, r)
+	})
 }

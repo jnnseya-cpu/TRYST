@@ -379,7 +379,11 @@ func (s *Service) FromSignal(threadID, reporter, subject, kind string) {
 	}
 }
 
-func (s *Service) handleCategories(w http.ResponseWriter, _ *http.Request) {
+func (s *Service) handleCategories(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.members.Authenticate(r); !ok {
+		fail(w, 401, "auth_required", "Please sign in again.")
+		return
+	}
 	type c struct {
 		Key   string `json:"key"`
 		Label string `json:"label"`

@@ -40,7 +40,7 @@ var leet = strings.NewReplacer("0", "o", "1", "i", "3", "e", "4", "a", "5", "s",
 func normalise(s string) string {
 	s = strings.ToLower(s)
 	s = strings.NewReplacer("０", "0", "１", "1", "２", "2", "３", "3", "４", "4", "５", "5", "６", "6", "７", "7", "８", "8", "９", "9",
-		"＠", "@", "．", ".", "​", "", "‌", "", "‍", "", "⁠", "").Replace(s)
+		"＠", "@", "．", ".", "\u200b", "", "\u200c", "", "\u200d", "", "\u2060", "").Replace(s)
 	return strings.Join(strings.Fields(s), " ")
 }
 

@@ -267,7 +267,7 @@ func (s *Service) handleProof(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(b)
+	_, _ = w.Write(b) // #nosec G705 -- JSON we signed and stored; application/json, nosniff + sandbox CSP
 }
 
 func (s *Service) handleKey(w http.ResponseWriter, _ *http.Request) {

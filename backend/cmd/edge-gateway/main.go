@@ -29,6 +29,6 @@ func main() {
 		addr = ":" + v
 	}
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
-	log.Printf("edge-gateway listening on %s", addr)
+	log.Printf("edge-gateway listening on %s", addr) // #nosec G706 -- operator-set port
 	log.Fatal(srv.ListenAndServe())
 }

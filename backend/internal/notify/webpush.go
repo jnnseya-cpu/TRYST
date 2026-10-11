@@ -123,7 +123,7 @@ func (p *WebPush) Send(ctx context.Context, endpoint string) error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	switch {
 	case resp.StatusCode == 404 || resp.StatusCode == 410:
 		return ErrGone

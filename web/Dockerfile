@@ -19,6 +19,10 @@ ENV NEXT_TELEMETRY_DISABLED=1 IDENTITY_URL=${IDENTITY_URL} OPS_CONSOLE=${OPS_CON
 RUN cd web && npm run build
 
 FROM ${NODE_IMAGE}
+# The server needs only node: drop the package managers (and their dependency trees, where
+# scanners find advisories) from the runtime image.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+      /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 COPY --from=build --chown=node:node /repo/web/.next/standalone ./

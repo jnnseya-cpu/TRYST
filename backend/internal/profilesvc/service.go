@@ -446,7 +446,7 @@ func (s *Service) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBytes+64<<10)
-	if err := r.ParseMultipartForm(MaxUploadBytes); err != nil {
+	if err := r.ParseMultipartForm(MaxUploadBytes); err != nil { // #nosec G120 -- body capped by MaxBytesReader on the line above
 		fail(w, 413, "too_large", "Photos can be up to 8 MB.")
 		return
 	}
@@ -545,7 +545,7 @@ func (s *Service) handleImage(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "not_found", "Not found")
 		return
 	}
-	_, _ = w.Write(data)
+	_, _ = w.Write(data) // #nosec G705 -- our own re-encoded image; type set by us, nosniff + sandbox CSP
 }
 
 func (s *Service) handlePatch(w http.ResponseWriter, r *http.Request) {

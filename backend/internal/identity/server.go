@@ -76,7 +76,7 @@ type Server struct {
 // New validates configuration. It refuses dev-only shortcuts outside the dev environment.
 func New(cfg Config, store *Store) (*Server, error) {
 	if cfg.Env != "dev" && cfg.Env != "prod" {
-		return nil, errors.New("Env must be dev or prod")
+		return nil, errors.New("env must be dev or prod")
 	}
 	if cfg.Liveness == nil {
 		cfg.Liveness = NoLiveness{}
@@ -316,7 +316,7 @@ func (s *Server) allow(r *http.Request) bool {
 	}
 	if len(kept) >= limit {
 		s.rl[ip] = kept
-		log.Printf("rate_limited path=%s", r.URL.Path) // no address logged (NFR-11)
+		log.Printf("rate_limited path=%q", r.URL.Path) // #nosec G706 -- quoted, so no forged log lines; no address logged (NFR-11)
 		return false
 	}
 	s.rl[ip] = append(kept, now)

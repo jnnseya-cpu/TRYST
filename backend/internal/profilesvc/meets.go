@@ -48,7 +48,6 @@ type safetySession struct {
 	SafetyLine bool
 	sess       *meet.Session
 	salt       []byte
-	cases      []*meet.Case
 	Ended      bool
 	Started    time.Time
 }

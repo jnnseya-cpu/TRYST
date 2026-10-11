@@ -55,6 +55,11 @@ jobs:
       - run: go vet ./...
       - run: go test -race ./...
       - run: go build ./...
+      - name: Security analysis (vulnerabilities, static analysis, gosec)
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+          go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+          go run github.com/securego/gosec/v2/cmd/gosec@latest -quiet ./...
 
   agents:
     name: Agents (Python)
@@ -90,6 +95,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "22", cache: npm, cache-dependency-path: web/package-lock.json }
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
@@ -124,6 +130,12 @@ jobs:
           for i in $(seq 1 30); do curl -sf localhost:8081/readyz && break; sleep 1; done
           docker exec api /identity-svc healthcheck
           docker inspect -f '{{.Config.User}}' tryst-api:ci | grep -q nonroot
+      - name: Image vulnerability scan (HIGH and CRITICAL fail the build)
+        run: |
+          for img in tryst-api:ci tryst-web:ci; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest \
+              image --quiet --severity HIGH,CRITICAL --exit-code 1 "$img"
+          done
       - uses: hashicorp/setup-terraform@v3
       - run: terraform -chdir=deploy/terraform fmt -check -recursive
       - run: terraform -chdir=deploy/terraform init -backend=false -input=false

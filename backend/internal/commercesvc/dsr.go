@@ -27,7 +27,7 @@ func (s *Service) Export(_ context.Context, account string) (any, error) {
 	}
 	var pays []pay
 	for _, p := range a.Payments {
-		pays = append(pays, pay{p.Item, p.Amount, p.At})
+		pays = append(pays, pay(p))
 	}
 	return map[string]any{
 		"billing_reference": a.BillingRef, "subscriptions": a.Subs, "payments": pays, "keys_ledger": a.Ledger,

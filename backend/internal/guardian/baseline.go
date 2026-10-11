@@ -62,7 +62,7 @@ var (
 
 func normalise(s string) string {
 	s = strings.ToLower(s)
-	s = strings.NewReplacer("’", "'", "‘", "'", "​", "", "‍", "").Replace(s)
+	s = strings.NewReplacer("’", "'", "‘", "'", "\u200b", "", "\u200d", "").Replace(s)
 	return strings.Join(strings.Fields(s), " ")
 }
 

@@ -52,8 +52,11 @@ func (a *softAuth) flags(attested bool) byte {
 }
 
 func (a *softAuth) coseKey() []byte {
-	x := a.key.PublicKey.X.FillBytes(make([]byte, 32))
-	y := a.key.PublicKey.Y.FillBytes(make([]byte, 32))
+	pub, err := a.key.PublicKey.Bytes() // 0x04 || X || Y
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	x, y := pub[1:33], pub[33:65]
 	b, err := cbor.Marshal(map[int]any{1: 2, 3: -7, -1: 1, -2: x, -3: y})
 	if err != nil {
 		a.t.Fatal(err)
