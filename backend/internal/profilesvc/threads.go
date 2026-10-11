@@ -534,8 +534,8 @@ func (s *Service) handleThreadPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	otherID := t.other(acc.ID)
 	other := s.data[otherID]
-	if other == nil || s.isBlocked(acc.ID, otherID) {
-		fail(w, 404, "not_found", "Not found")
+	if other == nil || s.isBlocked(acc.ID, otherID) || other.Status == statusLocked || other.Status == statusVanished {
+		fail(w, 404, "not_found", "Not found") // media links die with an emergency lock or vanish
 		return
 	}
 	shown, _ := s.visiblePhotos(other)

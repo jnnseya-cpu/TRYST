@@ -63,12 +63,13 @@ func (rc *Recovery) open(now time.Time) bool {
 }
 
 type recoveryState struct {
-	byHash map[string]*Recovery
-	starts map[string][]time.Time // contact hash -> recent begins
+	byHash    map[string]*Recovery
+	starts    map[string][]time.Time // contact hash -> recent begins
+	lockTries map[string][]time.Time // contact hash -> recent emergency-lock attempts
 }
 
 func (s *Server) loadRecovery(ctx context.Context) error {
-	s.rec = &recoveryState{byHash: map[string]*Recovery{}, starts: map[string][]time.Time{}}
+	s.rec = &recoveryState{byHash: map[string]*Recovery{}, starts: map[string][]time.Time{}, lockTries: map[string][]time.Time{}}
 	if s.cfg.Persist == nil {
 		return nil
 	}
@@ -315,6 +316,9 @@ func (s *Server) handleRecoveryFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	s.revokeAll(id.ID())
 	id.Failures, id.LockedUntil = 0, time.Time{}
+	unlocked := id.Locked
+	id.Locked = false
+	code := s.issueEmergencyCode(id) // the old one may be spent or known to someone else
 	id.record(now, "recovered", "")
 	rc.State = "done"
 	tok := randomToken(32)
@@ -323,7 +327,10 @@ func (s *Server) handleRecoveryFinish(w http.ResponseWriter, r *http.Request) {
 	s.store.sessDirty[tokenHash(tok)] = sess
 	s.store.mu.Unlock()
 	s.saveRecovery(r.Context(), rc.Hash)
-	writeJSON(w, 200, map[string]any{"access_token": tok, "expires_at": sess.ExpiresAt.UTC().Format(time.RFC3339), "kind": RecoverySession})
+	if unlocked && s.cfg.OnLock != nil {
+		s.cfg.OnLock(id.ID(), false)
+	}
+	writeJSON(w, 200, map[string]any{"access_token": tok, "expires_at": sess.ExpiresAt.UTC().Format(time.RFC3339), "kind": RecoverySession, "emergency_code": code})
 }
 
 // recoveryPending reports an open recovery on the account. Caller holds the store lock.

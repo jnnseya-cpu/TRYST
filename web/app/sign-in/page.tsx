@@ -149,6 +149,7 @@ export default function SignIn() {
       <hr className="rule" />
       <p className="note">We never sign you in with a text message or an email code, and no one at TRYST can sign in for you.</p>
       <p className="note">Lost all your devices? <a href="/recover">Recover your account</a></p>
+      <p className="note">Phone taken? <a href="/lock">Lock your account</a> with your emergency code.</p>
       <p className="note">Not a member yet? <a href="/join">Become a member</a></p>
     </Shell>
   );

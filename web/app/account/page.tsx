@@ -8,6 +8,7 @@ import { notices } from "@/lib/notify";
 import { DataRights } from "./DataRights";
 import { Devices } from "./Devices";
 import { Consents } from "./Consents";
+import { Discretion } from "./Discretion";
 import { Notifications } from "./Notifications";
 import { Standing } from "./Standing";
 
@@ -94,6 +95,7 @@ export default function Account() {
       <button type="button" className="button ghost" onClick={signOut}>Sign out</button>
       <p />
       <button type="button" className="button ghost" onClick={burn}>Burn: sign out everywhere and wipe this device</button>
+      <Discretion />
       <Devices />
       <Consents />
       <Notifications />

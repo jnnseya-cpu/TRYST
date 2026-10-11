@@ -86,10 +86,13 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Session' }
         '201':
-          description: New account; onboarding session (sign-up device only until V1)
+          description: New account; onboarding session (sign-up device only until V1) and the one-time emergency code, shown once (FR-064)
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Session' }
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/Session' }
+                  - { type: object, properties: { emergency_code: { type: string } } }
         '409': { $ref: '#/components/responses/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
   /auth/passkeys/register/begin:
@@ -665,16 +668,33 @@ paths:
     post:
       tags: [account]
       operationId: pauseAccount
+      summary: Out of discovery immediately; conversations carry on (FR-046, FR-127).
       x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
-      responses: { '204': { description: Removed from discovery immediately } }
+      responses:
+        '200': { description: Discretion state, content: { application/json: { schema: { $ref: '#/components/schemas/DiscretionState' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
   /account/vanish:
     post:
       tags: [account]
       operationId: vanishAccount
+      summary: Out of discovery and every conversation closed (the other member sees it closed, never why); account kept.
       x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
-      responses: { '204': { description: Hidden and threads closed } }
+      responses:
+        '200': { description: Discretion state, content: { application/json: { schema: { $ref: '#/components/schemas/DiscretionState' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /account/resume:
+    post:
+      tags: [account]
+      operationId: resumeAccount
+      summary: Back into discovery after pause or vanish. Needs step-up (403 step_up_required).
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '200': { description: Discretion state, content: { application/json: { schema: { $ref: '#/components/schemas/DiscretionState' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /account/export:
     post:
       tags: [account]
@@ -811,22 +831,35 @@ paths:
     post:
       tags: [account]
       operationId: emergencyLock
-      summary: No session needed (FR-064). Freeze sessions, hide profile, disable media links.
+      summary: No session needed (FR-064). With the account's contact and its one-time emergency code (issued at sign-up, reissued by recovery or /auth/emergency-code), ends every session, refuses sign-in, hides the profile and stops its photos being served, until recovery. Same answer whatever was entered; 5 attempts a day per contact.
       security: []
       x-min-tier: none
-      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [contact_hint, emergency_code]
+              required: [contact, code]
               properties:
-                contact_hint: { type: string }
-                emergency_code: { type: string }
+                contact: { type: string }
+                code: { type: string, description: 'XXXX-XXXX-XXXX; case and spacing ignored' }
       responses:
         '202': { description: Uniform response }
+        '422': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+  /auth/emergency-code:
+    post:
+      tags: [auth]
+      operationId: newEmergencyCode
+      summary: Replaces the emergency code. Needs step-up.
+      x-min-tier: V0
+      responses:
+        '201':
+          description: New code, shown once
+          content: { application/json: { schema: { type: object, properties: { emergency_code: { type: string } } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
 
   # ---------------------------------------------------------------- intake / profile / discretion
   /intake/turn:
@@ -1058,23 +1091,19 @@ paths:
         - { $ref: '#/components/parameters/Id' }
         - { $ref: '#/components/parameters/IdempotencyKey' }
       responses: { '204': { description: Key destroyed } }
+  /discretion:
+    get:
+      tags: [discretion]
+      operationId: getDiscretion
+      x-min-tier: V0
+      responses:
+        '200': { description: Discretion state, content: { application/json: { schema: { $ref: '#/components/schemas/DiscretionState' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
   /discretion/policy:
     put:
       tags: [discretion]
       operationId: putDiscretionPolicy
-      summary: New version. Broadening needs confirm_broaden=true from a fresh step-up.
-      x-min-tier: V0
-      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/DiscretionPolicy' } } }
-      responses:
-        '200': { description: New version stored }
-        '422': { $ref: '#/components/responses/Problem' }
-  /discretion/zones:
-    put:
-      tags: [discretion]
-      operationId: putZones
+      summary: New version. A change that shows the member to more people (visible instead of incognito, a longer distance, a lower counterpart tier) needs a fresh step-up (403 step_up_required); tightening never does.
       x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
@@ -1083,10 +1112,66 @@ paths:
           application/json:
             schema:
               type: object
+              required: [visibility, max_distance_km, min_counterparty_tier]
               properties:
-                home: { type: array, items: { $ref: '#/components/schemas/Geohash6' } }
-                work: { type: array, items: { $ref: '#/components/schemas/Geohash6' } }
-      responses: { '200': { description: Stored } }
+                visibility: { type: string, enum: [visible, incognito] }
+                max_distance_km: { type: integer, enum: [5, 10, 25, 50] }
+                min_counterparty_tier: { type: string, enum: [V2, V3] }
+      responses:
+        '200': { description: Discretion state, content: { application/json: { schema: { $ref: '#/components/schemas/DiscretionState' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /discretion/zones:
+    put:
+      tags: [discretion]
+      operationId: putZones
+      summary: Up to 4 hidden areas (area IDs from /profile/areas). People in them and the member don't see each other, both ways (FR-011). Removing one needs step-up.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [zones]
+              properties:
+                zones: { type: array, maxItems: 4, items: { type: string } }
+      responses:
+        '200': { description: Discretion state, content: { application/json: { schema: { $ref: '#/components/schemas/DiscretionState' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /discretion/shield:
+    post:
+      tags: [discretion]
+      operationId: addPartnerShield
+      summary: Partner shield (FR-106). Each entry is the lowercase hex SHA-256 of a normalised contact, made on the device; the server keys it at once and keeps only that. If it matches a member, the two never see each other, silently. Up to 10.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [add]
+              properties:
+                add: { type: array, maxItems: 10, items: { type: string, pattern: '^[0-9a-f]{64}$' } }
+      responses:
+        '200': { description: Discretion state, content: { application/json: { schema: { $ref: '#/components/schemas/DiscretionState' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [discretion]
+      operationId: clearPartnerShield
+      summary: Empties the shield. Needs step-up.
+      x-min-tier: V0
+      responses:
+        '200': { description: Discretion state, content: { application/json: { schema: { $ref: '#/components/schemas/DiscretionState' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
   /exclusion/psi/blind:
     post:
       tags: [discretion]
@@ -2209,6 +2294,21 @@ components:
     ConsentKind:
       type: string
       enum: [art9_processing, media_view, meet, couple_link, retention, conduct_attestation, safety_training_use, biometric_login]
+    DiscretionState:
+      type: object
+      properties:
+        status: { type: string, enum: [active, paused, vanished, locked] }
+        policy:
+          type: object
+          properties:
+            version: { type: integer }
+            visibility: { type: string, enum: [visible, incognito] }
+            max_distance_km: { type: integer }
+            min_counterparty_tier: { type: string }
+            zones: { type: array, items: { type: string } }
+            at: { type: string, format: date-time }
+        versions: { type: integer }
+        shield: { type: integer, description: Number of shielded contacts }
     Consent:
       type: object
       properties:
@@ -2246,23 +2346,6 @@ components:
         seeking: { type: array, items: { type: string } }
         modes: { type: array, items: { $ref: '#/components/schemas/IntentShape' } }
         visibility: { type: string, enum: [public, matched, incognito] }
-    Geohash6: { type: string, pattern: '^[0-9b-hjkmnp-z]{6}$' }
-    DiscretionPolicy:
-      type: object
-      required: [version]
-      properties:
-        version: { type: integer, minimum: 1 }
-        visibility: { type: string, enum: [public, matched, incognito] }
-        distance_band_km: { type: integer, enum: [5, 10, 25, 50] }
-        reveal_rules: { type: object }
-        notifications:
-          type: object
-          properties:
-            enabled: { type: boolean, default: false }
-            text: { type: string, default: You have an update, maxLength: 40 }
-        device_risk: { type: string, enum: [low, medium, high] }
-        min_counterparty_tier: { type: string, enum: [V2, V3] }
-        confirm_broaden: { type: boolean, default: false }
     RevealScope: { type: string, enum: [alias, blurred_gallery, photo_set, voice, video] }
     SlateCard:
       type: object

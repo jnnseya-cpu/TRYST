@@ -62,6 +62,11 @@ type memberProfile struct {
 	AreaID      string
 	CityOnly    bool
 	Photos      []*photo // gallery order
+	// Discretion (discretion.go).
+	Status        string   `json:",omitempty"` // "" active | paused | vanished | locked
+	Policy        *Policy  `json:",omitempty"`
+	PolicyHistory []Policy `json:",omitempty"`
+	Shield        []string `json:",omitempty"` // keyed partner-shield values
 }
 
 // Service is the HTTP handler.
@@ -97,6 +102,10 @@ type Service struct {
 	// Consent reports the member's current consent of a kind (consent ledger). Discovery
 	// needs art9_processing (FR-040). Nil: no ledger wired (unit tests).
 	Consent func(account, kind string) bool
+	// Partner shield (identity): a member's own keyed contact value, and keying a
+	// device-hashed contact. Nil: shield matching off (unit tests).
+	ShieldKeyOf func(account string) string
+	BlindShield func(digest string) string
 }
 
 // New returns the service. env "prod" refuses DevModerator.
@@ -156,6 +165,14 @@ func NewWithStore(auth Authenticator, mod Moderator, env string, st store.Store,
 	m.HandleFunc("POST /v1/meets/{meet}/checkin", s.handleCheckIn)
 	m.HandleFunc("POST /v1/meets/{meet}/{decision}", s.handleMeetDecision)
 	m.HandleFunc("POST /v1/safety/panic", s.handlePanic)
+	m.HandleFunc("GET /v1/discretion", s.handleDiscretion)
+	m.HandleFunc("PUT /v1/discretion/policy", s.handlePolicy)
+	m.HandleFunc("PUT /v1/discretion/zones", s.handleZones)
+	m.HandleFunc("POST /v1/discretion/shield", s.handleShieldAdd)
+	m.HandleFunc("DELETE /v1/discretion/shield", s.handleShieldClear)
+	m.HandleFunc("POST /v1/account/pause", s.handlePause)
+	m.HandleFunc("POST /v1/account/vanish", s.handleVanish)
+	m.HandleFunc("POST /v1/account/resume", s.handleResume)
 	m.HandleFunc("GET /v1/tonight", s.handleTonight)
 	m.HandleFunc("PUT /v1/tonight", s.handleTonightStart)
 	m.HandleFunc("DELETE /v1/tonight", s.handleTonightStop)

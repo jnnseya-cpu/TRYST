@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { startRegistration } from "@simplewebauthn/browser";
 import { Action } from "@/components/Action";
-import { StepUp } from "@/components/StepUp";
+import { useGuarded } from "@/components/StepUp";
 import { api, getToken, problemTitle } from "@/lib/api";
 
 type Device = { id: string; surface: string; kind: string; added: string; revoked: boolean };
@@ -13,24 +13,8 @@ const KIND: Record<string, string> = { platform_uv: "Passkey on this kind of dev
 /** Devices (passkeys) on the account. Viewing, adding and removing need step-up. */
 export function Devices() {
   const [list, setList] = useState<Device[] | null>(null);
-  const [need, setNeed] = useState<null | (() => void)>(null);
   const [msg, setMsg] = useState("");
-
-  async function guarded(run: () => Promise<{ status: number; data: unknown }>, then: (data: unknown) => void) {
-    setMsg("");
-    const r = await run();
-    if (r.status === 403 && (r.data as { code?: string }).code === "step_up_required") {
-      setNeed(() => async () => {
-        setNeed(null);
-        const again = await run();
-        if (again.status >= 300) return setMsg(problemTitle(again.data));
-        then(again.data);
-      });
-      return;
-    }
-    if (r.status >= 300) return setMsg(problemTitle(r.data));
-    then(r.data);
-  }
+  const { guarded, prompt } = useGuarded("Your devices are protected.", setMsg);
 
   const load = () => guarded(() => api<{ devices: Device[] }>("/v1/auth/devices", { token: getToken() }), (d) => setList((d as { devices: Device[] }).devices));
 
@@ -56,9 +40,7 @@ export function Devices() {
     <section className="card" aria-label="Your devices">
       <h2>Your devices</h2>
       <p className="note">The passkeys that can sign in to this account. Seeing or changing them needs both sign-in checks again.</p>
-      {need ? (
-        <StepUp reason="Your devices are protected." onDone={need} />
-      ) : list === null ? (
+      {prompt ? prompt : list === null ? (
         <Action className="button ghost" onClick={load}>Show my devices</Action>
       ) : (
         <>

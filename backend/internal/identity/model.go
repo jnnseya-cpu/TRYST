@@ -57,6 +57,11 @@ type Identity struct {
 	ConductAt      time.Time `json:",omitempty"` // conduct declaration (ToS 3.5) accepted
 	ConductVersion string    `json:",omitempty"`
 	Refused        string    `json:",omitempty"` // under_18 | not_eligible: the account can't be used
+	// Emergency lock (FR-064): keyed hash of the one-time code; Locked until recovery.
+	EmergencyHash string `json:",omitempty"`
+	Locked        bool   `json:",omitempty"`
+	// ShieldKey is the keyed value of the account's own contact for partner-shield matches.
+	ShieldKey string `json:",omitempty"`
 }
 
 // AuthEvent is one security event on the member's own account (02 §4.1 auth_event). It holds

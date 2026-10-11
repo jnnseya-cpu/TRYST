@@ -27,6 +27,8 @@ func (s *Service) Export(ctx context.Context, account string) (any, error) {
 			area = a.Label(p.CityOnly)
 		}
 		out["profile"] = map[string]any{"display_name": p.DisplayName, "area": area, "city_only": p.CityOnly, "birth_year_month": p.BirthYM}
+		out["discretion"] = map[string]any{"status": s.discretionView(p)["status"], "policy": p.policy(), "history": p.PolicyHistory,
+			"partner_shield_entries": len(p.Shield), "partner_shield_note": "Stored only as keyed one-way codes; the contacts can't be shown back."}
 	}
 	if e := s.tn.entries[account]; e != nil {
 		out["tonight"] = map[string]any{"until": e.until, "radius_km": e.radiusKm, "interests": len(e.interests)}

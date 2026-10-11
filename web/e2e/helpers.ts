@@ -4,6 +4,9 @@ import { join as pathJoin } from "node:path";
 export const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148";
 export const fx = (n: string) => pathJoin(__dirname, "fixtures", n);
 
+/** Emergency codes shown at sign-up, by member page. */
+export const emergencyCodes = new WeakMap<Page, string>();
+
 /** A signed-in member with a complete profile (dev services). */
 export async function member(browser: Browser, name: string, district: string, photo: string, opts: { verify?: boolean; contact?: string } = {}): Promise<Page> {
   const ctx = await browser.newContext({ userAgent: IPHONE_UA, viewport: { width: 1280, height: 900 } });
@@ -19,6 +22,9 @@ export async function member(browser: Browser, name: string, district: string, p
   const code = (await page.getByTestId("dev-otp").textContent())!.match(/\d{6}/)![0];
   await page.getByLabel(/6-digit code/).fill(code);
   await page.getByRole("button", { name: "Continue" }).click();
+  const shown = page.getByTestId("emergency-code");
+  await expect(shown).toBeVisible();
+  emergencyCodes.set(page, (await shown.locator(".code-link").textContent())!.trim());
   await page.getByRole("button", { name: "Create passkey" }).click();
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Sign in with passkey" }).click();

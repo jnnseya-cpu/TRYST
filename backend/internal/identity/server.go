@@ -77,6 +77,9 @@ type Config struct {
 	// ConsentGranted reads the ledger: the face check (biometric processing) needs
 	// biometric_login. Nil: not enforced (unit tests).
 	ConsentGranted func(account, kind string) bool
+	// OnLock runs after an emergency lock (true) or the recovery that lifts it (false):
+	// the profile service hides or restores the profile. May be nil.
+	OnLock func(account string, locked bool)
 }
 
 // Server is the identity HTTP service.
@@ -273,6 +276,8 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /v1/auth/recovery/{id}/check", s.handleRecoveryCheck)
 	m.HandleFunc("POST /v1/auth/recovery/{id}/finish", s.handleRecoveryFinish)
 	m.HandleFunc("POST /v1/auth/recovery/cancel", s.handleRecoveryCancel)
+	m.HandleFunc("POST /v1/emergency-lock", s.handleEmergencyLock)
+	m.HandleFunc("POST /v1/auth/emergency-code", s.handleEmergencyCode)
 	m.HandleFunc("POST /v1/assurance/session", s.handleAssuranceStart)
 	m.HandleFunc("POST /v1/assurance/callback", s.handleAssuranceCallback)
 	m.HandleFunc("GET /v1/assurance/status", s.handleAssuranceStatus)
@@ -432,7 +437,7 @@ func (s *Server) Authenticate(r *http.Request) (Account, bool) {
 		return Account{}, false
 	}
 	id, ok := s.store.identities[sess.IdentityID] // read-only: not marked for saving
-	if !ok || id.Refused != "" {
+	if !ok || id.Refused != "" || id.Locked {
 		return Account{}, false
 	}
 	return Account{ID: id.ID(), Tier: id.Tier, BirthYM: id.BirthYM, StepUp: s.stepUpOK(sess)}, true
@@ -552,11 +557,15 @@ func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	handle := mustDecodeB64(randomToken(32)) // 32 random bytes; never derived from the contact
-	id := &Identity{Handle: handle, ContactHash: ch, Tier: gate.V0, Jurisdiction: jur, CreatedAt: now, BirthYM: s.cfg.DevBirthYM}
+	id := &Identity{Handle: handle, ContactHash: ch, Tier: gate.V0, Jurisdiction: jur, CreatedAt: now, BirthYM: s.cfg.DevBirthYM,
+		ShieldKey: s.shieldKeyForContact(req.Contact)}
+	code := s.issueEmergencyCode(id)
 	s.store.identities[id.ID()] = id
 	s.store.dirty[id.ID()] = true
 	s.store.byContact[ch] = id.ID()
-	writeJSON(w, 201, s.issueSession(id, Onboarding, ""))
+	out := s.issueSession(id, Onboarding, "")
+	out["emergency_code"] = code // shown once (FR-064)
+	writeJSON(w, 201, out)
 }
 
 // ---------------------------------------------------------------- passkey registration
@@ -815,6 +824,10 @@ func (s *Server) finish(w http.ResponseWriter, la *LoginAttempt) {
 	}
 	if la.StepUpFor != "" {
 		s.finishStepUp(w, la)
+		return
+	}
+	if id.Locked {
+		fail(w, 403, "account_locked", "This account is locked. Recover it to unlock it.")
 		return
 	}
 	if id.Refused != "" {

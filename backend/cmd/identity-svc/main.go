@@ -267,6 +267,8 @@ func build() *app {
 		}
 	}
 	cfg.ConsentGranted = func(account, kind string) bool { return consents.Granted(account, kind) }
+	var prof *profilesvc.Service
+	cfg.OnLock = func(account string, locked bool) { prof.Lock(account, locked) }
 	srv, err := identity.New(cfg, identity.NewStore())
 	if err != nil {
 		log.Fatal(err)
@@ -285,12 +287,13 @@ func build() *app {
 		mod = profilesvc.DevModerator{}
 		log.Printf("DEV MODE: photo moderation vendors are simulated; AI-label checks run for real.")
 	}
-	prof, err := profilesvc.NewWithStore(srv, mod, mode, profStore, vault)
+	prof, err = profilesvc.NewWithStore(srv, mod, mode, profStore, vault)
 	if err != nil {
 		log.Fatal(err)
 	}
 	prof.Notify = notifyFn
 	prof.Consent = consents.Granted
+	prof.ShieldKeyOf, prof.BlindShield = srv.ShieldKeyOf, srv.BlindShield
 	consents.OnChange = prof.ConsentChanged
 	notifier = openNotify(mode, srv, profStore)
 	if arc := gateway("ARC"); arc != nil {
@@ -556,6 +559,11 @@ func routes(a *app) *http.ServeMux {
 	// service (cmd/safety-svc); the web proxy routes them there.
 	root.Handle("/ops/v1/vouchers", commerce)
 	root.Handle("/v1/consents", a.consents)
+	root.Handle("/v1/discretion", prof)
+	root.Handle("/v1/discretion/", prof)
+	root.Handle("/v1/account/pause", prof)
+	root.Handle("/v1/account/vanish", prof)
+	root.Handle("/v1/account/resume", prof)
 	root.Handle("/v1/account", rights)
 	root.Handle("/v1/account/export", rights)
 	root.Handle("/v1/deletion-proofs/", rights)

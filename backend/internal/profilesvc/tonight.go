@@ -82,7 +82,8 @@ func (t *tonight) active(id string, now time.Time) *tonightEntry {
 type Eligible func(viewer, member string) bool
 
 func (s *Service) eligible(viewer, member string) bool {
-	if viewer == member || s.isBlocked(viewer, member) || s.standing[member] == "shadow_limit" {
+	if viewer == member || s.isBlocked(viewer, member) || s.standing[member] == "shadow_limit" ||
+		!s.discreet(viewer, member) || !s.incognitoOK(viewer, member) {
 		return false
 	}
 	if s.Eligible != nil {
@@ -137,6 +138,7 @@ func (s *Service) tonightView(me string, p *memberProfile) map[string]any {
 	now := s.now()
 	e := s.tn.active(me, now)
 	out := map[string]any{"on": e != nil, "ready": s.ready(p), "tier_ok": p.Tier >= s.MinDiscoveryTier, "consent_ok": s.art9(me),
+		"status": p.Status, "max_distance_km": p.policy().MaxDistanceKm,
 		"max_hours": MaxTonightHours, "people": []tonightPerson{}, "mutual": []tonightPerson{}}
 	if e == nil {
 		return out
@@ -229,6 +231,10 @@ func (s *Service) handleTonightStart(w http.ResponseWriter, r *http.Request) {
 		fail(w, 403, "tier_required", "Finish your ID check to use Tonight.")
 		return
 	}
+	if hidden(p) {
+		fail(w, 409, "paused", "You're out of discovery. Come back from your account first.")
+		return
+	}
 	if !s.art9(acc.ID) {
 		problem.Write(w, problem.Problem{Title: "Discovery needs your consent to process what your profile says about your sex life.", Status: 403, Code: "consent_required", ConsentKind: "art9_processing"})
 		return
@@ -242,7 +248,7 @@ func (s *Service) handleTonightStart(w http.ResponseWriter, r *http.Request) {
 		e = &tonightEntry{interests: map[string]bool{}}
 		s.tn.entries[acc.ID] = e
 	}
-	e.until, e.radiusKm = s.now().Add(time.Duration(in.Hours)*time.Hour), in.RadiusKm
+	e.until, e.radiusKm = s.now().Add(time.Duration(in.Hours)*time.Hour), min(in.RadiusKm, p.policy().MaxDistanceKm)
 	writeJSON(w, 200, s.tonightView(acc.ID, p))
 }
 

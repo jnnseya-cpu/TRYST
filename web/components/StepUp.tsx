@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { startAuthentication } from "@simplewebauthn/browser";
 import QRCode from "qrcode";
 import { Action } from "@/components/Action";
@@ -89,4 +89,32 @@ export function StepUp({ reason, onDone }: { reason: string; onDone: () => void 
       {msg && <p role="alert">{msg}</p>}
     </div>
   );
+}
+
+type Res = { status: number; data: unknown };
+
+/**
+ * Runs an action that may need step-up: on 403 step_up_required it shows the prompt and
+ * retries once the member has confirmed. Returns the runner and the prompt to render.
+ */
+export function useGuarded(reason: string, onError: (msg: string) => void): {
+  guarded: (run: () => Promise<Res>, then: (data: unknown) => void) => Promise<void>;
+  prompt: ReactNode;
+} {
+  const [pending, setPending] = useState<null | (() => void)>(null);
+  async function guarded(run: () => Promise<Res>, then: (data: unknown) => void) {
+    const r = await run();
+    if (r.status === 403 && (r.data as { code?: string }).code === "step_up_required") {
+      setPending(() => async () => {
+        setPending(null);
+        const again = await run();
+        if (again.status >= 300) return onError(problemTitle(again.data));
+        then(again.data);
+      });
+      return;
+    }
+    if (r.status >= 300) return onError(problemTitle(r.data));
+    then(r.data);
+  }
+  return { guarded, prompt: pending ? <StepUp reason={reason} onDone={pending} /> : null };
 }

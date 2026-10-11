@@ -21,6 +21,7 @@ export default function Join() {
   const [enrolLink, setEnrolLink] = useState<string | null>(null);
   const [qr, setQr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [emergency, setEmergency] = useState<string | null>(null);
 
   async function sendCode() {
     setMsg(null);
@@ -32,9 +33,10 @@ export default function Join() {
 
   async function verify() {
     setMsg(null);
-    const r = await api<{ access_token: string }>("/v1/auth/verify", { method: "POST", body: { contact, otp: code } });
+    const r = await api<{ access_token: string; emergency_code?: string }>("/v1/auth/verify", { method: "POST", body: { contact, otp: code } });
     if (r.status !== 200 && r.status !== 201) return setMsg(problemTitle(r.data));
     setLocalToken(r.data.access_token);
+    if (r.data.emergency_code) setEmergency(r.data.emergency_code);
     setStep("passkey");
   }
 
@@ -95,6 +97,14 @@ export default function Join() {
           <input id="code" className="input" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" />
           {devCode && <p className="note" data-testid="dev-otp">Development code: {devCode}</p>}
           <Action className="button" onClick={verify}>Continue</Action>
+        </section>
+      )}
+
+      {step === "passkey" && emergency && (
+        <section className="card" data-testid="emergency-code">
+          <h2>Your emergency code</h2>
+          <p className="code-link" style={{ fontSize: "1.4rem", letterSpacing: "0.1em" }}>{emergency}</p>
+          <p className="note">Keep it somewhere only you can reach. If someone takes your phone, use it with your email or number at /lock to lock the account from any browser, without signing in. It works once. We show it only now.</p>
         </section>
       )}
 
