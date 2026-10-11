@@ -125,6 +125,25 @@ paths:
         '200': { description: Appeal decided, content: { application/json: { schema: { type: object } } } }
         '403': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /vouchers:
+    post:
+      tags: [audit]
+      operationId: issueVouchers
+      summary: Issue single-use gift codes (staff lead). Codes are returned once and stored only as hashes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grant, count]
+              properties:
+                grant: { type: string, pattern: '^(keys:[1-9][0-9]{0,3}|plan:(tryst_plus|tryst_plus_annual|duo|envoy):[1-9][0-9]{0,3})$' }
+                count: { type: integer, minimum: 1, maximum: 500 }
+      responses:
+        '201': { description: Codes, content: { application/json: { schema: { type: object, properties: { codes: { type: array, items: { type: string } } } } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /audit/verify:
     get:
       tags: [audit]

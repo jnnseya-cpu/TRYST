@@ -1,0 +1,10 @@
+/* Billing (02 §5.9; ToS cl. 16). Plain prices, no dark patterns. */
+.bl-plans { list-style: none; padding: 0; margin: 1rem 0; display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+.bl-plan { border-top: 1px solid var(--hairline); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.bl-plan h3 { font-family: var(--serif); font-size: 1.5rem; margin: 0; }
+.bl-price { color: var(--tryst-champagne); font-size: 1.1rem; }
+.bl-terms { border-left: 2px solid var(--hairline); padding-left: 0.9rem; margin: 1rem 0; max-width: 40rem; }
+.bl-terms li { margin: 0.3rem 0; }
+.bl-check { text-transform: none; letter-spacing: 0; font-size: 0.95rem; color: var(--tryst-cream); display: flex; gap: 0.6rem; align-items: baseline; margin: 0.6rem 0; }
+.bl-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+.bl-keys { font-family: var(--serif); font-size: 2.2rem; color: var(--tryst-champagne); }

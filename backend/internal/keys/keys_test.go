@@ -64,3 +64,30 @@ func TestCapBounds(t *testing.T) {
 		t.Fatal("cap must stay within 4-40")
 	}
 }
+
+func TestLedgerRestoreAndIdempotentCredits(t *testing.T) {
+	l := NewLedger()
+	if !l.CreditOnce("pi_1", 60, "purchase") || l.CreditOnce("pi_1", 60, "purchase") {
+		t.Fatal("CreditOnce not idempotent")
+	}
+	if err := l.Spend("in_1", 5); err != nil {
+		t.Fatal(err)
+	}
+	_ = l.Spend("in_2", 5)
+	l.RefundOnReply("in_1")
+	r := Restore(l.Entries())
+	if r.Balance() != 55 {
+		t.Fatalf("restored balance = %d", r.Balance())
+	}
+	r.RefundOnReply("in_1") // already refunded before restart
+	r.RefundOnReply("in_2")
+	if r.Balance() != 60 {
+		t.Fatalf("after refunds = %d", r.Balance())
+	}
+	if n := r.DebitUpTo("re_1", 100, "refund"); n != 60 || r.Balance() != 0 {
+		t.Fatalf("debit = %d, balance %d", n, r.Balance())
+	}
+	if n := r.DebitUpTo("re_1", 100, "refund"); n != 0 {
+		t.Fatal("debit not idempotent")
+	}
+}

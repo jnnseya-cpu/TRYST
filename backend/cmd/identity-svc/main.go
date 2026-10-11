@@ -22,6 +22,10 @@
 //	STAFF_TRUSTED_PROXIES comma-separated addresses of the staff sign-in proxy whose
 //	                X-Staff-Identity / X-Staff-Roles headers are believed (/ops/v1/*)
 //	STAFF_DEV_TOKENS dev only: id:role:token,... for the moderator console
+//	DATABASE_URL_COMMERCE  entitlements, Keys ledger, processed events, vouchers
+//	STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET  payments (dev uses a local test checkout)
+//	STRIPE_PRICE_<KEY>  Stripe Price id per catalogue key, e.g. STRIPE_PRICE_TRYST_PLUS
+//	PUBLIC_URL      member site origin for checkout return links (default first RP origin)
 package main
 
 import (
@@ -36,7 +40,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jnnseya-cpu/tryst/backend/internal/commercesvc"
+	"github.com/jnnseya-cpu/tryst/backend/internal/gate"
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
+	"github.com/jnnseya-cpu/tryst/backend/internal/payments"
 	"github.com/jnnseya-cpu/tryst/backend/internal/profilesvc"
 	"github.com/jnnseya-cpu/tryst/backend/internal/safetysvc"
 	"github.com/jnnseya-cpu/tryst/backend/internal/store"
@@ -171,6 +178,8 @@ func main() {
 		log.Fatal(err)
 	}
 	prof.OnSignal = safety.FromSignal
+
+	commerce := openCommerce(ctx, mode, srv, staff, cfg.RPOrigins[0])
 	go func() {
 		for range time.Tick(30 * time.Second) {
 			prof.SweepSafety(context.Background())
@@ -191,9 +200,60 @@ func main() {
 	root.Handle("/v1/appeals", safety)
 	root.Handle("/v1/me/standing", safety)
 	root.Handle("/ops/v1/", safety)
+	root.Handle("/ops/v1/vouchers", commerce)
+	for _, p := range []string{"/v1/entitlements", "/v1/deposit", "/v1/keys/", "/v1/subscription", "/v1/subscription/", "/v1/vouchers/", "/v1/billing/"} {
+		root.Handle(p, commerce)
+	}
 	root.Handle("/", srv)
 	addr := ":" + env("PORT", "8081")
 	log.Printf("identity-svc (%s) listening on %s", mode, addr)
 	hs := &http.Server{Addr: addr, Handler: root, ReadHeaderTimeout: 5 * time.Second}
 	log.Fatal(hs.ListenAndServe())
+}
+
+// openCommerce builds the commerce service: Stripe when configured, the local test checkout
+// in dev, and no processor otherwise (purchases answer 503 until Stripe is approved).
+func openCommerce(ctx context.Context, mode string, members *identity.Server, staff safetysvc.StaffAuth, origin string) *commercesvc.Service {
+	cfg := commercesvc.Config{Members: members, Store: openStore(ctx, mode, "DATABASE_URL_COMMERCE"), Env: mode, MinTier: gate.V1,
+		StaffLead: func(r *http.Request) (string, bool) {
+			st, ok := staff.Authenticate(r)
+			if !ok {
+				return "", false
+			}
+			for _, role := range st.Roles {
+				if role == "lead" {
+					return st.ID, true
+				}
+			}
+			return "", false
+		}}
+	var stripe *payments.Stripe
+	if key := os.Getenv("STRIPE_SECRET_KEY"); key != "" {
+		public := env("PUBLIC_URL", origin)
+		stripe = &payments.Stripe{SecretKey: key, WebhookSecret: os.Getenv("STRIPE_WEBHOOK_SECRET"), Prices: map[string]payments.StripePrice{},
+			SuccessURL: public + "/billing?done=1", CancelURL: public + "/billing"}
+		if stripe.WebhookSecret == "" {
+			log.Fatal("STRIPE_WEBHOOK_SECRET is required with STRIPE_SECRET_KEY")
+		}
+		for _, it := range commercesvc.Catalogue {
+			if id := os.Getenv("STRIPE_PRICE_" + strings.ToUpper(it.Key)); id != "" {
+				stripe.Prices[it.Key] = payments.StripePrice{PriceID: id, Subscription: it.Period != ""}
+			}
+		}
+		cfg.Provider = stripe
+	} else if mode == "dev" {
+		cfg.Provider = commercesvc.NewDevProvider()
+		cfg.MinTier = gate.V0
+		log.Printf("DEV MODE: payments use a local test checkout; no money moves.")
+	} else {
+		log.Printf("STRIPE_SECRET_KEY not set: purchases are unavailable (503) until payments are configured.")
+	}
+	svc, err := commercesvc.New(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if stripe != nil {
+		stripe.SubscriptionFor = svc.SubscriptionFor
+	}
+	return svc
 }

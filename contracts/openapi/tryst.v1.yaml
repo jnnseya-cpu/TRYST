@@ -1622,9 +1622,14 @@ paths:
     post:
       tags: [commerce]
       operationId: deposit
+      summary: £9.99 refundable deposit, credited in full as 60 Keys.
       x-min-tier: V1
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
-      responses: { '200': { $ref: '#/components/responses/Checkout' } }
+      responses:
+        '201': { $ref: '#/components/responses/Checkout' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
   /keys/purchase:
     post:
       tags: [commerce]
@@ -1640,7 +1645,12 @@ paths:
               required: [pack]
               properties:
                 pack: { type: string, enum: [keys_60] }
-      responses: { '200': { $ref: '#/components/responses/Checkout' } }
+      responses:
+        '201': { $ref: '#/components/responses/Checkout' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
   /vouchers/redeem:
     post:
       tags: [commerce]
@@ -1656,11 +1666,17 @@ paths:
               required: [code]
               properties:
                 code: { type: string }
-      responses: { '200': { description: Redeemed } }
+      responses:
+        '200':
+          description: Redeemed (single use; 5 failed attempts an hour per member)
+          content: { application/json: { schema: { type: object, properties: { plan: { type: string }, keys: { type: integer }, message: { type: string } } } } }
+        '422': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
   /subscription:
     post:
       tags: [commerce]
       operationId: subscribe
+      summary: Start a plan or the GHOST add-on. Requires the pre-contract information to have been shown and a separate request to start now (ToS 16.4); both are recorded.
       x-min-tier: V1
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
@@ -1669,19 +1685,34 @@ paths:
           application/json:
             schema:
               type: object
-              required: [tier]
+              required: [plan, pre_contract_ack, start_now]
               properties:
-                tier: { type: string, enum: [tryst_plus, tryst_plus_annual, envoy, duo] }
-                addon_ghost: { type: boolean, default: false }
-      responses: { '200': { $ref: '#/components/responses/Checkout' } }
+                plan: { type: string, enum: [tryst_plus, tryst_plus_annual, envoy, duo, ghost] }
+                pre_contract_ack: { type: boolean, const: true }
+                start_now: { type: boolean, const: true, description: 'Express request to start within the cooling-off period' }
+      responses:
+        '201': { $ref: '#/components/responses/Checkout' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
   /subscription/cancel:
     post:
       tags: [commerce]
       operationId: cancelSubscription
-      summary: One step; no retention flow; never gated by step-up.
+      summary: One step; no retention flow; never gated by step-up. Within 14 days of starting, the plan ends now and the unused days are refunded; after that it runs to the end of the paid period.
       x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
-      responses: { '204': { description: Cancels at period end } }
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { item: { type: string, description: 'Defaults to the current plan; "ghost" for the add-on' } } }
+      responses:
+        '200':
+          description: Cancelled
+          content: { application/json: { schema: { type: object, properties: { ends: { type: string, format: date-time }, ended: { type: string, format: date-time }, refund_minor: { type: integer }, message: { type: string } } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '502': { $ref: '#/components/responses/Problem' }
   /billing/stripe/webhook:
     post:
       tags: [commerce]
@@ -1746,7 +1777,7 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     Checkout:
-      description: Hosted checkout (Stripe primary, D-22)
+      description: Hosted checkout (Stripe primary, D-22). Only the opaque billing reference and the product key are sent to the processor.
       content:
         application/json:
           schema:
@@ -2010,7 +2041,21 @@ components:
     Entitlements:
       type: object
       properties:
-        tier: { type: string, enum: [verified_free, tryst_plus, envoy, duo] }
-        addon_ghost: { type: boolean }
-        keys_balance: { type: integer, minimum: 0 }
-        renews_at: { type: [string, 'null'], format: date-time }
+        plan: { type: string, enum: ['', tryst_plus, tryst_plus_annual, duo, envoy], description: 'Empty for Verified (free)' }
+        ghost: { type: boolean }
+        keys: { type: integer, minimum: 0 }
+        deposit_paid: { type: boolean }
+        payments_available: { type: boolean }
+        subscriptions:
+          type: array
+          items:
+            type: object
+            properties:
+              item: { type: string }
+              name: { type: string }
+              status: { type: string, enum: [active, past_due, trialing] }
+              period_end: { type: string, format: date-time }
+              cancel_at_period_end: { type: boolean }
+              in_cooling_off: { type: boolean }
+        voucher_plan: { type: object, properties: { plan: { type: string }, until: { type: string, format: date-time } } }
+        catalogue: { type: array, items: { type: object } }

@@ -26,33 +26,85 @@ func Cost(fromCouple, toSolo bool) int {
 	return CostSoloToSolo
 }
 
-type entry struct {
-	delta  int
-	reason string
-	intent string
+// Entry is one ledger line (commerce.keys_ledger).
+type Entry struct {
+	Delta  int    `json:"delta"`
+	Reason string `json:"reason"`
+	Intent string `json:"intent,omitempty"`
+	Ref    string `json:"ref,omitempty"` // payment, voucher or refund reference (idempotency)
 }
 
 // Ledger is an append-only, double-entry-style ledger for one member (in-memory model of
 // commerce.keys_ledger). The balance can never go negative.
 type Ledger struct {
-	entries []entry
+	entries []Entry
 	held    map[string]int // intent id -> keys held pending reply
 }
 
 func NewLedger() *Ledger { return &Ledger{held: map[string]int{}} }
 
+// Restore rebuilds a ledger from its persisted entries.
+func Restore(entries []Entry) *Ledger {
+	l := NewLedger()
+	for _, e := range entries {
+		l.entries = append(l.entries, e)
+		switch e.Reason {
+		case "intent":
+			l.held[e.Intent] = -e.Delta
+		case "refund_on_reply":
+			l.held[e.Intent] = 0
+		}
+	}
+	return l
+}
+
+// Entries returns a copy of the ledger lines for persistence.
+func (l *Ledger) Entries() []Entry { return append([]Entry(nil), l.entries...) }
+
 func (l *Ledger) Balance() int {
 	b := 0
 	for _, e := range l.entries {
-		b += e.delta
+		b += e.Delta
 	}
 	return b
 }
 
 func (l *Ledger) Credit(n int, reason string) {
 	if n > 0 {
-		l.entries = append(l.entries, entry{delta: n, reason: reason})
+		l.entries = append(l.entries, Entry{Delta: n, Reason: reason})
 	}
+}
+
+// CreditOnce credits n Keys for a payment or voucher reference; a repeated ref is ignored.
+func (l *Ledger) CreditOnce(ref string, n int, reason string) bool {
+	if n <= 0 || ref == "" {
+		return false
+	}
+	for _, e := range l.entries {
+		if e.Ref == ref {
+			return false
+		}
+	}
+	l.entries = append(l.entries, Entry{Delta: n, Reason: reason, Ref: ref})
+	return true
+}
+
+// DebitUpTo removes up to n Keys for a refunded or disputed payment without ever making the
+// balance negative (Keys already spent stay spent). Idempotent per ref; returns the amount.
+func (l *Ledger) DebitUpTo(ref string, n int, reason string) int {
+	for _, e := range l.entries {
+		if e.Ref == ref {
+			return 0
+		}
+	}
+	if b := l.Balance(); n > b {
+		n = b
+	}
+	if n <= 0 {
+		return 0
+	}
+	l.entries = append(l.entries, Entry{Delta: -n, Reason: reason, Ref: ref})
+	return n
 }
 
 // Spend holds keys for an intent. Idempotent per intent id.
@@ -63,7 +115,7 @@ func (l *Ledger) Spend(intentID string, n int) error {
 	if l.Balance() < n {
 		return ErrInsufficient
 	}
-	l.entries = append(l.entries, entry{delta: -n, reason: "intent", intent: intentID})
+	l.entries = append(l.entries, Entry{Delta: -n, Reason: "intent", Intent: intentID})
 	l.held[intentID] = n
 	return nil
 }
@@ -74,7 +126,7 @@ func (l *Ledger) RefundOnReply(intentID string) {
 	if !ok || n == 0 {
 		return
 	}
-	l.entries = append(l.entries, entry{delta: n, reason: "refund_on_reply", intent: intentID})
+	l.entries = append(l.entries, Entry{Delta: n, Reason: "refund_on_reply", Intent: intentID})
 	l.held[intentID] = 0
 }
 

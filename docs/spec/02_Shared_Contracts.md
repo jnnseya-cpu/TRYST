@@ -640,15 +640,19 @@ Standing is enforced on the member platform: `suspend` and `permanent` refuse me
 
 ### 5.9 Commerce (web-first)
 
+Served by the commerce service (`commercesvc`, COMMERCE-DB; [FR-117](#10-requirement-catalogue), [D-53](06_Decisions_and_Changes.md#2-decision-log)). The processor sees only an opaque `billing_ref` and the product key.
+
 | Method | Path | Min | Contract |
 |---|---|---|---|
-| GET | `/v1/entitlements` | V0 | Tier, add-ons, Keys balance, renewal date |
-| POST | `/v1/deposit` | V1 | £9.99 refundable deposit → Keys credit |
-| POST | `/v1/keys/purchase` | V1 | Keys packs |
-| POST | `/v1/vouchers/redeem` | V0 | Offline voucher/gift code |
-| POST | `/v1/subscription` | V1 | Neutral, truthful descriptor enforced at the PSP; pre-contract and cooling-off notices |
-| POST | `/v1/billing/stripe/webhook` | sys | Stripe events (signature-verified, idempotent) → entitlement and Keys-ledger updates (v1.2, D-22) |
-| POST | `/v1/subscription/cancel` | V0 | One step; no retention flow |
+| GET | `/v1/entitlements` | V0 | `{plan, ghost, keys, deposit_paid, subscriptions[] (period_end, cancel_at_period_end, in_cooling_off), voucher_plan?, catalogue, payments_available}` |
+| POST | `/v1/deposit` | V1 | £9.99 refundable deposit → checkout; credited 100% as 60 Keys; 409 if already paid |
+| POST | `/v1/keys/purchase` | V1 | `{pack: keys_60}` → checkout |
+| POST | `/v1/vouchers/redeem` | V0 | `{code}`. Single use; codes stored only as hashes; 5 failed attempts an hour per member (429). Grants Keys or a plan for N days |
+| POST | `/v1/subscription` | V1 | `{plan, pre_contract_ack: true, start_now: true}` → checkout. The pre-contract information is shown first and the express request to start within the cooling-off period is a separate confirmation (ToS 16.4); both are recorded. One plan at a time (409 `change_plan`); GHOST is an add-on. Neutral, truthful descriptor enforced at the PSP |
+| POST | `/v1/billing/stripe/webhook` | sys | Stripe events (signature-verified, idempotent on event id, out-of-order safe) → entitlement and Keys-ledger updates: `checkout.session.completed`, `invoice.paid`, `customer.subscription.*`, `charge.refunded` (removes the refunded share of Keys; never below zero), `charge.dispute.created` (v1.2, D-22) |
+| POST | `/v1/subscription/cancel` | V0 | `{item?}`. One step; no retention flow. Within 14 days of starting: ends now and refunds the unused days (whole days used are charged). After: runs to the end of the paid period, no further charge |
+
+Purchases answer 503 `payments_unavailable` until the processor is configured. Dev builds use a local test checkout (`/billing/checkout`, `POST /v1/billing/dev/complete`) that production refuses. Staff leads issue vouchers through `POST /ops/v1/vouchers` (console contract).
 
 ### 5.10 Error model
 
@@ -928,6 +932,7 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-112 | V2 identity checks run only through a provider with a valid, evidenced liveness certificate (ISO/IEC 30107-3, iBeta Level 2 or equivalent); without a valid injection-attack certificate (CEN/TS 18099 or equivalent) capture is native-app only with platform attestation and the web hands off by QR; with no certified provider, V2 fails closed; certificate expiry is monitored | BE | P1 | Founder v1.3, D-49 |
 | FR-113 | Everything a member creates survives restarts: identities, credentials, sessions and profiles persist in per-domain PostgreSQL databases; photos are stored encrypted under the member's own key and unreadable without the key vault; services refuse to start in production without their databases and key-encryption key | BE | P1 | D-50 |
 | FR-114 | End-to-end encrypted conversations: a thread opens only after mutual interest; every message is encrypted on the sender's device separately for each device of both members; the server stores and relays ciphertext only, with expiry from retention; the on-device Guardian warns on fraud, refuses to send child-safety content and freezes threads on child-safety or extortion signals; either member can block, which closes the thread for both and hides them from each other | Both | P1 | A §9.2, D-51 |
+| FR-117 | Payments: hosted checkout for plans, the GHOST add-on, Keys packs and the refundable deposit; entitlements and the Keys ledger change only from signature-verified, idempotent processor events; refunds and chargebacks remove the matching Keys; pre-contract information and a separate start-now request before subscribing; one-step cancellation with a proportionate refund inside 14 days; single-use vouchers; the processor sees only an opaque billing reference | Both | P1 | A §10, ToS cl. 16, D-22, D-53 |
 | FR-116 | Report, enforce and appeal: members report from a conversation (category, optionally the messages they choose to share, and block in the same step); on-device Guardian signals open cases automatically; moderators work a deadline-ordered queue where reporters are hidden, photos are blurred until a reason is recorded, decisions follow the enforcement ladder, permanent removal needs a second moderator, every action is in a tamper-evident log; members see each decision with its reason and appeal to a different reviewer | Both | P1 | A §7.3, A §8, FR-033–FR-035, ToS cl. 17–18, D-52 |
 | FR-115 | Meet planning and safety screens: propose and confirm a meet in the conversation (place never sent to TRYST), door-check words and verified photo on arrival, check-ins with duress PIN and "home safe", Share my plan (neutral text), and a Panic screen with a 999 call button and the Silent Solution; server-side timers alert the trusted contact and the safety line | Both | P1 | A §19.7, FR-020–FR-022, FR-099, FR-100 |
 

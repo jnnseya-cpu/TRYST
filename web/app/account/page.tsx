@@ -59,6 +59,7 @@ export default function Account() {
       <a className="button" href="/tonight" style={{ marginBottom: "0.8rem" }}>Free tonight?</a>
       <a className="button ghost" href="/messages" style={{ marginBottom: "0.8rem" }}>Messages</a>
       <a className="button ghost" href="/profile" style={{ marginBottom: "0.8rem" }}>Your profile and photos</a>
+      <a className="button ghost" href="/billing" style={{ marginBottom: "0.8rem" }}>Plans and Keys</a>
       <button type="button" className="button ghost" onClick={signOut}>Sign out</button>
       <p />
       <button type="button" className="button ghost" onClick={burn}>Burn: sign out everywhere and wipe this device</button>
