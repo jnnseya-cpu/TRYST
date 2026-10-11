@@ -34,9 +34,9 @@ func confirmedMeet(t *testing.T) (*world, *LogAlerting, string) {
 func TestMeetProposalValidation(t *testing.T) {
 	w, tid := mutualPair(t)
 	bad := []string{
-		`{"start":"2020-01-01T20:00:00Z","end":"2020-01-01T22:00:00Z"}`,                                                   // past
+		`{"start":"2020-01-01T20:00:00Z","end":"2020-01-01T22:00:00Z"}`,                                                    // past
 		fmt.Sprintf(`{"start":"%s","end":"%s"}`, w.now.Format(time.RFC3339), w.now.Add(13*time.Hour).Format(time.RFC3339)), // too long
-		fmt.Sprintf(`{"start":"%s","end":"%s"}`, w.now.Add(2*time.Hour).Format(time.RFC3339), w.now.Format(time.RFC3339)), // ends first
+		fmt.Sprintf(`{"start":"%s","end":"%s"}`, w.now.Add(2*time.Hour).Format(time.RFC3339), w.now.Format(time.RFC3339)),  // ends first
 	}
 	for _, b := range bad {
 		if c, _ := w.do("ana", "POST", "/v1/threads/"+tid+"/meets", b); c != 422 {
