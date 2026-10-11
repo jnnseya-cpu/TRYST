@@ -63,6 +63,7 @@ func TestRestoreDrill(t *testing.T) {
 	t.Setenv("INTERNAL_SECRET_SAFETY", "")
 	// Live system with two members' sealed data, and a safety case about each.
 	live := build()
+	t.Cleanup(func() { closeStores(live) }) // releases the single-instance lock before the databases go
 	sst, err := store.OpenPostgres(ctx, dsn("live_"+run+"_safety"))
 	if err != nil {
 		t.Fatal(err)
@@ -129,6 +130,7 @@ func TestRestoreDrill(t *testing.T) {
 		t.Setenv("DATABASE_URL_"+strings.ToUpper(d), dsn(prefix+"_"+d))
 	}
 	restored := build()
+	t.Cleanup(func() { closeStores(restored) })
 	if _, err := restored.vault.Open(ctx, "acc-erased", sealed["acc-erased"], []byte("photo:p1")); err == nil {
 		t.Fatal("erased member's data readable after restore + reapply")
 	}
@@ -145,5 +147,13 @@ func TestRestoreDrill(t *testing.T) {
 	for _, d := range dbs {
 		_, _ = conn.Exec(ctx, "drop database if exists live_"+run+"_"+d+" with (force)")
 		_, _ = conn.Exec(ctx, "drop database if exists "+prefix+"_"+d+" with (force)")
+	}
+}
+
+func closeStores(a *app) {
+	for _, st := range a.stores {
+		if p, ok := st.(*store.Postgres); ok {
+			p.Close()
+		}
 	}
 }

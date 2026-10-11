@@ -4,7 +4,7 @@
 //
 // It runs on the member's device (messages are end-to-end encrypted; the server never sees
 // them). This Go version is the reference implementation; the iOS, Android and web ports use
-// the same patterns and must pass the same labelled vectors (contracts/vocab/guardian_vectors.json).
+// the same patterns and must pass the same labelled vectors (shared/contracts/vocab/guardian_vectors.json).
 // Trained models replace a rule only when they beat it on the release gate (§7.7 D).
 package guardian
 

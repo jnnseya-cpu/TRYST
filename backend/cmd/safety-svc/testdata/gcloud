@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Stand-in for the gcloud CLI (Secret Manager only), storing values under $FAKE_AWS_DIR.
+set -euo pipefail
+d="${FAKE_AWS_DIR:?}"; echo "gcloud $*" >> "$d/calls.log"
+[ "$1" = secrets ] || exit 2
+shift
+name="" file=""
+case "$1" in
+  versions)
+    op="$2"; shift 2
+    for a in "$@"; do case "$a" in --secret=*) name="${a#--secret=}" ;; --data-file=*) file="${a#--data-file=}" ;; -*) ;; latest) ;; *) name="$a" ;; esac; done
+    f="$d/$name"
+    case "$op" in
+      access) [ -f "$f" ] || exit 1; cat "$f" ;;
+      add) [ -f "$f" ] || exit 1; cp "$file" "$f" ;;
+    esac ;;
+  describe) [ -f "$d/$2" ] || exit 1 ;;
+  create)
+    name="$2"; shift 2
+    for a in "$@"; do case "$a" in --data-file=*) file="${a#--data-file=}" ;; esac; done
+    [ ! -f "$d/$name" ] || exit 1; cp "$file" "$d/$name" ;;
+esac

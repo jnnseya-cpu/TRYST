@@ -1,0 +1,65 @@
+name: integration (end-to-end, images, infrastructure)
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'shared/**'
+      - 'deploy/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'shared/**'
+      - 'deploy/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Passkey login end-to-end (Chromium virtual authenticators)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontend } }
+    env: { NEXT_TELEMETRY_DISABLED: "1" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: backend/go.mod }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+
+  images:
+    name: Container images and infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t tryst-api:ci backend
+      - run: docker build -f frontend/Dockerfile -t tryst-web:ci .
+      - name: API container starts and answers its health check
+        run: |
+          docker run -d --name api -e TRYST_ENV=dev -p 8081:8081 tryst-api:ci
+          for i in $(seq 1 30); do curl -sf localhost:8081/readyz && break; sleep 1; done
+          docker exec api /identity-svc healthcheck
+          docker inspect -f '{{.Config.User}}' tryst-api:ci | grep -q nonroot
+          docker run -d --name safety -e TRYST_ENV=dev -p 8082:8082 --entrypoint /safety-svc tryst-api:ci
+          for i in $(seq 1 30); do curl -sf localhost:8082/readyz && break; sleep 1; done
+          docker exec safety /safety-svc healthcheck
+          ! docker run --rm --entrypoint /safety-svc tryst-api:ci   # production config refused
+      - name: Image vulnerability scan (HIGH and CRITICAL fail the build)
+        run: |
+          for img in tryst-api:ci tryst-web:ci; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest \
+              image --quiet --severity HIGH,CRITICAL --exit-code 1 "$img"
+          done
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform -chdir=deploy/terraform fmt -check -recursive
+      - run: terraform -chdir=deploy/terraform init -backend=false -input=false
+      - run: terraform -chdir=deploy/terraform validate

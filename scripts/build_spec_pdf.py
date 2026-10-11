@@ -2,13 +2,13 @@
 """Build docs/spec/TRYST_Spec_v1.3.pdf: python3 scripts/build_spec_pdf.py out.html, then print with headless Chromium (see README)."""
 import markdown, re, sys
 from pathlib import Path
-root=Path.cwd(); logo=(root/'assets/brand/tryst-logo.png').as_uri()
+root=Path.cwd(); logo=(root/'shared/brand/tryst-logo.png').as_uri()
 parts=[f'''<section class="cover"><img src="{logo}" alt="TRYST logo"><div class="t1">Product &amp; Technical Specification</div>
 <div class="t2">Version 1.2 — Baseline · 4 October 2026 · Confidential</div><div class="t3">Private chemistry. Intelligent discretion.</div></section>''']
 for f in sorted(Path('docs/spec').glob('0*.md')):
     md=f.read_text()
     md=re.sub(r'<p align="center"><img[^>]*></p>\n','',md)
-    md=md.replace('../../assets/brand/tryst-logo.png', logo)
+    md=md.replace('../../shared/brand/tryst-logo.png', logo)
     md=re.sub(r'\]\((0\d_[^)#]+\.md)#([^)]+)\)', lambda m: f'](#{m.group(2)})', md)
     md=re.sub(r'\]\((0\d_[^)#]+\.md)\)', lambda m: f'](#doc-{m.group(1)[:2]})', md)
     L=md.split('\n'); o=[]

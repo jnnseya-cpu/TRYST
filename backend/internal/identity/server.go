@@ -308,9 +308,11 @@ func decode(r *http.Request, v any) error {
 	return dec.Decode(v)
 }
 
-// clientIP is the caller's address. Behind a trusted proxy it is the last address the proxy
-// appended to X-Forwarded-For (the one the proxy itself saw); a client cannot spoof it by
-// sending its own header, because only the right-most entry from a trusted hop is used.
+// clientIP is the caller's address. Behind trusted proxies (for example Cloudflare, then
+// Caddy, then the web server), X-Forwarded-For is read from the right, skipping every
+// trusted hop: the first address that isn't a trusted proxy is the client. A client can't
+// spoof it by sending its own header, because only entries appended by trusted hops are
+// passed over.
 // TrustedAddr reports whether ip is in list, whose entries are addresses or CIDR ranges
 // (a container network, for example).
 func TrustedAddr(list []string, ip string) bool {
@@ -340,13 +342,16 @@ func (s *Server) clientIP(r *http.Request) string {
 	if !TrustedAddr(s.cfg.TrustedProxies, ip) {
 		return ip
 	}
-	xff := r.Header.Get("X-Forwarded-For")
-	if xff == "" {
-		return ip
-	}
-	parts := strings.Split(xff, ",")
-	if last := strings.TrimSpace(parts[len(parts)-1]); last != "" {
-		return last
+	parts := strings.Split(r.Header.Get("X-Forwarded-For"), ",")
+	for i := len(parts) - 1; i >= 0; i-- {
+		hop := strings.TrimSpace(parts[i])
+		if hop == "" {
+			continue
+		}
+		if !TrustedAddr(s.cfg.TrustedProxies, hop) {
+			return hop
+		}
+		ip = hop
 	}
 	return ip
 }

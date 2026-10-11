@@ -1,0 +1,39 @@
+name: release images
+# Builds the three images and pushes them to Artifact Registry (London), printing their
+# digests for deploy/gcp/deploy.sh. Manual only. Needs repository variables GCP_PROJECT,
+# GCP_WIF_PROVIDER and GCP_DEPLOY_SA (Workload Identity Federation; no keys in GitHub).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: europe-west2-docker.pkg.dev/${{ vars.GCP_PROJECT }}/tryst
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: gcloud auth configure-docker europe-west2-docker.pkg.dev --quiet
+      - name: Build and push
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_SHA::12}"
+          docker build -t "$REGISTRY/api:$tag" backend
+          docker build -f frontend/Dockerfile -t "$REGISTRY/web:$tag" .
+          docker build -f frontend/Dockerfile --build-arg OPS_CONSOLE=1 -t "$REGISTRY/ops:$tag" .
+          for img in api web ops; do docker push "$REGISTRY/$img:$tag"; done
+          {
+            echo "### Deploy with"
+            echo '```'
+            printf 'sudo /opt/tryst/deploy/gcp/deploy.sh'
+            for img in api web ops; do printf ' %s' "$(docker inspect --format '{{index .RepoDigests 0}}' "$REGISTRY/$img:$tag")"; done
+            echo; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

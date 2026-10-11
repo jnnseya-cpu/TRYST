@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Provision the safety-service secrets in AWS Secrets Manager (D-59; docs/runbooks/deploy.md).
+# Provision the safety-service secrets in AWS Secrets Manager or Google Secret Manager
+# (D-59; docs/runbooks/deploy.md, docs/runbooks/go-live.md).
 # Values are generated here and written straight to Secrets Manager through private
 # temporary files; nothing is printed, logged, or written to the repository.
 #
@@ -7,12 +8,15 @@
 #   ENV=prod scripts/provision-safety-secrets.sh --rotate               new internal secrets
 #   ENV=prod scripts/provision-safety-secrets.sh --finish-rotation      after both services redeployed
 #
+# SECRETS_BACKEND=aws (default): names "tryst-<env>/<NAME>". SECRETS_BACKEND=gcp: names
+# "tryst-<env>-<NAME>" in the current gcloud project, stored in europe-west2 only.
+#
 # roster.txt: one person per line, "email role[,role]" (roles: moderator, lead). Lines
 # starting with # are ignored. At least three people and one lead: a permanent removal
 # needs two different moderators and an appeal needs a third who wasn't involved.
 set -euo pipefail
 env_name="${ENV:?set ENV (e.g. prod)}"
-prefix="tryst-$env_name"
+backend="${SECRETS_BACKEND:-aws}"
 roster="" rotate=0 finish=0
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -22,20 +26,40 @@ while [ $# -gt 0 ]; do
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
 done
-command -v aws >/dev/null || { echo "aws CLI not found" >&2; exit 2; }
 umask 077
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 
-exists() { aws secretsmanager get-secret-value --secret-id "$prefix/$1" --query SecretString --output text >/dev/null 2>&1; }
-put() { # name, file
-  if aws secretsmanager describe-secret --secret-id "$prefix/$1" >/dev/null 2>&1; then
-    aws secretsmanager put-secret-value --secret-id "$prefix/$1" --secret-string "file://$2" >/dev/null
-  else
-    aws secretsmanager create-secret --name "$prefix/$1" --secret-string "file://$2" >/dev/null
-  fi
-  echo "set $prefix/$1"
-}
-current() { aws secretsmanager get-secret-value --secret-id "$prefix/$1" --query SecretString --output text; }
+case "$backend" in
+aws)
+  command -v aws >/dev/null || { echo "aws CLI not found" >&2; exit 2; }
+  prefix="tryst-$env_name"
+  exists() { aws secretsmanager get-secret-value --secret-id "$prefix/$1" --query SecretString --output text >/dev/null 2>&1; }
+  put() { # name, file
+    if aws secretsmanager describe-secret --secret-id "$prefix/$1" >/dev/null 2>&1; then
+      aws secretsmanager put-secret-value --secret-id "$prefix/$1" --secret-string "file://$2" >/dev/null
+    else
+      aws secretsmanager create-secret --name "$prefix/$1" --secret-string "file://$2" >/dev/null
+    fi
+    echo "set $prefix/$1"
+  }
+  current() { aws secretsmanager get-secret-value --secret-id "$prefix/$1" --query SecretString --output text; }
+  ;;
+gcp)
+  command -v gcloud >/dev/null || { echo "gcloud CLI not found" >&2; exit 2; }
+  prefix="tryst-$env_name"
+  exists() { gcloud secrets versions access latest --secret="$prefix-$1" >/dev/null 2>&1; }
+  put() { # name, file
+    if gcloud secrets describe "$prefix-$1" >/dev/null 2>&1; then
+      gcloud secrets versions add "$prefix-$1" --data-file="$2" >/dev/null
+    else
+      gcloud secrets create "$prefix-$1" --data-file="$2" --replication-policy=user-managed --locations=europe-west2 >/dev/null
+    fi
+    echo "set $prefix-$1"
+  }
+  current() { gcloud secrets versions access latest --secret="$prefix-$1"; }
+  ;;
+*) echo "SECRETS_BACKEND must be aws or gcp" >&2; exit 2 ;;
+esac
 new_secret() { openssl rand -hex 32 | tr -d '\n' > "$1"; }
 
 secrets=(INTERNAL_SECRET_SAFETY INTERNAL_SECRET_PLATFORM)

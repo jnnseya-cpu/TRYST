@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/brand/tryst-logo.png" alt="TRYST logo" width="240"></p>
+<p align="center"><img src="shared/brand/tryst-logo.png" alt="TRYST logo" width="240"></p>
 
 # TRYST
 
@@ -25,24 +25,22 @@ Start at [`docs/spec/00_README.md`](docs/spec/00_README.md).
 
 Consistency check (runs in CI): `python3 scripts/check_spec.py`
 
-## Code scaffold
+## Repository layout
 
-> **Scaffold only.** Per the spec (01 §14), production engineering is gated on the written UK legal opinion and the completed DPIA (phase P0). Nothing here holds member data, calls a real provider or is deployed.
+Three parts, each built, tested and deployed on its own. They meet only through `shared/`.
 
-| Path | What | Checks |
-|---|---|---|
-| `contracts/openapi/` | Edge API contract (OpenAPI 3.1), generated from spec 02 §5 | Redocly lint |
-| `contracts/proto/` | Agent bus and event schemas (Protobuf) | `protoc` compile |
-| `backend/` | Go: jurisdiction and V2 tier gates, two-factor login state machine, couple co-sign (VC), Keys ledger and inbound cap, cryptographic erasure, ban anchors, enforcement ladder and appeals (ToS 17–18), one-person-one-account and control-network checks, Tonight (who nearby is free now), message-safety baseline with labelled vectors, safety-line routing to a 24/7 alarm-receiving centre, certification-gated identity-check routing, profile text screening, meet safety (door check, duress PIN, escalation), profile rules (main photo, age from verified ID, area and approximate distance, up to 10 photos, AI-image rejection), couple verification, Stripe webhook verification, public sign-up with city-by-city matching (London first), gender-neutral balance waitlist and paid-acquisition brake, BitriPay adapter (sandbox only), AI Governance gate (agent registry, always-human actions, kill switch, hash-chained audit); SQL migrations generated from spec 02 §4 | `go vet`, `go test -race`, migration drift check |
-| `agents/` | Python: Broker Stage 0 hard gates (property-tested), slate assembly, Envoy schemas and Briefs, Mirror maths | `ruff`, `pytest` + Hypothesis |
-| `crypto-core/` | Rust: per-media keys, per-recipient wrapping, revoke | `cargo fmt`, `clippy`, `test` |
-| `web/` | Next.js PWA: brand tokens, logo (checksum-verified), two-factor sign-in steps, profile editor (photo upload with on-device location stripping, main photo, blur, order, area) and card preview, quick exit, `noindex` | `tsc`, `vitest`, `next build` |
-| `mobile/` | Native iOS/Android requirements (placeholders; no toolchain in the build environment) | — |
+| Path | What | Deploys as | CI |
+|---|---|---|---|
+| [`frontend/`](frontend/README.md) | Next.js web app (member site; the staff console is the same code built with `OPS_CONSOLE=1`). Talks to the backend only over HTTP (`/v1/*` proxied to `IDENTITY_URL` / `SAFETY_URL`) | Vercel or a container (`frontend/Dockerfile`) | `frontend.yml` |
+| [`backend/`](backend/README.md) | Go services: `identity-svc` (the member API) and `safety-svc` (Trust & Safety), one image, two entrypoints; PostgreSQL | Containers (`backend/Dockerfile`) | `backend.yml` |
+| [`shared/`](shared/README.md) | The contract between them: OpenAPI and Protobuf contracts, controlled vocabularies, test vectors both sides must pass, brand assets | Nothing to deploy | `shared.yml` |
+| `agents/`, `crypto-core/`, `mobile/` | Python agents, Rust media crypto, native app requirements | — | `backend.yml` |
+| `deploy/` | Docker Compose, Terraform, monitoring | — | `integration.yml` |
 
-Run everything locally with `make check`. CI runs the same checks (`.github/workflows/ci.yml`).
+`integration.yml` runs the browser end-to-end tests against both parts together and scans the images. Run everything locally with `make check`; go-live: [docs/runbooks/go-live.md](docs/runbooks/go-live.md).
 
 ## Sources and history
 
 - `docs/source/` — founder source documents (consolidated Spec + ToS, 4 Oct 2026; Developer Specification, 17 Sep 2026)
-- `assets/brand/` — logo (exactly as supplied) and colour tokens
+- `shared/brand/` — logo (exactly as supplied) and colour tokens
 - `docs/archive/` — superseded drafts (PRD v0.1 and the v1.0-vs-v0.1 reconciliation)

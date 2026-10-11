@@ -1,0 +1,49 @@
+name: shared (contracts and spec)
+on:
+  push:
+    paths:
+      - 'shared/**'
+      - 'docs/spec/**'
+      - 'scripts/check_spec.py'
+      - 'scripts/gen_migrations.py'
+      - 'backend/migrations/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'shared/**'
+      - 'docs/spec/**'
+      - 'scripts/check_spec.py'
+      - 'scripts/gen_migrations.py'
+      - 'backend/migrations/**'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  spec:
+    name: Spec consistency and migration drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python3 scripts/check_spec.py
+      - run: python3 scripts/gen_migrations.py --check
+      - run: pip install pglast && python3 -c "import glob,pglast; [pglast.parse_sql(open(f).read()) for f in glob.glob('backend/migrations/*/*.sql')]; print('SQL parses')"
+      - run: python3 -c "import re,pglast; t=open('docs/spec/09_Operating_System.md').read(); pglast.parse_sql(re.search(r'### 10.2 DDL\n\n\`\`\`sql\n(.*?)\`\`\`', t, re.S).group(1)); print('OS DDL parses')"
+
+  contracts:
+    name: OpenAPI and Protobuf contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npx --yes @redocly/cli@1 lint shared/contracts/openapi/tryst.v1.yaml shared/contracts/openapi/ops.v1.yaml shared/contracts/openapi/internal.v1.yaml --config shared/contracts/openapi/redocly.yaml
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: |
+          pip install grpcio-tools
+          mkdir -p /tmp/protoout
+          python3 -m grpc_tools.protoc -Icontracts/proto --python_out=/tmp/protoout $(find shared/contracts/proto -name '*.proto')

@@ -18,7 +18,7 @@ type vectors struct {
 // TestLabelledVectors is the release gate for the baseline: every harmful vector fires its
 // signal (recall 1.0 per category) and no benign vector fires anything (no false positives).
 func TestLabelledVectors(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "contracts", "vocab", "guardian_vectors.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "shared", "contracts", "vocab", "guardian_vectors.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

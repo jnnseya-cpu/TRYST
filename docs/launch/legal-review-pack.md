@@ -16,8 +16,8 @@ ENVOY, GHOST, Keys packs and the deposit built but not sold (D-60).
 | DPIA | To be completed: large-scale special-category data, systematic evaluation, biometrics (01 §14.2) |
 | Online Safety Act risk assessments (illegal content; children's access) | To be completed from 03 §7 (safety), FR-123, FR-124 |
 | Records of processing (Art. 30) | From the vendor list in [vendor-checklist.md](vendor-checklist.md) |
-| Consent wording, versioned | `web/lib/consent.ts` (`CONSENT_COPY`) and `backend/internal/consent` (`Versions`) |
-| Conduct declaration (ToS 3.5) | `web/app/verify/page.tsx`, version `tos-3.5/2026-10` |
+| Consent wording, versioned | `frontend/lib/consent.ts` (`CONSENT_COPY`) and `backend/internal/consent` (`Versions`) |
+| Conduct declaration (ToS 3.5) | `frontend/app/verify/page.tsx`, version `tos-3.5/2026-10` |
 
 ## 2. Open questions from the Terms draft (05 §29)
 

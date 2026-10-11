@@ -110,9 +110,9 @@ The discreet-connection market is large, proven and badly served. The incumbents
 
 ### 3.1 Logo
 
-<img src="../../assets/brand/tryst-logo.png" alt="TRYST logo: gold and oxblood interlocking crescents above the TRYST serif wordmark" width="260">
+<img src="../../shared/brand/tryst-logo.png" alt="TRYST logo: gold and oxblood interlocking crescents above the TRYST serif wordmark" width="260">
 
-The master logo is [`assets/brand/tryst-logo.png`](../../assets/brand/tryst-logo.png) (1254 × 1254 px, transparent background), supplied by the founder ([D-19](06_Decisions_and_Changes.md#2-decision-log)).
+The master logo is [`shared/brand/tryst-logo.png`](../../shared/brand/tryst-logo.png) (1254 × 1254 px, transparent background), supplied by the founder ([D-19](06_Decisions_and_Changes.md#2-decision-log)).
 
 - **Use it exactly as supplied.** Do not redraw, recolour, crop, stretch, re-shadow or separate the mark from the wordmark. The repository keeps the original file byte-for-byte (SHA-256 `5f2ceb55…eae2761`).
 - **Background:** the logo is designed for the dark `night` ground (§3.2), and is only placed on `night`, `oxblood-deep` or `oxblood`.
@@ -131,7 +131,7 @@ The master logo is [`assets/brand/tryst-logo.png`](../../assets/brand/tryst-logo
 
 ### 3.2 Colour palette
 
-The palette is sampled from the logo. Tokens live in [`assets/brand/tokens.json`](../../assets/brand/tokens.json) and [`assets/brand/tokens.css`](../../assets/brand/tokens.css).
+The palette is sampled from the logo. Tokens live in [`shared/brand/tokens.json`](../../shared/brand/tokens.json) and [`shared/brand/tokens.css`](../../shared/brand/tokens.css).
 
 | Token | Hex | Role | Contrast on `night` |
 |---|---|---|---|
@@ -158,7 +158,7 @@ TRYST is never named, branded or marketed as AI ([D-33](06_Decisions_and_Changes
 - The words "AI", "A.I." and "artificial intelligence" never appear in the name, tagline, logo, app-store listings, marketing site, Herald content, ads, press materials, product UI or notifications.
 - The product describes what members get, not the technology: "your agent compares intentions and limits", "we settle the details before you speak".
 - Internal engineering documents (02, 03, 09) may describe models and agents in technical terms. That vocabulary never reaches a member or the public.
-- Enforced by `web/test/brand.test.ts`, which fails the build if any user-facing source contains these words.
+- Enforced by `frontend/test/brand.test.ts`, which fails the build if any user-facing source contains these words.
 - Member-facing safety copy follows the same rule: images made by generators are described as "computer-generated" (FR-093), so the photo rules never put the word on screen.
 
 ---

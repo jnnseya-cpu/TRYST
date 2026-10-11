@@ -1,7 +1,9 @@
 # Deploying TRYST
 
-Internal engineering runbook (D-57). Infrastructure: `deploy/terraform` (AWS, London).
-Images: `backend/Dockerfile` (API, distroless, non-root) and `web/Dockerfile` (Next.js
+Internal engineering runbook (D-57). Recommended hosting: Google Cloud, London, one VM
+plus Cloud SQL ([go-live.md](go-live.md), `deploy/gcp`). The AWS alternative:
+`deploy/terraform` (London).
+Images: `backend/Dockerfile` (API, distroless, non-root) and `frontend/Dockerfile` (Next.js
 standalone, non-root). Local stack: `deploy/docker-compose.yml`.
 
 ## What production refuses to run without

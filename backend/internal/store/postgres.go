@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"errors"
+	"log"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,7 +26,10 @@ CREATE TABLE IF NOT EXISTS blobs (
 );`
 
 // Postgres is the production Store.
-type Postgres struct{ pool *pgxpool.Pool }
+type Postgres struct {
+	pool *pgxpool.Pool
+	lock *pgx.Conn // single-instance lock connection, outside the pool (Exclusive)
+}
 
 // OpenPostgres connects and applies the schema.
 func OpenPostgres(ctx context.Context, dsn string) (*Postgres, error) {
@@ -43,7 +48,12 @@ func OpenPostgres(ctx context.Context, dsn string) (*Postgres, error) {
 	return &Postgres{pool: pool}, nil
 }
 
-func (p *Postgres) Close() { p.pool.Close() }
+func (p *Postgres) Close() {
+	if p.lock != nil {
+		_ = p.lock.Close(context.Background()) // releases the single-instance lock
+	}
+	p.pool.Close()
+}
 
 // Ping checks the database is reachable (readiness).
 func (p *Postgres) Ping(ctx context.Context) error { return p.pool.Ping(ctx) }
@@ -104,4 +114,54 @@ func (p *Postgres) GetBlob(ctx context.Context, id string) ([]byte, error) {
 func (p *Postgres) DeleteBlob(ctx context.Context, id string) error {
 	_, err := p.pool.Exec(ctx, `DELETE FROM blobs WHERE id = $1`, id)
 	return err
+}
+
+// Exclusive makes this process the only one serving the database (single writer). Services
+// keep working state in memory and write through, so two copies against the same database
+// would drift apart. It waits while another process holds the lock (for example the old
+// copy during a deploy) and returns once it has it. If the lock's connection is ever lost,
+// lost is called: the caller must stop, because another copy may now take over.
+func (p *Postgres) Exclusive(ctx context.Context, name string, lost func(error)) error {
+	// Its own connection, outside the pool: held for the life of the process.
+	conn, err := pgx.ConnectConfig(ctx, p.pool.Config().ConnConfig.Copy())
+	if err != nil {
+		return err
+	}
+	warned := time.Time{}
+	for {
+		var ok bool
+		if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(hashtext($1))`, name).Scan(&ok); err != nil {
+			_ = conn.Close(context.Background())
+			return err
+		}
+		if ok {
+			break
+		}
+		if time.Since(warned) > 15*time.Second {
+			log.Printf("another instance holds the %s lock; waiting for it to stop", name)
+			warned = time.Now()
+		}
+		select {
+		case <-ctx.Done():
+			_ = conn.Close(context.Background())
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+	p.lock = conn
+	go func() { // #nosec G118 -- holds the lock for the life of the process, not of a request
+		for range time.Tick(10 * time.Second) {
+			if conn.IsClosed() {
+				return // Close was called: the service is stopping
+			}
+			c, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			err := conn.Ping(c)
+			cancel()
+			if err != nil {
+				lost(err)
+				return
+			}
+		}
+	}()
+	return nil
 }

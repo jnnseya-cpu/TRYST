@@ -1,0 +1,98 @@
+# Production on one Google Compute Engine VM (europe-west2, London), and staging on any
+# Linux VPS (for example Hostinger). See docs/runbooks/go-live.md.
+#
+#   Internet -> Cloudflare (WAF, Access for the console) -> Caddy :443 -> web / ops
+#   web and ops proxy /v1/* and /ops/v1/* to api and safety on the private network.
+#   api and safety are never published; PostgreSQL is Cloud SQL on a private IP
+#   (or the "localdb" profile on a staging VPS, test data only).
+#
+# Images are pinned by digest in /etc/tryst/images.env (deploy.sh). Settings and secrets
+# come from /run/tryst/*.env, written at boot by fetch-secrets.sh (tmpfs, never on disk).
+name: tryst
+services:
+  caddy:
+    image: caddy:2.10.2
+    restart: unless-stopped
+    ports: ["443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /etc/tryst/origin:/etc/tryst/origin:ro   # Cloudflare origin certificate and key
+      - caddy_data:/data
+    environment:
+      SITE_HOST: ${SITE_HOST:?set SITE_HOST}
+      CONSOLE_HOST: ${CONSOLE_HOST:?set CONSOLE_HOST}
+    depends_on: [web, ops]
+    networks: [edge]
+
+  web:
+    image: ${WEB_IMAGE:?set WEB_IMAGE}
+    restart: unless-stopped
+    networks: [edge, app]
+    depends_on: { api: { condition: service_healthy } }
+
+  ops:
+    image: ${OPS_IMAGE:?set OPS_IMAGE}       # the same web code built with OPS_CONSOLE=1
+    restart: unless-stopped
+    networks: [edge, app]
+    depends_on: { safety: { condition: service_healthy } }
+
+  api:
+    image: ${API_IMAGE:?set API_IMAGE}
+    restart: unless-stopped
+    env_file: [/run/tryst/api.env]
+    environment:
+      TRYST_ENV: prod
+      INTERNAL_ADDR: ":8091"
+      METRICS_ADDR: ":9090"
+      SAFETY_INTERNAL_URL: http://safety:8092
+      # Who may set X-Forwarded-For: the web and Caddy containers, then Cloudflare. The API
+      # walks the chain from the right and rate-limits the first address that isn't one.
+      TRUSTED_PROXIES: >-
+        172.30.0.0/16,173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32
+    stop_grace_period: 30s                   # in-flight safety alerts finish
+    read_only: true
+    healthcheck: { test: ["CMD", "/identity-svc", "healthcheck"], interval: 10s, retries: 30, start_period: 30s }
+    networks: [app]
+
+  safety:
+    image: ${API_IMAGE:?set API_IMAGE}
+    entrypoint: ["/safety-svc"]
+    restart: unless-stopped
+    env_file: [/run/tryst/safety.env]
+    environment:
+      TRYST_ENV: prod
+      INTERNAL_ADDR: ":8092"
+      METRICS_ADDR: ":9092"
+      PLATFORM_INTERNAL_URL: http://api:8091
+    stop_grace_period: 30s
+    read_only: true
+    healthcheck: { test: ["CMD", "/safety-svc", "healthcheck"], interval: 10s, retries: 30, start_period: 30s }
+    networks: [app]
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+    ports: ["127.0.0.1:9091:9090"]           # reach it over IAP/SSH tunnel only
+    networks: [app]
+
+  # Staging on a VPS only: a local PostgreSQL with test data. Never in production.
+  db:
+    image: postgres:16-alpine
+    profiles: [localdb]
+    restart: unless-stopped
+    environment: { POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-}" }
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks: [app]
+
+networks:
+  edge: { ipam: { config: [{ subnet: 172.30.1.0/24 }] } }
+  app: { ipam: { config: [{ subnet: 172.30.2.0/24 }] } }
+
+volumes:
+  caddy_data: {}
+  pgdata: {}

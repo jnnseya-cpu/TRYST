@@ -1,4 +1,4 @@
-<p align="center"><img src="../../assets/brand/tryst-logo.png" alt="TRYST logo" width="220"></p>
+<p align="center"><img src="../../shared/brand/tryst-logo.png" alt="TRYST logo" width="220"></p>
 
 # TRYST Specification v1.3 — Baseline
 
@@ -29,7 +29,7 @@ The specification is split by audience. Each document owns its topics; the other
 | 08 | [Source A — traceability](08_Source_A_Traceability.md) | Everyone | Where each section of the consolidated Spec + ToS lives in the spec and the code |
 | 09 | [Operating System (internal)](09_Operating_System.md) | Leadership, engineering, security, payments, operations | Agent workforce and governance (autonomy levels, always-human actions, kill switch, audit chain), command centres for every user type, self-managing platform layer, BitriPay API door, connector register, ops and partner schemas and APIs, B2B licensing and ACU, Admin Super Control Centre, roadmap |
 
-A combined PDF of 00–09 is at [`TRYST_Spec_v1.3.pdf`](TRYST_Spec_v1.3.pdf). Brand assets (logo exactly as supplied, colour tokens) are in [`assets/brand/`](../../assets/brand/tokens.json).
+A combined PDF of 00–09 is at [`TRYST_Spec_v1.3.pdf`](TRYST_Spec_v1.3.pdf). Brand assets (logo exactly as supplied, colour tokens) are in [`shared/brand/`](../../shared/brand/tokens.json).
 
 ## 2. Sources and precedence
 

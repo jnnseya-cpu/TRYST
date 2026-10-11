@@ -8,7 +8,7 @@ Part of the [TRYST v1.1 baseline](00_README.md). This document is the **single s
 
 | Topic | Rule |
 |---|---|
-| Contract formats | Edge API: **OpenAPI 3.1** (`contracts/openapi/`). Internal gRPC, the agent bus and events: **Protobuf** in the schema registry (`contracts/proto/`). Generated client and server types; no hand-written DTOs ([D-07](06_Decisions_and_Changes.md#2-decision-log)). |
+| Contract formats | Edge API: **OpenAPI 3.1** (`shared/contracts/openapi/`). Internal gRPC, the agent bus and events: **Protobuf** in the schema registry (`shared/contracts/proto/`). Generated client and server types; no hand-written DTOs ([D-07](06_Decisions_and_Changes.md#2-decision-log)). |
 | IDs | UUIDv7, opaque, never sequential or enumerable. Prefixed in logs only (`usr_`, `prf_`, `thr_`). |
 | Time | RFC 3339 UTC on the wire. Availability windows carry an IANA `tz`. |
 | Money | Integer minor units + ISO 4217 (`{"amount": 2499, "currency": "GBP"}`). |
@@ -749,7 +749,7 @@ Six dimensions only: intent alignment, structure alignment, boundary intersectio
 
 ### 6.3 IntentVector (wire view)
 
-The fields follow `intent_vector` (§4.3). `desire_tags` uses `yes|curious|no`. `hard_limits` is drawn from a controlled vocabulary (`contracts/vocab/hard_limits.yaml`). Free-text goals entered during intake are converted by Cartographer into controlled values, and the member confirms them.
+The fields follow `intent_vector` (§4.3). `desire_tags` uses `yes|curious|no`. `hard_limits` is drawn from a controlled vocabulary (`shared/contracts/vocab/hard_limits.yaml`). Free-text goals entered during intake are converted by Cartographer into controlled values, and the member confirms them.
 
 ### 6.4 Discretion Policy (versioned)
 
@@ -950,7 +950,7 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-107 | A member may hold a private solo profile and a joint couple profile under one account; the partner never sees the solo profile or any of its activity, notifications or payments, and the couple profile shows only couple activity; enforced as the Stage 0 `partner_secret` gate | Both | P1 | Founder v1.3, D-45 |
 | FR-108 | Never confirm or deny: support, legal and every other channel answer only "We can't say whether any person has an account"; account information goes only to the signed-in holder, a court order or lawful request reviewed by counsel, or the emergency rule (P7) | BE | P1 | Founder v1.3, ToS 14.4 |
 | FR-109 | Tonight: a member with a complete profile can go free for 1–6 hours and see who nearby is also free; visibility is reciprocal and ends when they stop or time runs out; approximate distance only; per-viewer handles; private interest revealed only when mutual; at most 10 interests an evening; all Stage 0 gates apply | Both | P1 | Founder v1.3, D-46 |
-| FR-110 | Message-safety baseline: deterministic on-device rules for M6f, M6g and M6h ship at launch and must pass every labelled vector in `contracts/vocab/guardian_vectors.json` (no misses, no false positives) on every client; a trained model replaces a rule only when it beats it on the held-out evaluation gate (03 §7.7) | Both | P1 | Founder v1.3, D-47 |
+| FR-110 | Message-safety baseline: deterministic on-device rules for M6f, M6g and M6h ship at launch and must pass every labelled vector in `shared/contracts/vocab/guardian_vectors.json` (no misses, no false positives) on every client; a trained model replaces a rule only when it beats it on the held-out evaluation gate (03 §7.7) | Both | P1 | Founder v1.3, D-47 |
 | FR-111 | Safety line staffed 24/7 from launch by a contracted alarm-receiving centre (BS EN 50518, BS 8484) with the on-call T&S rota as backup: acknowledgement within 60 s or the alert moves on; an ARC with no heartbeat for 5 minutes is skipped; if nobody acknowledges, the trusted contact is alerted and the member's phone shows the 999 / Silent Solution screen; alerts carry only alias, callback number, shared location, meet window and reason | BE | P1 | Founder v1.3, D-48 |
 | FR-112 | V2 identity checks run only through a provider with a valid, evidenced liveness certificate (ISO/IEC 30107-3, iBeta Level 2 or equivalent); without a valid injection-attack certificate (CEN/TS 18099 or equivalent) capture is native-app only with platform attestation and the web hands off by QR; with no certified provider, V2 fails closed; certificate expiry is monitored | BE | P1 | Founder v1.3, D-49 |
 | FR-113 | Everything a member creates survives restarts: identities, credentials, sessions and profiles persist in per-domain PostgreSQL databases; photos are stored encrypted under the member's own key and unreadable without the key vault; services refuse to start in production without their databases and key-encryption key | BE | P1 | D-50 |

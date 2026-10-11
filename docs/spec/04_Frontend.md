@@ -47,7 +47,7 @@ Explicit media sent from the web is delivered to native clients as a placeholder
 | Web | **Next.js PWA** (installable), TypeScript | No third-party scripts; strict CSP; non-extractable WebCrypto keys in IndexedDB; service worker caches no personal data |
 | Crypto core | **Rust** (OpenMLS, AES-GCM, OPRF client) compiled to Swift (UniFFI), Kotlin (JNI) and WASM | One audited implementation across all three surfaces |
 | On-device ML | Core ML (iOS), TFLite/NNAPI (Android), ONNX Runtime Web (WASM/WebGPU) | Guardian M6a–e, nudity pre-send check, conversation-feature extraction |
-| API client | Generated from `contracts/openapi` | DPoP proof per request, signed with the device key |
+| API client | Generated from `shared/contracts/openapi` | DPoP proof per request, signed with the device key |
 
 **React Native is not used.** Source A rejects cross-platform shells because Secure Enclave/StrongBox, FLAG_SECURE, screenshot detection, decoy skin and backup exclusion are unreliable through them ([E-07](06_Decisions_and_Changes.md#3-errata-fixed-in-v11)).
 
@@ -187,9 +187,9 @@ Location never leaves the device at better than geohash-5, except in the Panic f
 
 ### 7.2 Brand application (v1.2)
 
-**Logo.** Use [`assets/brand/tryst-logo.png`](../../assets/brand/tryst-logo.png) **exactly as supplied**: no redraws, recolours, crops or effects. Place it on `night`, `oxblood-deep` or `oxblood` only. Never show it in decoy mode, on lock screens, in notifications, app-switcher snapshots or Share My Plan (FR-063; [01 §3.1](01_Product.md#31-logo)). For small sizes (favicon, ≤ 48 px) use the PNG scaled down. If it is illegible at that size, the web favicon defaults to the neutral option (FR-027) rather than a modified logo.
+**Logo.** Use [`shared/brand/tryst-logo.png`](../../shared/brand/tryst-logo.png) **exactly as supplied**: no redraws, recolours, crops or effects. Place it on `night`, `oxblood-deep` or `oxblood` only. Never show it in decoy mode, on lock screens, in notifications, app-switcher snapshots or Share My Plan (FR-063; [01 §3.1](01_Product.md#31-logo)). For small sizes (favicon, ≤ 48 px) use the PNG scaled down. If it is illegible at that size, the web favicon defaults to the neutral option (FR-027) rather than a modified logo.
 
-**Colour.** Import [`assets/brand/tokens.css`](../../assets/brand/tokens.css) (web) or generate native colour assets from [`tokens.json`](../../assets/brand/tokens.json). Defaults:
+**Colour.** Import [`shared/brand/tokens.css`](../../shared/brand/tokens.css) (web) or generate native colour assets from [`tokens.json`](../../shared/brand/tokens.json). Defaults:
 
 | Element | Token |
 |---|---|

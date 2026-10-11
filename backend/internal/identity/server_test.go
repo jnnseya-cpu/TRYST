@@ -537,3 +537,29 @@ func TestRateLimitUsesClientBehindTrustedProxy(t *testing.T) {
 		t.Fatalf("spoofed prefix escaped member A's limit: %d", c)
 	}
 }
+
+func TestClientIPThroughAChainOfTrustedProxies(t *testing.T) {
+	srv, err := New(Config{RPID: "localhost", RPDisplayName: "x", RPOrigins: []string{"http://localhost:3000"}, Env: "dev",
+		ContactPepper: []byte("p"), TrustedProxies: []string{"172.18.0.0/16", "173.245.48.0/20"}}, NewStore())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ip := func(remote, xff string) string {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.RemoteAddr = remote + ":5000"
+		req.Header.Set("X-Forwarded-For", xff)
+		return srv.clientIP(req)
+	}
+	// Client -> Cloudflare -> Caddy -> web -> API: each trusted hop appends the previous one.
+	if got := ip("172.18.0.5", "203.0.113.5, 173.245.48.10, 172.18.0.3"); got != "203.0.113.5" {
+		t.Fatalf("client through the chain: %s", got)
+	}
+	// A forged entry to the left of the real client is never used.
+	if got := ip("172.18.0.5", "6.6.6.6, 203.0.113.5, 173.245.48.10, 172.18.0.3"); got != "203.0.113.5" {
+		t.Fatalf("forged prefix: %s", got)
+	}
+	// An untrusted caller's header is ignored.
+	if got := ip("198.51.100.1", "203.0.113.5"); got != "198.51.100.1" {
+		t.Fatalf("untrusted caller: %s", got)
+	}
+}

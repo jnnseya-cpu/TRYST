@@ -166,6 +166,9 @@ func main() {
 		}
 		os.Exit(0)
 	}
+	if len(os.Args) > 2 && os.Args[1] == "admin" {
+		svcenv.Lock = svcenv.AdminLock(os.Args[2]) // read-only commands run beside the live service
+	}
 	a := build()
 	if len(os.Args) > 1 && os.Args[1] == "admin" {
 		os.Exit(runAdmin(a, os.Args[2:]))
@@ -245,6 +248,7 @@ func build() *app {
 	}
 	ctx := context.Background()
 	idStore := openStore(ctx, mode, "DATABASE_URL_IDENTITY")
+	svcenv.SingleInstance(ctx, idStore, "tryst-identity-svc") // state is in memory: one copy only
 	profStore := openStore(ctx, mode, "DATABASE_URL_PROFILE")
 	keyStore := openStore(ctx, mode, "DATABASE_URL_KEYS")
 	vault := openVault(mode, keyStore)

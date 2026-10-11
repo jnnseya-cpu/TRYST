@@ -78,8 +78,8 @@ func TestEveryContractRouteRefusesSignedOutCallers(t *testing.T) {
 	t.Setenv("RATE_LIMIT_PER_MIN", "1000000") // a 429 must not hide a 2xx
 	h := apiHeaders(routes(build()))
 
-	all := loadContract(t, "../../../contracts/openapi/tryst.v1.yaml", "/v1")
-	for k, v := range loadContract(t, "../../../contracts/openapi/ops.v1.yaml", "/ops/v1") {
+	all := loadContract(t, "../../../shared/contracts/openapi/tryst.v1.yaml", "/v1")
+	for k, v := range loadContract(t, "../../../shared/contracts/openapi/ops.v1.yaml", "/ops/v1") {
 		all[k] = v
 	}
 	if len(all) < 60 {

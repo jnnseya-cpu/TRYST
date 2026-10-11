@@ -103,3 +103,52 @@ func APIHeaders(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// LockMode controls SingleInstance for the process: LockWait (a service: wait for an old
+// copy to stop), LockTry (an admin command that writes: refuse while the service runs) or
+// LockSkip (a read-only admin command run beside the live service).
+type LockMode int
+
+const (
+	LockWait LockMode = iota
+	LockTry
+	LockSkip
+)
+
+// Lock is set by main before build, from the command line.
+var Lock = LockWait
+
+// AdminLock is the lock mode for an admin subcommand: writes need the service stopped.
+func AdminLock(sub string) LockMode {
+	if sub == "reapply-erasures" {
+		return LockTry
+	}
+	return LockSkip
+}
+
+// SingleInstance makes sure only one copy of the service runs against its database (see
+// store.Postgres.Exclusive). It waits for an old copy to stop and exits the process if
+// the lock is ever lost. Memory stores (dev, tests) need nothing.
+func SingleInstance(ctx context.Context, st store.Store, name string) {
+	p, ok := st.(*store.Postgres)
+	if !ok || Lock == LockSkip {
+		return
+	}
+	if Lock == LockTry {
+		c, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		ctx = c
+	}
+	lost := func(err error) {
+		log.Fatalf("lost the %s single-instance lock (%v); stopping so another copy can take over", name, err)
+	}
+	if err := p.Exclusive(ctx, name, lost); err != nil {
+		if Lock == LockTry {
+			log.Fatalf("%s is running: stop it before running this command (it would change data the running service holds in memory)", name)
+		}
+		log.Fatalf("%s single-instance lock: %v", name, err)
+	}
+	if Lock == LockWait {
+		log.Printf("%s: single-instance lock held", name)
+	}
+}

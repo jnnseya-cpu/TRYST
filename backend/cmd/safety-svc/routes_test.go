@@ -49,8 +49,8 @@ func TestConsoleAndMemberRoutesRefuseUnauthenticatedCallers(t *testing.T) {
 			}
 		}
 	}
-	read("../../../contracts/openapi/ops.v1.yaml", "/ops/v1", func(p string) bool { return p != "/vouchers" })
-	read("../../../contracts/openapi/tryst.v1.yaml", "/v1", func(p string) bool {
+	read("../../../shared/contracts/openapi/ops.v1.yaml", "/ops/v1", func(p string) bool { return p != "/vouchers" })
+	read("../../../shared/contracts/openapi/tryst.v1.yaml", "/v1", func(p string) bool {
 		return strings.HasPrefix(p, "/reports") || p == "/appeals" || p == "/me/standing"
 	})
 	if len(ops) < 12 {

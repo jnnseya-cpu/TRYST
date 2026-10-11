@@ -43,7 +43,7 @@ import (
 	"github.com/jnnseya-cpu/tryst/backend/internal/profile"
 )
 
-// Controlled vocabularies (contracts/vocab; 02 §6.3).
+// Controlled vocabularies (shared/contracts/vocab; 02 §6.3).
 var (
 	Identities = []string{"woman", "man", "nonbinary"}
 	Groups     = []string{"women", "men", "nonbinary", "couples"}

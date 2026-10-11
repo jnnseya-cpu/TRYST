@@ -50,7 +50,7 @@ services:
       interval: 5s
       retries: 20
   web:
-    build: { context: .., dockerfile: web/Dockerfile, args: { IDENTITY_URL: "http://api:8081", SAFETY_URL: "http://safety:8082" } }
+    build: { context: .., dockerfile: frontend/Dockerfile, args: { IDENTITY_URL: "http://api:8081", SAFETY_URL: "http://safety:8082" } }
     image: tryst-web:local
     depends_on: { api: { condition: service_healthy }, safety: { condition: service_healthy } }
     ports: ["127.0.0.1:3000:3000"]

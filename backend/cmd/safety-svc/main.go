@@ -57,6 +57,9 @@ func main() {
 		}
 		os.Exit(0)
 	}
+	if len(os.Args) > 2 && os.Args[1] == "admin" {
+		svcenv.Lock = svcenv.AdminLock(os.Args[2]) // read-only commands run beside the live service
+	}
 	a := build()
 	if len(os.Args) > 1 && os.Args[1] == "admin" {
 		os.Exit(runAdmin(a, os.Args[2:]))
@@ -86,6 +89,7 @@ func build() *app {
 	}
 	toPlatform := &svcauth.Client{BaseURL: platformURL, Caller: "safety", Secret: svcenv.InternalSecret(mode, "INTERNAL_SECRET_PLATFORM")}
 	st := svcenv.OpenStore(ctx, mode, "DATABASE_URL_SAFETY")
+	svcenv.SingleInstance(ctx, st, "tryst-safety-svc") // state is in memory: one copy only
 	svc, err := safetysvc.New(safetysvc.RemoteMembers{C: toPlatform}, staff, safetysvc.RemoteDirectory{C: toPlatform}, st)
 	if err != nil {
 		log.Fatal(err)

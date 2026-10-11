@@ -127,8 +127,13 @@ resource "aws_ecs_service" "api" {
   name            = "api"
   cluster         = aws_ecs_cluster.c.id
   task_definition = aws_ecs_task_definition.api.arn
-  desired_count   = var.api_count
-  launch_type     = "FARGATE"
+  # Exactly one copy: working state is in memory with write-through to PostgreSQL, and a
+  # database lock makes a second copy wait (backend/README.md). Deploys stop the old task
+  # before starting the new one.
+  desired_count                      = 1
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
+  launch_type                        = "FARGATE"
   network_configuration {
     subnets         = aws_subnet.private[*].id
     security_groups = [aws_security_group.api.id]
@@ -237,8 +242,13 @@ resource "aws_ecs_service" "safety" {
   name            = "safety"
   cluster         = aws_ecs_cluster.c.id
   task_definition = aws_ecs_task_definition.safety.arn
-  desired_count   = 2
-  launch_type     = "FARGATE"
+  # Exactly one copy: working state is in memory with write-through to PostgreSQL, and a
+  # database lock makes a second copy wait (backend/README.md). Deploys stop the old task
+  # before starting the new one.
+  desired_count                      = 1
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
+  launch_type                        = "FARGATE"
   network_configuration {
     subnets         = aws_subnet.private[*].id
     security_groups = [aws_security_group.safety.id]

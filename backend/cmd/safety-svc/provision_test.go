@@ -10,8 +10,15 @@ import (
 	"github.com/jnnseya-cpu/tryst/backend/internal/staffauth"
 )
 
-// TestProvisionScript runs scripts/provision-safety-secrets.sh against a stand-in AWS CLI.
+// TestProvisionScript runs scripts/provision-safety-secrets.sh against stand-in AWS and
+// gcloud CLIs.
 func TestProvisionScript(t *testing.T) {
+	for _, b := range []struct{ backend, sep string }{{"aws", "_"}, {"gcp", "-"}} {
+		t.Run(b.backend, func(t *testing.T) { provisionWith(t, b.backend, b.sep) })
+	}
+}
+
+func provisionWith(t *testing.T, backend, sep string) {
 	if _, err := exec.LookPath("openssl"); err != nil {
 		t.Skip("openssl not installed")
 	}
@@ -19,12 +26,12 @@ func TestProvisionScript(t *testing.T) {
 	stub, _ := filepath.Abs("testdata")
 	run := func(args ...string) (string, error) {
 		cmd := exec.Command("../../../scripts/provision-safety-secrets.sh", args...)
-		cmd.Env = append(os.Environ(), "ENV=prod", "FAKE_AWS_DIR="+store, "PATH="+stub+":"+os.Getenv("PATH"))
+		cmd.Env = append(os.Environ(), "ENV=prod", "SECRETS_BACKEND="+backend, "FAKE_AWS_DIR="+store, "PATH="+stub+":"+os.Getenv("PATH"))
 		out, err := cmd.CombinedOutput()
 		return string(out), err
 	}
 	read := func(name string) string {
-		b, _ := os.ReadFile(filepath.Join(store, "tryst-prod_"+name))
+		b, _ := os.ReadFile(filepath.Join(store, "tryst-prod"+sep+name))
 		return string(b)
 	}
 	roster := filepath.Join(t.TempDir(), "roster.txt")

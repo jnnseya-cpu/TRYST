@@ -209,7 +209,7 @@ API keys (sandbox and live), webhooks with delivery log and replay, usage in ACU
 
 ### 4.9 Developer Command Centre (U7)
 
-OpenAPI reference (`contracts/openapi/tryst.v1.yaml`), sandbox keys, webhook tester, the BitriPay sandbox magic numbers (§7.6), SDK downloads, changelog, status. Same surface for internal engineers and licensee developers, with scopes.
+OpenAPI reference (`shared/contracts/openapi/tryst.v1.yaml`), sandbox keys, webhook tester, the BitriPay sandbox magic numbers (§7.6), SDK downloads, changelog, status. Same surface for internal engineers and licensee developers, with scopes.
 
 ### 4.10 Regulator Portal (U10)
 
@@ -779,7 +779,7 @@ Erasure must survive restore: deletion jobs are replayed against any restored ba
 
 ### 9.9 Deployment strategy
 
-Trunk-based development; every merge runs CI (spec check, contracts lint, Go, Python, Rust, web, Playwright e2e, as in `.github/workflows/ci.yml`). Images are signed (Sigstore cosign) with SLSA provenance; Argo CD syncs from Git; progressive delivery 1% → 10% → 50% → 100% with automated canary analysis; feature flags for every user-visible change; freeze windows around launches. Agents ship with their eval suites as a release gate (03 §9). Infrastructure is Terraform with policy checks (OPA) in CI.
+Trunk-based development; every merge runs CI (spec check, contracts lint, Go, Python, Rust, web, Playwright e2e, as in `.github/workflows/` (one pipeline each for shared, backend and frontend, plus integration)). Images are signed (Sigstore cosign) with SLSA provenance; Argo CD syncs from Git; progressive delivery 1% → 10% → 50% → 100% with automated canary analysis; feature flags for every user-visible change; freeze windows around launches. Agents ship with their eval suites as a release gate (03 §9). Infrastructure is Terraform with policy checks (OPA) in CI.
 
 ### 9.10 Testing strategy
 
@@ -788,7 +788,7 @@ Trunk-based development; every merge runs CI (spec check, contracts lint, Go, Py
 | Unit | Each package | Go (`go test ./...`, including `aigov` and `payments`), Python (pytest + Hypothesis), Rust (`cargo test`), web (Vitest) |
 | Property | Hard-limit inviolability, ranking invariants | `agents/tests` (Hypothesis) |
 | Contract | OpenAPI lint; Protobuf compatibility; processor adapters against recorded sandbox behaviour | Redocly in CI; `bitripay_test.go` |
-| End to end | Passkey sign-up and two-factor sign-in with virtual authenticators | Playwright (`web/e2e/passkey.spec.ts`) |
+| End to end | Passkey sign-up and two-factor sign-in with virtual authenticators | Playwright (`frontend/e2e/passkey.spec.ts`) |
 | Agent evals | 400-case golden set per agent; injection red team; workflow-level replay | 03 §9 (P1) |
 | Governance | Always-human classes, kill switch, audit-chain tamper detection; mutation-checked | `aigov_test.go` |
 | Privacy | Privacy Auditor probes: access, retention, model leakage | `jobs` (P1) |
@@ -937,7 +937,7 @@ CREATE TABLE partner.acu_balance (
 
 | Surface | Base | Auth | Who |
 |---|---|---|---|
-| Member API (existing) | `/v1` (02 §5; `contracts/openapi/tryst.v1.yaml`) | Passkey session; DPoP from P1 | Members |
+| Member API (existing) | `/v1` (02 §5; `shared/contracts/openapi/tryst.v1.yaml`) | Passkey session; DPoP from P1 | Members |
 | Ops API | `/ops/v1` (internal origin, not internet-routable) | Staff SSO + hardware key + JIT role | Operators, admins |
 | Partner API (P4) | `/partner/v1` | `Authorization: Bearer tk_live_…` + optional mTLS; scopes | Licensees, resellers |
 | Inbound webhooks | `/v1/billing/{provider}/webhook` | Provider signature | Stripe, acquirer, BitriPay |
@@ -1096,7 +1096,7 @@ The OS changes 01 §10.3 in three ways (to be measured in beta, not assumed):
 |---|---|
 | DDoS | Cloudflare and AWS Shield; per-route rate limits; autoscaling with caps |
 | SQL injection | Parameterised queries only (Go `database/sql` placeholders, pglast-validated migrations); least-privilege DB roles; SAST rule |
-| XSS | React escaping; strict CSP with no inline scripts on app origins (`web/next.config.ts`); no third-party scripts; Trusted Types in P1 |
+| XSS | React escaping; strict CSP with no inline scripts on app origins (`frontend/next.config.ts`); no third-party scripts; Trusted Types in P1 |
 | CSRF | No cookie-authenticated mutating endpoints without SameSite=Strict and Origin checks; tokens are DPoP-bound bearer (not ambient) |
 | Session hijacking | Sessions bound to the device (DPoP); short lifetimes; sign-out everywhere; emergency lock (built) |
 | Account takeover | No passwords, no SMS or email login codes; passkey + second factor; no staff overrides (D-16) |
@@ -1261,7 +1261,7 @@ This document is the developer-ready OS specification for TRYST. The brief's req
 | System, infrastructure, AI, agent architecture | §5, §9.1–§9.3; 03 |
 | Security architecture; complete security controls | §13; 03 §6 |
 | Database architecture; complete ERD and schemas | §10; 02 §4; generated migrations |
-| API architecture; complete API specifications | §11; 02 §5; `contracts/openapi/tryst.v1.yaml` |
+| API architecture; complete API specifications | §11; 02 §5; `shared/contracts/openapi/tryst.v1.yaml` |
 | Event architecture | §9.4; 02 §8 |
 | DevOps and deployment architecture | §9.9 |
 | Monitoring architecture | §9.3 (observability, monitoring), §9.5 SLOs |

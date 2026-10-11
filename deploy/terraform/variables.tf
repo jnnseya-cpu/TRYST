@@ -22,10 +22,6 @@ variable "db_instance_class" {
   type    = string
   default = "db.t4g.medium"
 }
-variable "api_count" {
-  type    = number
-  default = 2
-}
 variable "ops_image" {
   type        = string
   description = "Web image built with OPS_CONSOLE=1 (moderator console), pinned by digest"

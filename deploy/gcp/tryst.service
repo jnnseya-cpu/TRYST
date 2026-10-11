@@ -1,0 +1,18 @@
+# /etc/systemd/system/tryst.service: fetch secrets into tmpfs, then start the stack.
+[Unit]
+Description=TRYST
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=ENV=prod
+WorkingDirectory=/opt/tryst
+ExecStartPre=/opt/tryst/deploy/gcp/fetch-secrets.sh
+ExecStart=/usr/bin/docker compose -f /opt/tryst/deploy/gcp/compose.yml --env-file /etc/tryst/images.env up -d --wait
+ExecStop=/usr/bin/docker compose -f /opt/tryst/deploy/gcp/compose.yml --env-file /etc/tryst/images.env stop -t 30
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

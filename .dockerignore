@@ -2,7 +2,7 @@
 **/.next
 **/test-results
 **/playwright-report
-web/.e2e-identity-svc
+frontend/.e2e-*-svc
 **/__pycache__
 **/.venv
 crypto-core/target

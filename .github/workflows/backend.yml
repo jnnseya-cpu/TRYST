@@ -1,0 +1,73 @@
+name: backend
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - 'agents/**'
+      - 'crypto-core/**'
+      - 'shared/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'agents/**'
+      - 'crypto-core/**'
+      - 'shared/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: test, POSTGRES_DB: tryst_test }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TRYST_TEST_PG: postgres://postgres:test@localhost:5432/tryst_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: backend/go.mod }
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: go build ./...
+      - name: Security analysis (vulnerabilities, static analysis, gosec)
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+          go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+          go run github.com/securego/gosec/v2/cmd/gosec@latest -quiet ./...
+
+  agents:
+    name: Agents (Python)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: agents } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -e '.[dev]'
+      - run: ruff check src tests
+      - run: python -m pytest -q
+
+  crypto-core:
+    name: Crypto core (Rust)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: crypto-core } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { components: "rustfmt, clippy" }
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
