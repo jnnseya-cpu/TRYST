@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { problemTitle } from "@/lib/api";
 import { acceptConduct, ageMessage, start, status, type VerifyStatus } from "@/lib/verify";
+import { CONSENT_COPY, setConsent } from "@/lib/consent";
 import "../profile/profile.css";
 import "../billing/billing.css";
 
@@ -12,6 +13,7 @@ export default function Verify() {
   const [s, setS] = useState<VerifyStatus | null>(null);
   const [signedOut, setSignedOut] = useState(false);
   const [ticked, setTicked] = useState(false);
+  const [bio, setBio] = useState(false);
   const [msg, setMsg] = useState("");
 
   const load = useCallback(async () => {
@@ -25,6 +27,10 @@ export default function Verify() {
 
   async function go(kind: "liveness" | "age") {
     setMsg("");
+    if (kind === "liveness") {
+      const c = await setConsent("biometric_login", true);
+      if (c.status !== 201) return setMsg(problemTitle(c.data));
+    }
     const r = await start(kind);
     if (r.status !== 201) return setMsg(problemTitle(r.data));
     window.location.assign(r.data.url);
@@ -61,7 +67,9 @@ export default function Verify() {
         {s.liveness_done ? <p data-testid="step-done">Done.</p> : (
           <>
             <p>A short live check that you&rsquo;re a real person and match your photos.</p>
-            <button type="button" className="button inline" onClick={() => go("liveness")}>Start face check</button>
+            <p className="note">{CONSENT_COPY.biometric_login.body} You can withdraw this in your account.</p>
+            <label className="bl-check"><input type="checkbox" checked={bio} onChange={(e) => setBio(e.target.checked)} /> I consent to face checks</label>
+            <button type="button" className="button inline" disabled={!bio} onClick={() => go("liveness")}>Start face check</button>
           </>
         )}
       </section>

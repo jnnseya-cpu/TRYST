@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { member } from "./helpers";
+import { consentToDiscovery, member } from "./helpers";
 
 // Tonight end to end with two real members (dev services).
 test("tonight: reciprocal visibility and private interest until it's mutual", async ({ browser }) => {
@@ -13,12 +13,15 @@ test("tonight: reciprocal visibility and private interest until it's mutual", as
 
   // Ana goes free; Ben, who is not free, sees nothing of her.
   await ana.goto("/tonight");
+  // Discovery needs the separate Article 9 consent first.
+  await expect(ana.getByTestId("art9-consent")).toBeVisible();
+  await consentToDiscovery(ana);
   await ana.getByLabel("For", { exact: true }).selectOption("4");
   await ana.getByRole("button", { name: /I.m free tonight/ }).click();
   await expect(ana.getByTestId("tonight-on")).toBeVisible();
   await expect(anaSees(B)).toHaveCount(0);
   await ben.goto("/tonight");
-  await expect(ben.getByRole("button", { name: /I.m free tonight/ })).toBeVisible();
+  await consentToDiscovery(ben);
   await expect(ben.getByTestId("person")).toHaveCount(0); // not free: sees nobody at all
 
   // Ben goes free: each now sees the other.
@@ -46,5 +49,16 @@ test("tonight: reciprocal visibility and private interest until it's mutual", as
   await ben.reload();
   await expect(ben.getByTestId("mutual").filter({ hasText: A })).toHaveCount(0);
   await expect(benSees(A)).toHaveCount(0);
-  await ben.getByRole("button", { name: "Stop now" }).click(); // leave the shared service clean
+
+  // Withdrawing the Article 9 consent takes Ben out of discovery at once.
+  await ana.getByRole("button", { name: /I.m free tonight/ }).click();
+  await expect(anaSees(B)).toHaveCount(1);
+  await ben.goto("/account");
+  await ben.getByTestId("consent-art9_processing").getByRole("button", { name: "Withdraw" }).click();
+  await expect(ben.getByTestId("consent-art9_processing")).toContainText("not given");
+  await ana.reload();
+  await expect(anaSees(B)).toHaveCount(0);
+  await ben.goto("/tonight");
+  await expect(ben.getByTestId("art9-consent")).toBeVisible();
+  await ana.getByRole("button", { name: "Stop now" }).click(); // leave the shared service clean
 });

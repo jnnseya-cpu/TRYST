@@ -72,8 +72,11 @@ type Config struct {
 	RecoveryReturnURL string
 	// AnchorPepper keys the one-way document codes (HSM-held in production; ≥ 32 bytes).
 	AnchorPepper []byte
-	// Consent appends to the member's consent ledger (consents service). May be nil.
-	Consent func(account, purpose, version string)
+	// Consent appends a grant to the member's consent ledger. May be nil.
+	Consent func(account, kind, version string)
+	// ConsentGranted reads the ledger: the face check (biometric processing) needs
+	// biometric_login. Nil: not enforced (unit tests).
+	ConsentGranted func(account, kind string) bool
 }
 
 // Server is the identity HTTP service.

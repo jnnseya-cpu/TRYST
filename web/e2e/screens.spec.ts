@@ -1,6 +1,7 @@
 import { test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { consentToDiscovery, verify } from "./helpers";
 
 // Captures every screen of the platform at desktop and phone sizes, driving real flows
 // (real passkeys on virtual authenticators, real identity service). Output: docs/screenshots/.
@@ -191,6 +192,7 @@ async function withProfile(page: Page, name: string, district: string, photo: st
   await page.getByLabel("Name shown to members").blur();
   await page.getByLabel("Area").selectOption({ label: district });
   await page.getByTestId("ready").waitFor();
+  await verify(page, `SHOT-${name}-${Date.now()}`);
 }
 
 test("tonight (desktop and phone)", async ({ browser }) => {
@@ -204,10 +206,12 @@ test("tonight (desktop and phone)", async ({ browser }) => {
   }
   await withProfile(me, "Velvet", "Islington", "photo-1.jpg");
   await me.goto("/tonight");
+  await consentToDiscovery(me);
   await shot(me, "tonight-start-desktop");
   await me.getByRole("button", { name: /I.m free tonight/ }).click();
   for (const p of others) {
     await p.goto("/tonight");
+    await consentToDiscovery(p);
     await p.getByRole("button", { name: /I.m free tonight/ }).click();
     await p.getByTestId("tonight-on").waitFor();
   }

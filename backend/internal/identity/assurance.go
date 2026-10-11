@@ -31,6 +31,7 @@ import (
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/admission"
 	"github.com/jnnseya-cpu/tryst/backend/internal/gate"
+	"github.com/jnnseya-cpu/tryst/backend/internal/problem"
 	"github.com/jnnseya-cpu/tryst/backend/internal/profile"
 )
 
@@ -170,6 +171,10 @@ func (s *Server) handleAssuranceStart(w http.ResponseWriter, r *http.Request) {
 	case s.cfg.Assurance == nil:
 		s.store.mu.Unlock()
 		fail(w, 503, "verification_unavailable", "Verification isn't available right now. Please try again later.")
+		return
+	case in.Kind == "liveness" && s.cfg.ConsentGranted != nil && !s.cfg.ConsentGranted(id.ID(), "biometric_login"):
+		s.store.mu.Unlock()
+		problem.Write(w, problem.Problem{Title: "The face check needs your explicit consent to biometric processing.", Status: 403, Code: "consent_required", ConsentKind: "biometric_login"})
 		return
 	}
 	if s.cfg.AssuranceRoute != nil {
@@ -348,7 +353,7 @@ func (s *Server) handleConduct(w http.ResponseWriter, r *http.Request) {
 	}
 	id.ConductAt, id.ConductVersion = s.cfg.Now(), in.Version
 	if s.cfg.Consent != nil {
-		s.cfg.Consent(id.ID(), "conduct_declaration", in.Version)
+		s.cfg.Consent(id.ID(), "conduct_attestation", in.Version)
 	}
 	s.promote(id)
 	writeJSON(w, 200, s.assuranceStatus(id))

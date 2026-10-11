@@ -7,6 +7,7 @@ import { forgetDevice } from "@/lib/e2ee";
 import { notices } from "@/lib/notify";
 import { DataRights } from "./DataRights";
 import { Devices } from "./Devices";
+import { Consents } from "./Consents";
 import { Notifications } from "./Notifications";
 import { Standing } from "./Standing";
 
@@ -94,6 +95,7 @@ export default function Account() {
       <p />
       <button type="button" className="button ghost" onClick={burn}>Burn: sign out everywhere and wipe this device</button>
       <Devices />
+      <Consents />
       <Notifications />
       <DataRights />
     </Shell>

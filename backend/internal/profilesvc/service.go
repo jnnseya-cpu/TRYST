@@ -94,6 +94,9 @@ type Service struct {
 	Notify func(account, kind, link string)
 	// MinDiscoveryTier is the tier needed to use Tonight (V2 in production, E-01).
 	MinDiscoveryTier string
+	// Consent reports the member's current consent of a kind (consent ledger). Discovery
+	// needs art9_processing (FR-040). Nil: no ledger wired (unit tests).
+	Consent func(account, kind string) bool
 }
 
 // New returns the service. env "prod" refuses DevModerator.

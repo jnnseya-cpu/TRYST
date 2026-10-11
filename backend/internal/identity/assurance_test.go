@@ -200,3 +200,19 @@ func TestProviderCallbacksMustBeSigned(t *testing.T) {
 		t.Fatal("dev assurance accepted in prod")
 	}
 }
+
+func TestFaceCheckNeedsBiometricConsent(t *testing.T) {
+	g := newAssuranceRig(t, store.NewMemory(), DevAssurance{})
+	given := map[string]bool{}
+	g.srv.cfg.ConsentGranted = func(account, kind string) bool { return kind == "biometric_login" && given[account] }
+	tok := g.member("cy@example.com")
+	r := g.h.do("POST", "/v1/assurance/session", map[string]string{"kind": "liveness"}, tok, uaIPhone)
+	if r.status != 403 || r.json(t)["consent_kind"] != "biometric_login" {
+		t.Fatalf("without consent: %d %s", r.status, r.body)
+	}
+	a, _ := g.account(tok)
+	given[a.ID] = true
+	if c, _ := g.start(tok, "liveness"); c != 201 {
+		t.Fatalf("with consent: %d", c)
+	}
+}

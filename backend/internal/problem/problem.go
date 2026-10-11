@@ -14,6 +14,7 @@ type Problem struct {
 	Code         string `json:"code"`
 	RequiredTier string `json:"required_tier,omitempty"`
 	Factor       string `json:"factor,omitempty"`
+	ConsentKind  string `json:"consent_kind,omitempty"`
 }
 
 // Write sends p with the right content type and status.

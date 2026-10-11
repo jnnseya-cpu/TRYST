@@ -70,6 +70,7 @@ import (
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/assurance"
 	"github.com/jnnseya-cpu/tryst/backend/internal/commercesvc"
+	"github.com/jnnseya-cpu/tryst/backend/internal/consent"
 	"github.com/jnnseya-cpu/tryst/backend/internal/dsr"
 	"github.com/jnnseya-cpu/tryst/backend/internal/gate"
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
@@ -150,6 +151,7 @@ type app struct {
 	commerce   *commercesvc.Service
 	notifier   *notify.Service
 	rights     *dsr.Service
+	consents   *consent.Ledger
 	stores     map[string]store.Store // by database name, for readiness and admin
 	vault      *store.Vault
 }
@@ -256,7 +258,23 @@ func build() *app {
 		}
 	}
 	cfg.Notify = notifyFn
+	// The consent ledger lives with the profile data (core-svc, 03 §11). Identity records the
+	// conduct declaration in it and reads biometric_login before the face check.
+	var consents *consent.Ledger
+	cfg.Consent = func(account, kind, version string) {
+		if _, err := consents.Append(context.Background(), account, kind, true, version); err != nil {
+			log.Printf("consent append failed: %v", err)
+		}
+	}
+	cfg.ConsentGranted = func(account, kind string) bool { return consents.Granted(account, kind) }
 	srv, err := identity.New(cfg, identity.NewStore())
+	if err != nil {
+		log.Fatal(err)
+	}
+	consents, err = consent.New(ctx, profStore, func(r *http.Request) (string, bool) {
+		a, ok := srv.Authenticate(r)
+		return a.ID, ok
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -272,6 +290,8 @@ func build() *app {
 		log.Fatal(err)
 	}
 	prof.Notify = notifyFn
+	prof.Consent = consents.Granted
+	consents.OnChange = prof.ConsentChanged
 	notifier = openNotify(mode, srv, profStore)
 	if arc := gateway("ARC"); arc != nil {
 		if out == nil {
@@ -329,7 +349,7 @@ func build() *app {
 	rights, err := dsr.New(func(r *http.Request) (string, bool) {
 		a, ok := srv.Authenticate(r)
 		return a.ID, ok
-	}, idStore, seed, prof, safetyPart, commerce, notifier, srv)
+	}, idStore, seed, prof, safetyPart, commerce, notifier, consents, srv)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -338,7 +358,7 @@ func build() *app {
 	ledger := openStore(ctx, mode, "DATABASE_URL_LEDGER")
 	rights.Ledger = ledger
 	rights.StepUp = srv.StepUpOK
-	return &app{mode: mode, srv: srv, prof: prof, commerce: commerce, notifier: notifier, rights: rights, vault: vault,
+	return &app{mode: mode, srv: srv, prof: prof, commerce: commerce, notifier: notifier, rights: rights, vault: vault, consents: consents,
 		signals: signals, signalKick: signalKick, toSafety: toSafety,
 		stores: map[string]store.Store{"identity": idStore, "profile": profStore, "keys": keyStore, "commerce": commerceStore, "ledger": ledger}}
 }
@@ -377,6 +397,8 @@ func serve(a *app) {
 	m.Help("tryst_http_requests_total", "Requests by route shape, method and status.")
 	m.Help("tryst_safety_alert_failures_total", "Safety alerts that could not be delivered after a retry.")
 	m.Help("tryst_erasure_seconds", "Account erasure duration (NFR-01: < 60 s p99).")
+	m.Help("tryst_consent_chains_broken", "Consent ledger chains failing hash verification (should always be 0).")
+	m.Gauge("tryst_consent_chains_broken", func() float64 { _, broken := a.consents.VerifyAll(); return float64(broken) })
 	m.Gauge("tryst_outbox_pending", func() float64 { return float64(a.signals.Pending(context.Background())) })
 	go func() {
 		mux := http.NewServeMux()
@@ -533,6 +555,7 @@ func routes(a *app) *http.ServeMux {
 	// Reports, appeals, standing and the moderator console are served by the safety
 	// service (cmd/safety-svc); the web proxy routes them there.
 	root.Handle("/ops/v1/vouchers", commerce)
+	root.Handle("/v1/consents", a.consents)
 	root.Handle("/v1/account", rights)
 	root.Handle("/v1/account/export", rights)
 	root.Handle("/v1/deletion-proofs/", rights)

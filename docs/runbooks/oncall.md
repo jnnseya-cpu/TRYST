@@ -55,3 +55,13 @@ lost; they sit in each service's database and retry every 15 seconds. Check both
 sides (a mismatch shows as 401s in the receiver's log). Until it clears, a member who
 should be frozen may still be active: if it lasts more than 15 minutes, a T&S lead freezes
 urgent cases by hand from the console once delivery is restored.
+
+## Consent chain broken
+
+A member's consent ledger chain no longer verifies: a record in the profile database
+(`kind = 'consent'`) was changed or removed by something other than the service. Treat it
+as a possible integrity incident. Don't edit the chain to "fix" it. Restore the document
+from the last backup that verifies, compare it with the current one to see what changed,
+and tell the DPO the same day. Until it's resolved the member's consents can't be shown to
+be genuine; if the restored chain doesn't cover the latest entries, the DPO decides whether
+to ask the member to confirm them again in Account → Consents.

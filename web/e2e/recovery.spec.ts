@@ -23,6 +23,7 @@ test("devices need step-up; recovery needs the same ID and can be cancelled from
   await other.goto("/recover");
   await other.getByLabel(/Email or mobile number on your account/).fill(contact);
   await other.getByRole("button", { name: "Start recovery" }).click();
+  await other.getByLabel(/I consent to a face check/).check();
   await other.getByRole("button", { name: "Start face check" }).click();
   await other.getByRole("button", { name: "Pass" }).click();
   await other.waitForURL("**/recover");
@@ -35,6 +36,7 @@ test("devices need step-up; recovery needs the same ID and can be cancelled from
   await other.getByRole("button", { name: "Start again" }).click();
   await other.getByLabel(/Email or mobile number on your account/).fill(contact);
   await other.getByRole("button", { name: "Start recovery" }).click();
+  await other.getByLabel(/I consent to a face check/).check();
   await other.getByRole("button", { name: "Start face check" }).click();
   await other.getByRole("button", { name: "Pass" }).click();
   await other.waitForURL("**/recover");

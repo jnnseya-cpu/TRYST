@@ -624,16 +624,25 @@ paths:
     get:
       tags: [account]
       operationId: listConsents
+      summary: The member's consent ledger (append-only, hash-chained; FR-040, FR-126).
       x-min-tier: V0
       responses:
         '200':
-          description: Consent ledger entries
+          description: Ledger, current answers and chain verification
           content:
             application/json:
-              schema: { type: array, items: { $ref: '#/components/schemas/Consent' } }
+              schema:
+                type: object
+                properties:
+                  entries: { type: array, items: { $ref: '#/components/schemas/Consent' } }
+                  current: { type: object, additionalProperties: { type: boolean } }
+                  chain_ok: { type: boolean }
+                  versions: { type: object, additionalProperties: { type: string } }
+        '401': { $ref: '#/components/responses/Problem' }
     post:
       tags: [account]
       operationId: appendConsent
+      summary: Grant or withdraw art9_processing, biometric_login or safety_training_use. Other kinds are recorded where they are given (the conduct declaration, meets, couple links). Withdrawing art9_processing takes the member out of discovery at once.
       x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
@@ -644,10 +653,14 @@ paths:
               type: object
               required: [kind, granted]
               properties:
-                kind: { $ref: '#/components/schemas/ConsentKind' }
+                kind: { type: string, enum: [art9_processing, biometric_login, safety_training_use] }
                 granted: { type: boolean }
       responses:
-        '201': { description: Appended (never mutated) }
+        '201':
+          description: Appended (never mutated)
+          content: { application/json: { schema: { $ref: '#/components/schemas/Consent' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /account/pause:
     post:
       tags: [account]
@@ -2199,10 +2212,13 @@ components:
     Consent:
       type: object
       properties:
-        consent_id: { type: string, format: uuid }
+        id: { type: string }
         kind: { $ref: '#/components/schemas/ConsentKind' }
         granted: { type: boolean }
-        created_at: { type: string, format: date-time }
+        scope: { type: string, description: Wording version the consent was given against }
+        at: { type: string, format: date-time }
+        prev_hash: { type: string }
+        hash: { type: string, description: 'SHA-256(prev_hash, canonical record including the account)' }
     IntentShape: { type: string, enum: [one_off, recurring, ongoing, exploratory, third, couple] }
     IntentVector:
       type: object

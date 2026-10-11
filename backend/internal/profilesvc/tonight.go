@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jnnseya-cpu/tryst/backend/internal/problem"
 	"github.com/jnnseya-cpu/tryst/backend/internal/profile"
 )
 
@@ -135,7 +136,7 @@ func (s *Service) ageOf(p *memberProfile) *int {
 func (s *Service) tonightView(me string, p *memberProfile) map[string]any {
 	now := s.now()
 	e := s.tn.active(me, now)
-	out := map[string]any{"on": e != nil, "ready": s.ready(p), "tier_ok": p.Tier >= s.MinDiscoveryTier,
+	out := map[string]any{"on": e != nil, "ready": s.ready(p), "tier_ok": p.Tier >= s.MinDiscoveryTier, "consent_ok": s.art9(me),
 		"max_hours": MaxTonightHours, "people": []tonightPerson{}, "mutual": []tonightPerson{}}
 	if e == nil {
 		return out
@@ -147,7 +148,7 @@ func (s *Service) tonightView(me string, p *memberProfile) map[string]any {
 	var people, mutual []tonightPerson
 	for id, other := range s.data {
 		oe := s.tn.active(id, now)
-		if oe == nil || !s.ready(other) || other.Tier < s.MinDiscoveryTier || !s.eligible(me, id) {
+		if oe == nil || !s.ready(other) || other.Tier < s.MinDiscoveryTier || !s.eligible(me, id) || !s.art9(id) {
 			continue
 		}
 		oa, ok := areaByID(other.AreaID)
@@ -184,6 +185,22 @@ func (s *Service) tonightView(me string, p *memberProfile) map[string]any {
 	return out
 }
 
+// art9 reports the member's Article 9 consent (always true without a ledger).
+func (s *Service) art9(account string) bool {
+	return s.Consent == nil || s.Consent(account, "art9_processing")
+}
+
+// ConsentChanged applies a consent change: withdrawing art9_processing takes the member out
+// of discovery at once.
+func (s *Service) ConsentChanged(account, kind string, granted bool) {
+	if kind != "art9_processing" || granted {
+		return
+	}
+	s.mu.Lock()
+	delete(s.tn.entries, account)
+	s.mu.Unlock()
+}
+
 func (s *Service) handleTonight(w http.ResponseWriter, r *http.Request) {
 	acc, p, ok := s.member(w, r)
 	if !ok {
@@ -210,6 +227,10 @@ func (s *Service) handleTonightStart(w http.ResponseWriter, r *http.Request) {
 	}
 	if p.Tier < s.MinDiscoveryTier {
 		fail(w, 403, "tier_required", "Finish your ID check to use Tonight.")
+		return
+	}
+	if !s.art9(acc.ID) {
+		problem.Write(w, problem.Problem{Title: "Discovery needs your consent to process what your profile says about your sex life.", Status: 403, Code: "consent_required", ConsentKind: "art9_processing"})
 		return
 	}
 	if !s.ready(p) {

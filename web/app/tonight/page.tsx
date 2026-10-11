@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CONSENT_COPY, setConsent } from "@/lib/consent";
 import { Shell } from "@/components/Shell";
 import { api, getToken, problemTitle } from "@/lib/api";
 import { imageURL } from "@/lib/profile";
 import "../profile/profile.css";
 import "./tonight.css";
+import "../billing/billing.css";
 
 type Person = {
   handle: string;
@@ -24,6 +26,7 @@ type View = {
   on: boolean;
   ready: boolean;
   tier_ok: boolean;
+  consent_ok: boolean;
   until?: string;
   radius_km?: number;
   interests_left?: number;
@@ -59,6 +62,14 @@ export default function Tonight() {
   const [radius, setRadius] = useState(10);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [agree, setAgree] = useState(false);
+
+  async function consent() {
+    const r = await setConsent("art9_processing", true);
+    if (r.status !== 201) return setError(problemTitle(r.data));
+    setError("");
+    load();
+  }
 
   async function load() {
     const r = await api<View>("/v1/tonight", { token: getToken() });
@@ -104,6 +115,14 @@ export default function Tonight() {
           <p>{!view.tier_ok ? "Finish your ID check to use Tonight." : "Finish your profile first: a main photo, a name and your area."}</p>
           {!view.tier_ok && <a className="button inline" href="/verify">Verify now</a>}
           <a className="button inline" href="/profile">Your profile</a>
+        </section>
+      ) : !view.consent_ok ? (
+        <section className="pf-section" aria-label="Consent" data-testid="art9-consent">
+          <h2>{CONSENT_COPY.art9_processing.title}</h2>
+          <p>{CONSENT_COPY.art9_processing.body}</p>
+          <p className="note">This is separate from our Terms, and you can withdraw it any time in your account. {CONSENT_COPY.art9_processing.withdraw}</p>
+          <label className="bl-check"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /> I give my explicit consent</label>
+          <button type="button" className="button inline" disabled={!agree} onClick={consent}>Continue</button>
         </section>
       ) : !view.on ? (
         <section className="pf-section tn-start" aria-labelledby="start-h">

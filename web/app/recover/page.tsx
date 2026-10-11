@@ -5,6 +5,7 @@ import { startRegistration } from "@simplewebauthn/browser";
 import { Shell } from "@/components/Shell";
 import { Action } from "@/components/Action";
 import { api, problemTitle } from "@/lib/api";
+import "../billing/billing.css";
 
 const KEY = "tryst.recovery";
 
@@ -44,6 +45,7 @@ export default function Recover() {
   const [token, setTok] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [msg, setMsg] = useState("");
+  const [bio, setBio] = useState(false);
 
   const load = useCallback(async (rid: string) => {
     const r = await api<Status>(`/v1/auth/recovery/${encodeURIComponent(rid)}`);
@@ -158,7 +160,12 @@ export default function Recover() {
       <section className="card" data-testid="recovery-checks">
         <h2>{st.liveness_done ? "2. ID check" : "1. Face check"}</h2>
         <p>{st.liveness_done ? "Use the same ID document you verified this account with." : "A quick live check with our verification provider."}</p>
-        {st.liveness_done ? <Action className="button" onClick={() => check("age")}>Start ID check</Action> : <Action className="button" onClick={() => check("liveness")}>Start face check</Action>}
+        {st.liveness_done ? <Action className="button" onClick={() => check("age")}>Start ID check</Action> : (
+          <>
+            <label className="bl-check"><input type="checkbox" checked={bio} onChange={(e) => setBio(e.target.checked)} /> I consent to a face check by the verification provider</label>
+            <Action className="button" disabled={!bio} onClick={() => check("liveness")}>Start face check</Action>
+          </>
+        )}
       </section>
     );
   }

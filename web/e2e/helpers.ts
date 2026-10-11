@@ -41,6 +41,7 @@ export async function member(browser: Browser, name: string, district: string, p
 /** Verification through the development stand-in provider: face check, declaration, ID. */
 export async function verify(page: Page, doc: string, birth = "1990-05") {
   await page.goto("/verify");
+  await page.getByLabel("I consent to face checks").check();
   await page.getByRole("button", { name: "Start face check" }).click();
   await page.getByRole("button", { name: "Pass" }).click();
   await page.getByLabel("I make this declaration").check();
@@ -59,10 +60,23 @@ export async function stepUp(page: Page) {
   await box.getByRole("button", { name: "Start live check" }).click();
 }
 
+/** Gives the Article 9 consent on the Tonight page if it's asked for. */
+export async function consentToDiscovery(page: Page) {
+  const box = page.getByTestId("art9-consent");
+  const start = page.getByRole("button", { name: /I.m free tonight/ });
+  await expect(box.or(start)).toBeVisible();
+  if (await box.isVisible()) {
+    await box.getByLabel("I give my explicit consent").check();
+    await box.getByRole("button", { name: "Continue" }).click();
+    await expect(start).toBeVisible();
+  }
+}
+
 /** Makes two members a mutual Tonight match and returns the thread URL. */
 export async function matched(a: Page, aName: string, b: Page, bName: string): Promise<string> {
   for (const p of [a, b]) {
     await p.goto("/tonight");
+    await consentToDiscovery(p);
     await p.getByRole("button", { name: /I.m free tonight/ }).click();
     await expect(p.getByTestId("tonight-on")).toBeVisible();
   }

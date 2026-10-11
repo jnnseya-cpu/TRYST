@@ -254,3 +254,29 @@ func TestInterestLimitAndBlurredPhotosNeverServed(t *testing.T) {
 		t.Fatalf("blurred photo served: %d", c)
 	}
 }
+
+func TestDiscoveryNeedsArticle9Consent(t *testing.T) {
+	w := newWorld(t, "dev", "ana", "ben")
+	consents := map[string]bool{"acc-ben": true}
+	w.s.Consent = func(account, kind string) bool { return kind == "art9_processing" && consents[account] }
+	w.ready("ana", "Islington")
+	w.ready("ben", "Camden")
+	if c, out := w.do("ana", "PUT", "/v1/tonight", `{"hours":2,"radius_km":10}`); c != 403 || out["code"] != "consent_required" || out["consent_kind"] != "art9_processing" {
+		t.Fatalf("no consent: %d %v", c, out)
+	}
+	consents["acc-ana"] = true
+	w.do("ana", "PUT", "/v1/tonight", `{"hours":2,"radius_km":10}`)
+	w.do("ben", "PUT", "/v1/tonight", `{"hours":2,"radius_km":10}`)
+	if _, out := w.do("ana", "GET", "/v1/tonight", ""); len(people(out, "people")) != 1 {
+		t.Fatalf("ana should see ben: %v", out)
+	}
+	// Ben withdraws: he leaves discovery at once, even before his entry is swept.
+	consents["acc-ben"] = false
+	if _, out := w.do("ana", "GET", "/v1/tonight", ""); len(people(out, "people")) != 0 {
+		t.Fatal("ben still shown after withdrawing")
+	}
+	w.s.ConsentChanged("acc-ben", "art9_processing", false)
+	if _, out := w.do("ben", "GET", "/v1/tonight", ""); out["on"] != false || out["consent_ok"] != false {
+		t.Fatalf("ben still on: %v", out)
+	}
+}

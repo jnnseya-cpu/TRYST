@@ -15,6 +15,12 @@ groups:
         annotations:
           summary: "A safety-line, trusted-contact or Panic alert could not be delivered"
           runbook: "docs/runbooks/oncall.md#safety-alert-delivery-failing"
+      - alert: ConsentChainBroken
+        expr: tryst_consent_chains_broken > 0
+        labels: { severity: page }
+        annotations:
+          summary: "A consent ledger chain fails hash verification (records changed outside the service)"
+          runbook: "docs/runbooks/oncall.md#consent-chain-broken"
       - alert: ExternalReportPending
         expr: tryst_safety_external_reports_pending > 0
         for: 12h
