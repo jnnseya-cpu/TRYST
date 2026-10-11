@@ -130,3 +130,55 @@ test("phone: join and sign in with two biometric checks", async ({ browser }) =>
   await phone.getByRole("heading", { name: "Signed out" }).waitFor();
   await shot(phone, "signed-out-phone");
 });
+
+// Profile screens. The test images are abstract colour fields, not photographs of anyone;
+// dev mode simulates the face-match vendor, so they are accepted as the member's photos.
+const FX = (f: string) => join(__dirname, "fixtures", f);
+
+async function signedIn(browser: Browser, viewport: { width: number; height: number }, mobile: boolean): Promise<Page> {
+  const ctx = await browser.newContext({ userAgent: IPHONE_UA, viewport, deviceScaleFactor: 2, isMobile: mobile, hasTouch: mobile, reducedMotion: "reduce" });
+  const page = await ctx.newPage();
+  const cdp = await ctx.newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
+  });
+  await page.goto("/join");
+  await page.getByLabel(/Email or mobile/).fill(`pf${Date.now()}${viewport.width}@example.com`);
+  await page.getByRole("button", { name: "Send code" }).click();
+  const code = (await page.getByTestId("dev-otp").textContent())!.match(/\d{6}/)![0];
+  await page.getByLabel(/6-digit code/).fill(code);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Create passkey" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in with passkey" }).click();
+  await page.getByRole("button", { name: "Start live check" }).click();
+  await page.getByTestId("session").waitFor();
+  return page;
+}
+
+for (const [label, viewport, mobile] of [["desktop", { width: 1440, height: 900 }, false], ["phone", { width: 390, height: 844 }, true]] as const) {
+  test(`profile and photo upload (${label})`, async ({ browser }) => {
+    const page = await signedIn(browser, viewport, mobile);
+    await page.goto("/profile");
+    await page.getByRole("heading", { name: "How other members see you" }).waitFor();
+    await shot(page, `profile-empty-${label}`);
+    await page.getByTestId("file-input").setInputFiles([FX("photo-1.jpg"), FX("photo-2.jpg"), FX("generated.jpg"), FX("photo-3.jpg"), FX("photo-4.jpg")]);
+    await page.getByTestId("photo").nth(3).waitFor();
+    await page.locator("main").getByRole("alert").waitFor();
+    await page.locator("main").getByRole("alert").evaluate((el) => el.scrollIntoView({ block: "start" }));
+    await page.evaluate(() => window.scrollBy(0, -120));
+    await shot(page, `profile-photos-generated-refused-${label}`);
+    await page.getByTestId("photo").nth(2).getByRole("button", { name: "Blur" }).click();
+    await page.getByTestId("photo").nth(2).getByText("Blurred until you reveal it").waitFor();
+    await page.getByLabel("Name shown to members").fill("Velvet");
+    await page.getByLabel("Name shown to members").blur();
+    await page.getByLabel("Area").selectOption({ label: "Islington" });
+    await page.getByTestId("ready").waitFor();
+    await shot(page, `profile-complete-${label}`, true);
+    await page.goto("/profile/card");
+    await page.getByTestId("card").waitFor();
+    await page.waitForTimeout(400);
+    await shot(page, `profile-card-preview-${label}`, true);
+  });
+}

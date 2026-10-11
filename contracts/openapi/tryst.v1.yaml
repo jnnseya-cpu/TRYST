@@ -577,15 +577,167 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/IntentVector' } } }
       responses: { '200': { description: Confirmed; new history version (FR-079) } }
   /profile:
-    patch:
+    get:
       tags: [intake]
-      operationId: patchProfile
+      operationId: getProfile
+      summary: The member's own profile (owner view) with what still blocks publication (FR-092).
+      x-min-tier: V0
+      responses:
+        '200': { description: Owner view, content: { application/json: { schema: { $ref: '#/components/schemas/OwnerProfile' } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+    put:
+      tags: [intake]
+      operationId: putProfile
+      summary: Pseudonymous fields only. Display name screened (FR-098); area chosen from /profile/areas, never GPS.
       x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/ProfilePatch' } } }
-      responses: { '200': { description: Updated } }
+      responses:
+        '200': { description: Updated owner view, content: { application/json: { schema: { $ref: '#/components/schemas/OwnerProfile' } } } }
+        '422': { $ref: '#/components/responses/Problem' }
+  /profile/areas:
+    get:
+      tags: [intake]
+      operationId: listAreas
+      summary: Selectable launch-city areas. The profile stores only the area's geohash-5 cell.
+      x-min-tier: V0
+      responses:
+        '200':
+          description: Areas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  areas:
+                    type: array
+                    items:
+                      type: object
+                      properties: { id: { type: string }, district: { type: string }, city: { type: string } }
+  /profile/card:
+    get:
+      tags: [intake]
+      operationId: getProfileCard
+      summary: The member's card exactly as another verified member sees it (FR-092).
+      x-min-tier: V0
+      responses:
+        '200':
+          description: Card
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  display_name: { type: string }
+                  age: { type: [integer, 'null'], description: Whole years from the verified birth year-month (D-37) }
+                  area: { type: string, example: 'Islington, London' }
+                  distance: { type: string, example: 'About 10 km away' }
+                  verified: { type: string, enum: [V0, V1, V2, V3] }
+                  ready: { type: boolean }
+                  photos:
+                    type: [array, 'null']
+                    items:
+                      type: object
+                      properties: { url: { type: string }, main: { type: boolean }, blurred: { type: boolean } }
+  /profile/photos:
+    post:
+      tags: [intake]
+      operationId: uploadProfilePhoto
+      summary: >-
+        Upload one public-tier profile photo (JPEG or PNG, at most 8 MB, at least 200 x 200).
+        Location and device data are stripped on the device; the server reads provenance, runs
+        the moderation vendors and the FR-093 rules, refuses (never stores) computer-generated,
+        borrowed or third-party images, and re-encodes accepted photos to drop all metadata.
+        At most 10 photos. The first photo that passes the main-photo rules becomes the main photo.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [photo]
+              properties:
+                photo: { type: string, format: binary }
+      responses:
+        '201':
+          description: Accepted (live, or held for a person to check)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  photo: { $ref: '#/components/schemas/ProfilePhoto' }
+                  profile: { $ref: '#/components/schemas/OwnerProfile' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '413': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /profile/photos/order:
+    put:
+      tags: [intake]
+      operationId: orderProfilePhotos
+      summary: New gallery order (all photo ids). The main photo always stays first.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties: { ids: { type: array, maxItems: 10, items: { type: string } } }
+      responses:
+        '200': { description: Updated owner view, content: { application/json: { schema: { $ref: '#/components/schemas/OwnerProfile' } } } }
+        '422': { $ref: '#/components/responses/Problem' }
+  /profile/photos/{photo_id}:
+    parameters:
+      - { name: photo_id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [intake]
+      operationId: getProfilePhoto
+      summary: The stored (metadata-free) image; owner only in this API.
+      x-min-tier: V0
+      responses:
+        '200': { description: Image, content: { image/jpeg: { schema: { type: string, format: binary } }, image/png: { schema: { type: string, format: binary } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+    patch:
+      tags: [intake]
+      operationId: revealProfilePhoto
+      summary: Show or blur a photo behind the reveal ladder. The main photo cannot be blurred.
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [revealed], properties: { revealed: { type: boolean } } }
+      responses:
+        '200': { description: Updated owner view, content: { application/json: { schema: { $ref: '#/components/schemas/OwnerProfile' } } } }
+        '422': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [intake]
+      operationId: deleteProfilePhoto
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '200': { description: Updated owner view, content: { application/json: { schema: { $ref: '#/components/schemas/OwnerProfile' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /profile/photos/{photo_id}/main:
+    parameters:
+      - { name: photo_id, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [intake]
+      operationId: setMainPhoto
+      summary: Make this photo the main photo. Only photos that passed the main-photo rules (face clearly matched, not explicit).
+      x-min-tier: V0
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '200': { description: Updated owner view, content: { application/json: { schema: { $ref: '#/components/schemas/OwnerProfile' } } } }
+        '422': { $ref: '#/components/responses/Problem' }
   /profile/media:
     post:
       tags: [intake]
@@ -600,7 +752,7 @@ paths:
               type: object
               required: [tier, ciphertext_upload]
               properties:
-                tier: { type: string, enum: [profile_public, profile_private, thread] }
+                tier: { type: string, enum: [profile_private, thread], description: 'Client-encrypted media. Public-tier profile photos use /profile/photos.' }
                 ciphertext_upload: { type: boolean, const: true }
       responses:
         '201':
@@ -1309,6 +1461,28 @@ components:
             properties:
               checkout_url: { type: string, format: uri }
   schemas:
+    ProfilePhoto:
+      type: object
+      properties:
+        id: { type: string }
+        main: { type: boolean }
+        revealed: { type: boolean }
+        status: { type: string, enum: [live, checking] }
+        reason: { type: string }
+        can_be_main: { type: boolean }
+        main_problem: { type: string }
+        url: { type: string }
+    OwnerProfile:
+      type: object
+      properties:
+        display_name: { type: string }
+        age: { type: [integer, 'null'] }
+        area: { type: object, properties: { id: { type: string }, label: { type: string } } }
+        city_only: { type: boolean }
+        photos: { type: array, maxItems: 10, items: { $ref: '#/components/schemas/ProfilePhoto' } }
+        max_photos: { type: integer, const: 10 }
+        ready: { type: boolean }
+        problems: { type: [array, 'null'], items: { type: string } }
     Problem:
       type: object
       required: [type, title, status, code]
@@ -1403,7 +1577,9 @@ components:
       type: object
       additionalProperties: false
       properties:
-        display_name: { type: string, maxLength: 40 }
+        display_name: { type: string, minLength: 2, maxLength: 24, description: 'Pseudonym; screened for contact details, prices and age references (FR-098)' }
+        area_id: { type: string, description: 'From /profile/areas' }
+        city_only: { type: boolean, description: 'Show only the city, not the district' }
         pronouns: { type: string, maxLength: 40 }
         gender_identity: { type: string, maxLength: 60 }
         seeking: { type: array, items: { type: string } }

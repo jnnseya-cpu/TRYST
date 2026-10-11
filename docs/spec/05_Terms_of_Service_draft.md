@@ -71,7 +71,7 @@ Part of the [TRYST v1.1 baseline](00_README.md).
 
 ## 6. Your account
 
-6.1 Everything you tell us about yourself must be accurate, and your photographs must be current and of you. Your profile shows your main photo, which must clearly show your face (both faces, for a Couple Profile), your age, your area and an approximate distance, to Members who are allowed to see it. You may show up to 10 photographs. **You must not upload images that are generated or altered by artificial intelligence, images of anyone other than you (and your partner, for a Couple Profile), or images taken from elsewhere.** We check every photograph and remove any that break these rules. Profiles that misrepresent who you are will be removed. **[v1.3]**
+6.1 Everything you tell us about yourself must be accurate, and your photographs must be current and of you. Your profile shows your main photo, which must clearly show your face (both faces, for a Couple Profile), your age, your area and an approximate distance, to Members who are allowed to see it. You may show up to 10 photographs. **You must not upload images that are computer-generated or altered with image-generation software, images of anyone other than you (and your partner, for a Couple Profile), or images taken from elsewhere.** We check every photograph and remove any that break these rules. Profiles that misrepresent who you are will be removed. **[v1.3]**
 
 6.2 Keep your access credentials, PIN and device secure. Tell us immediately if you think someone else has access to your account.
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 /** Frame for app screens: quiet top bar, centred editorial column, footer. */
-export function Shell({ children }: { children: React.ReactNode }) {
+export function Shell({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="shell">
       <header className="topbar">
@@ -11,7 +11,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <Link href="/join">Join</Link>
         </nav>
       </header>
-      <main className="page">{children}</main>
+      <main className={wide ? "page page-wide" : "page"}>{children}</main>
       <footer className="footer">
         <span>Adults only. Opening in London first.</span>
         <span>Press Esc twice, or Leave, to exit instantly.</span>

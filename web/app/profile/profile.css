@@ -1,0 +1,65 @@
+/* Profile editor and card (docs/spec/04_Frontend.md §4.1 step 8, §4.2). Editorial: hairlines,
+   serif names, no rounded app cards. */
+
+main.page-wide { max-width: 64rem; }
+
+.pf-section { border-top: 1px solid var(--hairline); padding: 2rem 0 0.5rem; margin: 2.2rem 0; }
+.pf-section h2 { font-size: 1.9rem; margin-bottom: 0.8rem; }
+.pf-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.pf-count { font-family: var(--sans); font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-muted); margin-left: 0.6rem; }
+label.button.inline { width: auto; margin: 0; }
+label.button.is-disabled { opacity: 0.45; pointer-events: none; }
+
+.pf-rules { margin: 0.4rem 0 1.4rem; padding-left: 1.1rem; color: var(--ink-muted); font-size: 0.95rem; }
+.pf-rules li { margin: 0.25rem 0; }
+.pf-errors { margin: 0 0 1.6rem; }
+.pf-errors p { margin: 0.2rem 0; }
+.pf-empty { color: var(--ink-muted); font-family: var(--serif); font-size: 1.35rem; font-style: italic; }
+
+.pf-grid { list-style: none; padding: 0; margin: 0; display: grid; gap: 1.4rem 1.2rem;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); }
+.pf-photo.is-main { grid-column: span 2; grid-row: span 2; }
+.pf-frame { position: relative; aspect-ratio: 4 / 5; overflow: hidden; background: var(--night-raised);
+  border: 1px solid var(--hairline-soft); }
+.pf-frame img, .pf-card-main, .pf-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+.is-blurred { filter: blur(18px) saturate(0.6); transform: scale(1.12); }
+.pf-tag { position: absolute; left: 0.6rem; top: 0.6rem; padding: 0.22rem 0.55rem; background: rgba(11, 6, 7, 0.78);
+  color: var(--tryst-champagne); font-size: 0.66rem; letter-spacing: 0.18em; text-transform: uppercase; }
+.pf-tag-quiet { top: auto; bottom: 0.6rem; color: var(--tryst-cream); }
+.pf-actions { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; padding-top: 0.55rem; }
+.pf-actions button { background: none; border: 0; padding: 0.2rem 0; color: var(--tryst-champagne); font-family: var(--sans);
+  font-size: 0.74rem; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; }
+.pf-actions button:hover { color: var(--tryst-cream); }
+.pf-actions button:disabled { opacity: 0.4; cursor: default; }
+.pf-note { font-size: 0.82rem; color: var(--ink-muted); margin: 0.3rem 0 0; }
+
+.pf-details { display: grid; gap: 1.2rem 2.5rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.pf-fixed { font-family: var(--serif); font-size: 1.6rem; margin: 0.6rem 0 0.4rem; border-bottom: 1px solid var(--hairline-soft); padding-bottom: 0.7rem; }
+.pf-select { font-size: 1.25rem; appearance: none; cursor: pointer; }
+.pf-select option, .pf-select optgroup { background: var(--night-raised); color: var(--tryst-cream); }
+.pf-check { display: flex; gap: 0.6rem; align-items: center; text-transform: none; letter-spacing: 0; font-size: 0.95rem; color: var(--tryst-cream); margin: -0.6rem 0 0.4rem; }
+.pf-status ul { color: var(--ink-muted); }
+
+/* The card, as another member sees it */
+.pf-card { max-width: 25rem; margin: 2rem 0 1.5rem; border: 1px solid var(--hairline); background: var(--night-raised); }
+.pf-card-hero { position: relative; aspect-ratio: 4 / 5; overflow: hidden; }
+.pf-card-caption { position: absolute; inset: auto 0 0 0; padding: 3.5rem 1.3rem 1.1rem;
+  background: linear-gradient(to top, rgba(11, 6, 7, 0.92), rgba(11, 6, 7, 0)); }
+.pf-card-name { font-family: var(--serif); font-size: 2.2rem; line-height: 1; margin: 0 0 0.35rem; color: var(--tryst-cream); }
+.pf-card-age { color: var(--tryst-champagne); }
+.pf-card-place { margin: 0; font-size: 0.92rem; color: var(--tryst-cream); letter-spacing: 0.02em; }
+.pf-card-place span { color: var(--ink-muted); }
+.pf-card-body { padding: 1rem 1.3rem 1.2rem; }
+.pf-card-fact { font-size: 0.74rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--tryst-gold); margin: 0 0 0.9rem; }
+.pf-card-fact.is-pending { color: var(--ink-muted); text-transform: none; letter-spacing: 0; font-size: 0.88rem; }
+.pf-card-thumbs { list-style: none; padding: 0; margin: 0 0 0.6rem; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.35rem; }
+.pf-card-thumbs li { position: relative; aspect-ratio: 1; overflow: hidden; background: var(--tryst-night); }
+.pf-thumb-lock { position: absolute; inset: auto 0 0 0; font-size: 0.56rem; letter-spacing: 0.14em; text-transform: uppercase;
+  text-align: center; padding: 0.15rem 0; background: rgba(11, 6, 7, 0.75); color: var(--tryst-cream); }
+.pf-card-count { margin: 0; font-size: 0.8rem; color: var(--ink-muted); }
+.pf-placeholder { width: 100%; height: 100%; background: var(--night-raised); }
+
+@media (max-width: 34rem) {
+  .pf-grid { grid-template-columns: repeat(2, 1fr); }
+  .pf-photo.is-main { grid-column: span 2; grid-row: auto; }
+}

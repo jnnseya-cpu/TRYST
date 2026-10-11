@@ -63,13 +63,13 @@ func Moderate(c Checks, owners int, main bool) Decision {
 	case c.CSAMHashHit:
 		return Decision{Report, "removed"}
 	case c.Provenance.Synthetic:
-		return Decision{Reject, "This image is marked as AI-generated or AI-edited. Please upload a real photo of yourself."}
+		return Decision{Reject, "This image is marked as computer-generated or edited with an image generator. Please upload a real photo of yourself."}
 	case c.Provenance.NotPhoto:
 		return Decision{Reject, "Please upload a photograph, not artwork or a screenshot."}
 	case c.ReverseImageHit:
 		return Decision{Reject, "This photo appears elsewhere online. Please upload a photo of yourself that you took."}
 	case c.DetectorRan && c.SyntheticScore >= SyntheticReject:
-		return Decision{Reject, "This image looks AI-generated. Please upload a real photo of yourself."}
+		return Decision{Reject, "This image looks computer-generated. Please upload a real photo of yourself."}
 	}
 	// Every face must be one of the owners: no third parties, no borrowed photos.
 	matched := make([]bool, owners)

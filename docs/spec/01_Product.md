@@ -159,6 +159,7 @@ TRYST is never named, branded or marketed as AI ([D-33](06_Decisions_and_Changes
 - The product describes what members get, not the technology: "your agent compares intentions and limits", "we settle the details before you speak".
 - Internal engineering documents (02, 03, 09) may describe models and agents in technical terms. That vocabulary never reaches a member or the public.
 - Enforced by `web/test/brand.test.ts`, which fails the build if any user-facing source contains these words.
+- Member-facing safety copy follows the same rule: images made by generators are described as "computer-generated" (FR-093), so the photo rules never put the word on screen.
 
 ---
 

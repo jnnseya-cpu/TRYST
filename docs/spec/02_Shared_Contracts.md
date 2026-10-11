@@ -544,8 +544,14 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 | POST | `/v1/intake/turn` | V0 | Cartographer conversational turn |
 | GET | `/v1/intake/vector` | V0 | Proposed IntentVector (structured) |
 | POST | `/v1/intake/vector/confirm` | V0 | Member confirms or edits each field; stored with `confirmed_at` |
-| PATCH | `/v1/profile` | V0 | Pseudonymous fields only |
-| POST / DELETE | `/v1/profile/media` · `/{id}` | V1 | Client-encrypted blob + wrapped keys; public-tier photos go through server moderation ([03 §7.5](03_Backend.md#75-profile-and-media-moderation-server-side)) |
+| GET / PUT | `/v1/profile` | V0 | Owner view and pseudonymous fields only: display name (screened, FR-098), area chosen from `/v1/profile/areas` (never GPS), city-only option. The owner view lists what still blocks publication |
+| GET | `/v1/profile/areas` | V0 | Selectable launch-city areas; the profile stores only the area's geohash-5 cell |
+| GET | `/v1/profile/card` | V0 | The member's card exactly as another verified member sees it (FR-092) |
+| POST | `/v1/profile/photos` | V0 | Public-tier profile photo, multipart, JPEG/PNG ≤ 8 MB. Location stripped on device; provenance, vendor checks and FR-093 rules on the server; refused photos are never stored; accepted photos are re-encoded (all metadata dropped); at most 10. Uploading is allowed before V1 because the V1 face check is matched against these photos; nothing is visible to others below V2 |
+| GET / PATCH / DELETE | `/v1/profile/photos/{id}` | V0 | Owner image · show or blur (`revealed`; the main photo can't be blurred) · delete |
+| POST | `/v1/profile/photos/{id}/main` | V0 | Make main; only photos that passed the main-photo rules |
+| PUT | `/v1/profile/photos/order` | V0 | Gallery order; the main photo stays first |
+| POST / DELETE | `/v1/profile/media` · `/{id}` | V1 | **Private-tier** media: client-encrypted blob + wrapped keys (public-tier photos use `/v1/profile/photos`; moderation per [03 §7.5](03_Backend.md#75-profile-and-media-moderation-server-side)) |
 | PUT | `/v1/discretion/policy` | V0 | New version (§6.4). **Rejects any change that broadens exposure unless `confirm_broaden=true`** is sent from a fresh biometric/PIN session |
 | PUT | `/v1/discretion/zones` | V0 | Home/work exclusion geofences (geohash-6 cells) |
 | POST | `/v1/exclusion/psi/blind` | V2 | OPRF round 1 |

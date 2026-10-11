@@ -46,6 +46,9 @@ type Config struct {
 	Sender        Sender
 	Jurisdictions gate.Jurisdictions
 	Now           func() time.Time
+	// DevBirthYM stands in for the age-assurance provider in dev only: new accounts get this
+	// verified birth year-month so profile screens can show an age. Refused in prod.
+	DevBirthYM string
 }
 
 // Server is the identity HTTP service.
@@ -67,6 +70,9 @@ func New(cfg Config, store *Store) (*Server, error) {
 	}
 	if _, isDev := cfg.Liveness.(DevLiveness); isDev && cfg.Env != "dev" {
 		return nil, errors.New("DevLiveness is forbidden outside the dev environment")
+	}
+	if cfg.DevBirthYM != "" && cfg.Env != "dev" {
+		return nil, errors.New("DevBirthYM is forbidden outside the dev environment")
 	}
 	if cfg.Env != "dev" && len(cfg.ContactPepper) < 32 {
 		return nil, errors.New("ContactPepper must be at least 32 bytes in prod")
@@ -209,6 +215,30 @@ func (s *Server) sessionFrom(r *http.Request) (*Session, string, bool) {
 	return sess, th, true
 }
 
+// Account is what another service learns about a signed-in caller (Authenticate).
+type Account struct {
+	ID      string
+	Tier    gate.Tier
+	BirthYM string
+}
+
+// Authenticate checks the caller's bearer token and returns their account. Only full
+// sessions count (both sign-in factors done); onboarding sessions are refused. Services
+// mounted beside identity (the profile API in dev) use this instead of their own auth.
+func (s *Server) Authenticate(r *http.Request) (Account, bool) {
+	s.store.mu.Lock()
+	defer s.store.mu.Unlock()
+	sess, _, ok := s.sessionFrom(r)
+	if !ok || sess.Kind != Full {
+		return Account{}, false
+	}
+	id, ok := s.store.identities[sess.IdentityID]
+	if !ok {
+		return Account{}, false
+	}
+	return Account{ID: id.ID(), Tier: id.Tier, BirthYM: id.BirthYM}, true
+}
+
 func (s *Server) issueSession(id *Identity, kind SessionKind, surface auth.Surface) map[string]any {
 	now := s.cfg.Now()
 	tok := randomToken(32)
@@ -322,7 +352,7 @@ func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	handle := mustDecodeB64(randomToken(32)) // 32 random bytes; never derived from the contact
-	id := &Identity{Handle: handle, ContactHash: ch, Tier: gate.V0, Jurisdiction: jur, CreatedAt: now}
+	id := &Identity{Handle: handle, ContactHash: ch, Tier: gate.V0, Jurisdiction: jur, CreatedAt: now, BirthYM: s.cfg.DevBirthYM}
 	s.store.identities[id.ID()] = id
 	s.store.byContact[ch] = id.ID()
 	writeJSON(w, 201, s.issueSession(id, Onboarding, ""))

@@ -1,5 +1,7 @@
 // Command identity-svc runs the TRYST identity service: sign-up, passkey registration and
-// account-holder-only two-factor login (docs/spec/02_Shared_Contracts.md §3.3).
+// account-holder-only two-factor login (docs/spec/02_Shared_Contracts.md §3.3). It also
+// mounts the profile and photo API (/v1/profile*) behind the same sign-in; in production
+// that API is the profile module of core-svc.
 //
 // Environment:
 //
@@ -19,6 +21,7 @@ import (
 	"time"
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
+	"github.com/jnnseya-cpu/tryst/backend/internal/profilesvc"
 )
 
 type logSender struct{}
@@ -54,6 +57,7 @@ func main() {
 	}
 	if mode == "dev" {
 		cfg.Liveness = identity.DevLiveness{}
+		cfg.DevBirthYM = env("DEV_BIRTH_YM", "1988-04") // stands in for the ID check's birth year-month
 		cfg.Sender = logSender{}
 		if cfg.ContactPepper == nil {
 			cfg.ContactPepper = []byte("dev-only-pepper")
@@ -64,8 +68,21 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	var mod profilesvc.Moderator = profilesvc.NoModerator{}
+	if mode == "dev" {
+		mod = profilesvc.DevModerator{}
+		log.Printf("DEV MODE: photo moderation vendors are simulated; AI-label checks run for real.")
+	}
+	prof, err := profilesvc.New(srv, mod, mode)
+	if err != nil {
+		log.Fatal(err)
+	}
+	root := http.NewServeMux()
+	root.Handle("/v1/profile", prof)
+	root.Handle("/v1/profile/", prof)
+	root.Handle("/", srv)
 	addr := ":" + env("PORT", "8081")
 	log.Printf("identity-svc (%s) listening on %s", mode, addr)
-	hs := &http.Server{Addr: addr, Handler: srv, ReadHeaderTimeout: 5 * time.Second}
+	hs := &http.Server{Addr: addr, Handler: root, ReadHeaderTimeout: 5 * time.Second}
 	log.Fatal(hs.ListenAndServe())
 }

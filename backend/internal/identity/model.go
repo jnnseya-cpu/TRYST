@@ -48,6 +48,7 @@ type Identity struct {
 	LockedUntil  time.Time
 	CreatedAt    time.Time
 	Events       []AuthEvent // own security activity, kept 90 days (NFR-11)
+	BirthYM      string      // "YYYY-MM" from the ID document at V2; the day is never stored (D-37)
 }
 
 // AuthEvent is one security event on the member's own account (02 §4.1 auth_event). It holds
