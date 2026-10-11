@@ -33,6 +33,12 @@
 //	POSTMARK_SERVER_TOKEN, OTP_EMAIL_FROM  sign-up codes by email (neutral sender name)
 //	TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_MESSAGING_SERVICE (or TWILIO_FROM)
 //	                sign-up codes by SMS. Production needs at least one channel.
+//	LIVENESS_URL, LIVENESS_API_KEY, LIVENESS_SECRET  identity provider gateway for the B2
+//	                login face check and photo face match (fail closed without it)
+//	SIGHTENGINE_USER, SIGHTENGINE_SECRET, PHOTODNA_KEY  photo checks; without all of them
+//	                (and LIVENESS_URL) every photo waits for a person
+//	ARC_URL, ARC_API_KEY, ARC_SECRET  the alarm-receiving centre (safety line, Panic);
+//	                required in production (D-48)
 //	PUBLIC_URL      member site origin for checkout return links (default first RP origin)
 package main
 
@@ -59,6 +65,7 @@ import (
 	"github.com/jnnseya-cpu/tryst/backend/internal/profilesvc"
 	"github.com/jnnseya-cpu/tryst/backend/internal/safetysvc"
 	"github.com/jnnseya-cpu/tryst/backend/internal/store"
+	"github.com/jnnseya-cpu/tryst/backend/internal/vendors"
 )
 
 type logSender struct{}
@@ -148,10 +155,15 @@ func main() {
 		}
 		log.Printf("DEV MODE: liveness auto-approves and OTPs are returned in X-Dev-OTP. Never use in production.")
 	}
-	if out := otpSender(); out != nil {
+	out := otpSender()
+	if out != nil {
 		cfg.Sender = out
 	} else if mode != "dev" {
 		log.Fatal("sign-up codes can't be delivered: set POSTMARK_SERVER_TOKEN and/or TWILIO_* (see the header of this file)")
+	}
+	idGateway := gateway("LIVENESS")
+	if idGateway != nil {
+		cfg.Liveness = &vendors.Liveness{G: idGateway}
 	}
 	ctx := context.Background()
 	idStore := openStore(ctx, mode, "DATABASE_URL_IDENTITY")
@@ -173,7 +185,9 @@ func main() {
 		log.Fatal(err)
 	}
 	var mod profilesvc.Moderator = profilesvc.NoModerator{}
-	if mode == "dev" {
+	if u, sec, pd := os.Getenv("SIGHTENGINE_USER"), os.Getenv("SIGHTENGINE_SECRET"), os.Getenv("PHOTODNA_KEY"); u != "" && sec != "" && pd != "" && idGateway != nil {
+		mod = &vendors.PhotoModerator{Sightengine: &vendors.Sightengine{User: u, Secret: sec}, PhotoDNA: &vendors.PhotoDNA{Key: pd}, Faces: idGateway}
+	} else if mode == "dev" {
 		mod = profilesvc.DevModerator{}
 		log.Printf("DEV MODE: photo moderation vendors are simulated; AI-label checks run for real.")
 	}
@@ -183,7 +197,14 @@ func main() {
 	}
 	prof.Notify = notifyFn
 	notifier = openNotify(mode, srv, profStore)
-	if mode == "dev" {
+	if arc := gateway("ARC"); arc != nil {
+		if out == nil {
+			log.Fatal("the safety line needs a message channel for trusted contacts (POSTMARK_* or TWILIO_*)")
+		}
+		prof.Alerts = &vendors.ARCAlerting{ARC: arc, Contact: out}
+	} else if mode != "dev" {
+		log.Fatal("ARC_URL is required in production: meet safety can't run without the safety line (D-48)")
+	} else {
 		prof.Alerts = &profilesvc.LogAlerting{}
 		log.Printf("DEV MODE: safety alerts go to the log, not to real contacts or the alarm-receiving centre.")
 	}
@@ -342,8 +363,8 @@ func openNotify(mode string, members *identity.Server, st store.Store) *notify.S
 	return n
 }
 
-// otpSender returns the configured email/SMS code sender, or nil if none is configured.
-func otpSender() identity.Sender {
+// otpSender returns the configured email/SMS sender, or nil if none is configured.
+func otpSender() *outbound.Sender {
 	var out outbound.Sender
 	if t := os.Getenv("POSTMARK_SERVER_TOKEN"); t != "" {
 		out.Email = &outbound.Postmark{Token: t, From: env("OTP_EMAIL_FROM", "Member services <codes@example.invalid>")}
@@ -358,5 +379,17 @@ func otpSender() identity.Sender {
 	if out.Email == nil && out.SMS == nil {
 		return nil
 	}
-	return out
+	return &out
+}
+
+// gateway reads a vendor gateway from <PREFIX>_URL, _API_KEY and _SECRET.
+func gateway(prefix string) *vendors.Gateway {
+	u := os.Getenv(prefix + "_URL")
+	if u == "" {
+		return nil
+	}
+	if !strings.HasPrefix(u, "https://") || os.Getenv(prefix+"_SECRET") == "" {
+		log.Fatalf("%s_URL must be https and %s_SECRET is required", prefix, prefix)
+	}
+	return &vendors.Gateway{BaseURL: u, APIKey: os.Getenv(prefix + "_API_KEY"), Secret: os.Getenv(prefix + "_SECRET")}
 }

@@ -139,3 +139,18 @@ func (t *Twilio) Send(ctx context.Context, to, text string) error {
 	}
 	return nil
 }
+
+// Message sends a short free-text message (for example to a member's trusted contact),
+// routed by contact type like Send.
+func (s Sender) Message(ctx context.Context, to, text string) error {
+	if strings.Contains(to, "@") {
+		if s.Email == nil {
+			return ErrNoChannel
+		}
+		return s.Email.Send(ctx, to, "Please check on a friend", text)
+	}
+	if s.SMS == nil {
+		return ErrNoChannel
+	}
+	return s.SMS.Send(ctx, to, text)
+}
