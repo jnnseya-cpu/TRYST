@@ -1,7 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
-// End-to-end passkey tests: real Chromium, virtual WebAuthn authenticators, the real Go
-// identity service (dev mode) and the production Next.js build.
+// End-to-end tests: real Chromium, virtual WebAuthn authenticators, the real Go identity
+// service (dev mode) and the production Next.js build. Every test browser shares one address
+// (127.0.0.1), so the per-address rate limit is raised for the test run only.
 const chromium = process.env.CHROMIUM_PATH; // e.g. /opt/pw-browsers/chromium-1194/chrome-linux/chrome
 
 export default defineConfig({
@@ -16,7 +17,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "cd ../backend && go build -o ../web/.e2e-identity-svc ./cmd/identity-svc && TRYST_ENV=dev RP_ID=localhost RP_ORIGINS=http://localhost:3000 PORT=8081 ../web/.e2e-identity-svc",
+      command: "cd ../backend && go build -o ../web/.e2e-identity-svc ./cmd/identity-svc && TRYST_ENV=dev RP_ID=localhost RP_ORIGINS=http://localhost:3000 PORT=8081 RATE_LIMIT_PER_MIN=2000 ../web/.e2e-identity-svc",
       url: "http://localhost:8081/healthz",
       timeout: 180_000,
       reuseExistingServer: false,

@@ -1,0 +1,205 @@
+{
+  "about": "Labelled test vectors for the Guardian message-safety baseline (docs/spec/03_Backend.md §7.7, FR-110). Every client port (iOS, Android, web) and every model that replaces a rule must pass all of them. 'expect' lists the signals that must fire; benign messages must fire none.",
+  "vectors": [
+    {
+      "text": "Can you send me £200? My rent is due and I'll pay you back after we meet",
+      "expect": [
+        "fraud"
+      ]
+    },
+    {
+      "text": "I'm stuck at the airport, could you transfer me money for a taxi",
+      "expect": [
+        "fraud"
+      ]
+    },
+    {
+      "text": "Buy me a couple of Apple gift cards and send the codes",
+      "expect": [
+        "fraud"
+      ]
+    },
+    {
+      "text": "I made 40% last month on a crypto trading platform, I can show you how to invest",
+      "expect": [
+        "fraud"
+      ]
+    },
+    {
+      "text": "my bitcoin wallet address is below, guaranteed returns",
+      "expect": [
+        "fraud"
+      ]
+    },
+    {
+      "text": "Western Union is easiest for me, just send it there",
+      "expect": [
+        "fraud"
+      ]
+    },
+    {
+      "text": "can you lend me some cash before tonight",
+      "expect": [
+        "fraud"
+      ]
+    },
+    {
+      "text": "Send me some pics of your daughter",
+      "expect": [
+        "child_safety"
+      ]
+    },
+    {
+      "text": "When are your kids home alone?",
+      "expect": [
+        "child_safety"
+      ]
+    },
+    {
+      "text": "bring your son along, I'd like to meet him",
+      "expect": [
+        "child_safety"
+      ]
+    },
+    {
+      "text": "I could babysit your kids sometime, just me and them",
+      "expect": [
+        "child_safety"
+      ]
+    },
+    {
+      "text": "pretend you're 14 for me",
+      "expect": [
+        "child_safety"
+      ]
+    },
+    {
+      "text": "how old is your daughter? is she pretty",
+      "expect": [
+        "child_safety"
+      ]
+    },
+    {
+      "text": "I like them young, like 15",
+      "expect": [
+        "child_safety"
+      ]
+    },
+    {
+      "text": "Pay me £500 or I'll tell your wife everything",
+      "expect": [
+        "extortion"
+      ]
+    },
+    {
+      "text": "I have screenshots of our chat. Send money unless you want your boss to see them",
+      "expect": [
+        "extortion"
+      ]
+    },
+    {
+      "text": "If you don't reply I will show your husband the photos",
+      "expect": [
+        "extortion"
+      ]
+    },
+    {
+      "text": "I know where you work. Everyone will know what you are",
+      "expect": [
+        "extortion"
+      ]
+    },
+    {
+      "text": "I'm going to expose you to your family",
+      "expect": [
+        "extortion"
+      ]
+    },
+    {
+      "text": "Pay up or the pics go to your partner",
+      "expect": [
+        "extortion"
+      ]
+    },
+    {
+      "text": "Hi! Loved your profile, coffee on Thursday?",
+      "expect": []
+    },
+    {
+      "text": "My husband doesn't know I'm here, so please keep it discreet",
+      "expect": []
+    },
+    {
+      "text": "Don't tell my wife, obviously",
+      "expect": []
+    },
+    {
+      "text": "I have two kids, they're at their dad's this weekend so I'm free",
+      "expect": []
+    },
+    {
+      "text": "My daughter starts university next month, feels strange",
+      "expect": []
+    },
+    {
+      "text": "I'll pay for dinner, my treat",
+      "expect": []
+    },
+    {
+      "text": "Let's split the hotel, I'll send you my half on the day",
+      "expect": []
+    },
+    {
+      "text": "I work in finance, mostly boring spreadsheets",
+      "expect": []
+    },
+    {
+      "text": "I'll show you the wine bar I mentioned",
+      "expect": []
+    },
+    {
+      "text": "Can you send me a photo from tonight? You looked amazing",
+      "expect": []
+    },
+    {
+      "text": "I'm 41, married 15 years, curious about this",
+      "expect": []
+    },
+    {
+      "text": "Tell me what you'd like to do when we meet",
+      "expect": []
+    },
+    {
+      "text": "My boss is driving me mad this week",
+      "expect": []
+    },
+    {
+      "text": "We could meet at the bar near the station, it's always busy",
+      "expect": []
+    },
+    {
+      "text": "I'm not after money or anything, just good company",
+      "expect": []
+    },
+    {
+      "text": "The kids are with my mum tonight",
+      "expect": []
+    },
+    {
+      "text": "my partner and I are looking for a third, she's lovely",
+      "expect": []
+    },
+    {
+      "text": "Turn off notifications or your husband will see them",
+      "expect": []
+    },
+    {
+      "text": "Delete our chat after, I don't want my wife to find out",
+      "expect": []
+    },
+    {
+      "text": "Send me the address of the bar unless you'd rather I pick",
+      "expect": []
+    }
+  ]
+}

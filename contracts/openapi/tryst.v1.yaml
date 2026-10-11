@@ -972,6 +972,68 @@ paths:
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody: { $ref: '#/components/requestBodies/Target' }
       responses: { '204': { description: Saved } }
+  /tonight:
+    get:
+      tags: [discovery]
+      operationId: getTonight
+      summary: Tonight view (FR-109). Lists only members who are also free, within both radii, inside the Stage 0 gates.
+      x-min-tier: V2
+      responses:
+        '200': { description: View, content: { application/json: { schema: { $ref: '#/components/schemas/TonightView' } } } }
+    put:
+      tags: [discovery]
+      operationId: startTonight
+      summary: Go free for 1-6 hours. Needs a complete profile.
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hours, radius_km]
+              properties:
+                hours: { type: integer, minimum: 1, maximum: 6 }
+                radius_km: { type: integer, enum: [5, 10, 25, 50] }
+      responses:
+        '200': { description: View, content: { application/json: { schema: { $ref: '#/components/schemas/TonightView' } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [discovery]
+      operationId: stopTonight
+      summary: Stop now; hidden at once and tonight's interests are dropped.
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '200': { description: View, content: { application/json: { schema: { $ref: '#/components/schemas/TonightView' } } } }
+  /tonight/interest/{handle}:
+    parameters:
+      - { name: handle, in: path, required: true, schema: { type: string }, description: Per-viewer handle }
+    post:
+      tags: [discovery]
+      operationId: tonightInterest
+      summary: Private interest, revealed to neither side until mutual. At most 10 per evening.
+      x-min-tier: V2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '200': { description: View, content: { application/json: { schema: { $ref: '#/components/schemas/TonightView' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+  /tonight/photos/{handle}/{n}:
+    parameters:
+      - { name: handle, in: path, required: true, schema: { type: string } }
+      - { name: n, in: path, required: true, schema: { type: integer, minimum: 0 } }
+    get:
+      tags: [discovery]
+      operationId: tonightPhoto
+      summary: The n-th photo the viewer may see (main and shown photos only; blurred photos are never served).
+      x-min-tier: V2
+      responses:
+        '200': { description: Image, content: { image/jpeg: { schema: { type: string, format: binary } } } }
+        '404': { $ref: '#/components/responses/Problem' }
   /signals:batch:
     post:
       tags: [discovery]
@@ -1461,6 +1523,30 @@ components:
             properties:
               checkout_url: { type: string, format: uri }
   schemas:
+    TonightPerson:
+      type: object
+      properties:
+        handle: { type: string }
+        display_name: { type: string }
+        age: { type: [integer, 'null'] }
+        area: { type: string }
+        distance: { type: string, example: Nearby }
+        photos: { type: integer }
+        blurred: { type: integer }
+        interested: { type: boolean }
+        mutual: { type: boolean }
+    TonightView:
+      type: object
+      properties:
+        on: { type: boolean }
+        ready: { type: boolean }
+        tier_ok: { type: boolean }
+        until: { type: string, format: date-time }
+        radius_km: { type: integer }
+        interests_left: { type: integer }
+        max_hours: { type: integer }
+        people: { type: array, maxItems: 30, items: { $ref: '#/components/schemas/TonightPerson' } }
+        mutual: { type: array, items: { $ref: '#/components/schemas/TonightPerson' } }
     ProfilePhoto:
       type: object
       properties:

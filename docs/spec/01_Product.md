@@ -227,7 +227,7 @@ Source B's mode names are kept as the **member-facing labels**; Source A's inten
 
 | Mode (UI) | Intent shape(s) | Typical segments | Notes |
 |---|---|---|---|
-| **SPARK** | `one_off` | S1, S2, S4, S6 | Matched on availability, distance and chemistry |
+| **SPARK** | `one_off` | S1, S2, S4, S6 | Matched on availability, distance and chemistry. **Tonight** (v1.3): go free for a few hours and see who nearby is also free; reciprocal, approximate distance, mutual interest only (FR-109) |
 | **EMBER** | `recurring`, `ongoing` | S1, S2 | Matched on cadence, emotional depth, communication windows |
 | **THIRD** | `third` | S3 ↔ S4 | Couple profile must be `VC`; the third is an equal member with a respected veto |
 | **QUAD** | `couple` | S5 ↔ S5 | Four independent verified accounts; match only after each couple's veto mode is satisfied |
@@ -319,7 +319,7 @@ In the UK you cannot lawfully buy sex-offender or criminal-record screening for 
 - **24/7 T&S rota** from P3, with published SLAs.
 - **Door check** (v1.3, FR-099): on arrival both phones show the other's verified main photo and the same three words; if the person doesn't match, leave.
 - **Duress PIN** (v1.3, FR-100): a check-in PIN that looks normal on screen but silently raises the alarm.
-- **TRYST safety line** (v1.3, FR-100, [D-42](06_Decisions_and_Changes.md#2-decision-log)): opt-in second step after the trusted contact; the 24/7 team receives location for that meet only.
+- **TRYST safety line** (v1.3, FR-100, [D-42](06_Decisions_and_Changes.md#2-decision-log)): opt-in second step after the trusted contact; staffed 24/7 from launch by a contracted alarm-receiving centre (BS EN 50518 / BS 8484), with the on-call T&S rota as backup ([D-48](06_Decisions_and_Changes.md#2-decision-log)); location for that meet only.
 - **Video first** (v1.3, FR-103): an in-app video call is offered before every first meet and can be made a hard limit; a first meet at a private address triggers an on-device warning.
 
 The full defence against fake profiles and criminal use (grooming, trafficking, fraud, extortion, drugs) is in [03 §7.7](03_Backend.md#77-fake-profiles-and-criminal-misuse-v13).

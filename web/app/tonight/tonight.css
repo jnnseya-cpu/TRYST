@@ -1,0 +1,16 @@
+/* Tonight (FR-109). Same editorial system as the profile screens. */
+.tn-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0 2rem; max-width: 32rem; }
+.tn-status { display: flex; justify-content: space-between; align-items: center; gap: 1rem 2rem; flex-wrap: wrap; }
+.tn-status p { margin: 0; font-family: var(--serif); font-size: 1.35rem; }
+.tn-safety { border-left: 2px solid var(--tryst-gold); padding: 0.2rem 0 0.2rem 1rem; color: var(--ink-muted); font-size: 0.95rem; max-width: 46rem; }
+.tn-safety strong { color: var(--tryst-champagne); font-weight: 500; }
+.tn-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 1.6rem 1.4rem; grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr)); }
+.tn-person { border-top: 1px solid var(--hairline); padding-top: 0.9rem; }
+.tn-person.is-mutual { border-top-color: var(--tryst-gold); }
+.tn-photo { aspect-ratio: 4 / 5; overflow: hidden; background: var(--night-raised); margin-bottom: 0.8rem; }
+.tn-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tn-name { font-family: var(--serif); font-size: 1.7rem; line-height: 1.05; margin: 0 0 0.3rem; }
+.tn-name span { color: var(--tryst-champagne); }
+.tn-place { margin: 0 0 0.2rem; font-size: 0.92rem; }
+.tn-meta { margin: 0 0 0.9rem; font-size: 0.82rem; color: var(--ink-muted); }
+.tn-flag { margin: 0; font-size: 0.88rem; color: var(--tryst-champagne); }

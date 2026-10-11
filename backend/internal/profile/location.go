@@ -131,3 +131,23 @@ func AreaLabel(cell string, names map[string]string, cityOnly bool) string {
 	}
 	return "Location hidden"
 }
+
+// CellDistanceKm is the distance between two cell centres, for radius filtering. It is
+// never shown to a member; DistanceBand is.
+func CellDistanceKm(a, b string) (float64, error) {
+	if len(a) > 5 {
+		a = a[:5]
+	}
+	if len(b) > 5 {
+		b = b[:5]
+	}
+	la1, lo1, err := centre(a)
+	if err != nil {
+		return 0, err
+	}
+	la2, lo2, err := centre(b)
+	if err != nil {
+		return 0, err
+	}
+	return haversineKm(la1, lo1, la2, lo2), nil
+}

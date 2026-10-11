@@ -496,3 +496,44 @@ func TestSecurityActivityIsRealAndPrivate(t *testing.T) {
 		t.Fatal("security activity must not contain the contact")
 	}
 }
+
+func TestRateLimitUsesClientBehindTrustedProxy(t *testing.T) {
+	srv, err := New(Config{RPID: "localhost", RPDisplayName: "x", RPOrigins: []string{"http://localhost:3000"}, Env: "dev",
+		ContactPepper: []byte("p"), TrustedProxies: []string{"10.0.0.1"}, RateLimitPerMin: 3}, NewStore())
+	if err != nil {
+		t.Fatal(err)
+	}
+	hit := func(remote, xff string) int {
+		req := httptest.NewRequest("POST", "/v1/auth/login/begin", strings.NewReader("{}"))
+		req.RemoteAddr = remote + ":5000"
+		if xff != "" {
+			req.Header.Set("X-Forwarded-For", xff)
+		}
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	// Two different members behind the same proxy each get their own allowance.
+	for i := 0; i < 3; i++ {
+		if c := hit("10.0.0.1", "203.0.113.5"); c == 429 {
+			t.Fatalf("member A request %d limited", i)
+		}
+	}
+	if c := hit("10.0.0.1", "203.0.113.5"); c != 429 {
+		t.Fatalf("member A over the limit: %d", c)
+	}
+	if c := hit("10.0.0.1", "198.51.100.7"); c == 429 {
+		t.Fatal("member B limited because of member A")
+	}
+	// A client that is not a trusted proxy cannot pick its own bucket with a forged header.
+	for i := 0; i < 3; i++ {
+		hit("192.0.2.9", "1.1.1."+string(rune('1'+i)))
+	}
+	if c := hit("192.0.2.9", "9.9.9.9"); c != 429 {
+		t.Fatalf("forged X-Forwarded-For escaped the limit: %d", c)
+	}
+	// A spoofed left-most entry from behind the proxy is ignored: the right-most one counts.
+	if c := hit("10.0.0.1", "6.6.6.6, 203.0.113.5"); c != 429 {
+		t.Fatalf("spoofed prefix escaped member A's limit: %d", c)
+	}
+}

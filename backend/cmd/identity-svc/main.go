@@ -10,6 +10,9 @@
 //	RP_ORIGINS      comma-separated allowed origins (e.g. http://localhost:3000)
 //	CONTACT_PEPPER  hex, >= 32 bytes in prod (HSM-held in production)
 //	PORT            default 8081
+//	TRUSTED_PROXIES comma-separated proxy addresses whose X-Forwarded-For is believed
+//	                (the web app's proxy, the edge gateway); dev default 127.0.0.1,::1
+//	RATE_LIMIT_PER_MIN requests per client address per minute (default 120)
 package main
 
 import (
@@ -17,6 +20,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -47,6 +51,18 @@ func main() {
 		RPDisplayName: "Member services", // neutral: shown in the device's passkey manager
 		RPOrigins:     strings.Split(env("RP_ORIGINS", "http://localhost:3000"), ","),
 		Env:           mode,
+	}
+	if v := os.Getenv("TRUSTED_PROXIES"); v != "" {
+		cfg.TrustedProxies = strings.Split(v, ",")
+	} else if mode == "dev" {
+		cfg.TrustedProxies = []string{"127.0.0.1", "::1"}
+	}
+	if v := os.Getenv("RATE_LIMIT_PER_MIN"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			log.Fatal("RATE_LIMIT_PER_MIN must be a positive number")
+		}
+		cfg.RateLimitPerMin = n
 	}
 	if p := os.Getenv("CONTACT_PEPPER"); p != "" {
 		b, err := hex.DecodeString(p)
@@ -80,6 +96,8 @@ func main() {
 	root := http.NewServeMux()
 	root.Handle("/v1/profile", prof)
 	root.Handle("/v1/profile/", prof)
+	root.Handle("/v1/tonight", prof)
+	root.Handle("/v1/tonight/", prof)
 	root.Handle("/", srv)
 	addr := ":" + env("PORT", "8081")
 	log.Printf("identity-svc (%s) listening on %s", mode, addr)

@@ -46,6 +46,11 @@ type Config struct {
 	Sender        Sender
 	Jurisdictions gate.Jurisdictions
 	Now           func() time.Time
+	// TrustedProxies are the addresses (e.g. the web app's proxy, the edge gateway) whose
+	// X-Forwarded-For header is believed. Everyone else is limited by their own address.
+	TrustedProxies []string
+	// RateLimitPerMin per client address; default 120.
+	RateLimitPerMin int
 	// DevBirthYM stands in for the age-assurance provider in dev only: new accounts get this
 	// verified birth year-month so profile screens can show an age. Refused in prod.
 	DevBirthYM string
@@ -151,10 +156,39 @@ func decode(r *http.Request, v any) error {
 	return dec.Decode(v)
 }
 
-func (s *Server) allow(r *http.Request) bool {
+// clientIP is the caller's address. Behind a trusted proxy it is the last address the proxy
+// appended to X-Forwarded-For (the one the proxy itself saw); a client cannot spoof it by
+// sending its own header, because only the right-most entry from a trusted hop is used.
+func (s *Server) clientIP(r *http.Request) string {
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		ip = r.RemoteAddr
+	}
+	trusted := false
+	for _, p := range s.cfg.TrustedProxies {
+		if p == ip {
+			trusted = true
+		}
+	}
+	if !trusted {
+		return ip
+	}
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff == "" {
+		return ip
+	}
+	parts := strings.Split(xff, ",")
+	if last := strings.TrimSpace(parts[len(parts)-1]); last != "" {
+		return last
+	}
+	return ip
+}
+
+func (s *Server) allow(r *http.Request) bool {
+	ip := s.clientIP(r)
+	limit := s.cfg.RateLimitPerMin
+	if limit <= 0 {
+		limit = perIPRequestsPerMin
 	}
 	now := s.cfg.Now()
 	s.store.mu.Lock()
@@ -166,8 +200,9 @@ func (s *Server) allow(r *http.Request) bool {
 			kept = append(kept, t)
 		}
 	}
-	if len(kept) >= perIPRequestsPerMin {
+	if len(kept) >= limit {
 		s.rl[ip] = kept
+		log.Printf("rate_limited path=%s", r.URL.Path) // no address logged (NFR-11)
 		return false
 	}
 	s.rl[ip] = append(kept, now)

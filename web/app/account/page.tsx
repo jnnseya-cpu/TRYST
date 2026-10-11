@@ -52,7 +52,8 @@ export default function Account() {
         <p>Signed in with two checks ({me.surface === "desktop" ? "computer" : "phone"}).</p>
         <p className="note">Passkeys registered: {me.passkeys} · Verification: {me.tier}</p>
       </section>
-      <a className="button" href="/profile" style={{ marginBottom: "0.8rem" }}>Your profile and photos</a>
+      <a className="button" href="/tonight" style={{ marginBottom: "0.8rem" }}>Free tonight?</a>
+      <a className="button ghost" href="/profile" style={{ marginBottom: "0.8rem" }}>Your profile and photos</a>
       <button type="button" className="button ghost" onClick={signOut}>Sign out</button>
       <p />
       <button type="button" className="button ghost" onClick={burn}>Burn: sign out everywhere and wipe this device</button>

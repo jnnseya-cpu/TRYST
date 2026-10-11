@@ -574,6 +574,9 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 | GET | `/v1/slate` | V2 | Up to 18 cards incl. 15% exploration; each with `explanation_codes` (2–4) and `paid_label`. Re-authorised against the current Discretion Policy and block graph on every read |
 | POST | `/v1/intent` | V2 | `{target, keys_spent}` → `202 {intent_id, state}`. Inbound-cap overflow returns `state=sent` to the sender and is queued (the cap is never revealed) |
 | POST | `/v1/pass` · `/v1/save` | V2 | Private |
+| GET / PUT / DELETE | `/v1/tonight` | V2 | **Tonight** (FR-109): view; go free for 1–6 hours within about 5/10/25/50 km; stop. Needs a complete profile. Lists only members who are also free, within both members' radius, inside the Stage 0 gates; each identified by a per-viewer handle; approximate distance only |
+| POST | `/v1/tonight/interest/{handle}` | V2 | Private interest; shown to neither side until mutual; at most 10 per evening |
+| GET | `/v1/tonight/photos/{handle}/{n}` | V2 | The n-th photo the viewer may see (main + shown; blurred never served) while both are free |
 | POST | `/v1/signals:batch` | V0 | ≤ 50 behaviour events (§8) |
 | GET | `/v1/preferences/insights` | V2 | Category-level view of what has been learned (never a raw vector) |
 | POST | `/v1/preferences/correction` | V2 | "More / less like this" and category corrections |
@@ -899,6 +902,10 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-106 | Partner shield: a member may add their partner's phone number or email, blinded on device (hashed match in P1, PSI in P2 with FR-010); if the partner joins, both are permanently and silently invisible to each other; couple partners on TRYST and household signals are shielded the same way | Both | P1 | Founder v1.3, D-45 |
 | FR-107 | A member may hold a private solo profile and a joint couple profile under one account; the partner never sees the solo profile or any of its activity, notifications or payments, and the couple profile shows only couple activity; enforced as the Stage 0 `partner_secret` gate | Both | P1 | Founder v1.3, D-45 |
 | FR-108 | Never confirm or deny: support, legal and every other channel answer only "We can't say whether any person has an account"; account information goes only to the signed-in holder, a court order or lawful request reviewed by counsel, or the emergency rule (P7) | BE | P1 | Founder v1.3, ToS 14.4 |
+| FR-109 | Tonight: a member with a complete profile can go free for 1–6 hours and see who nearby is also free; visibility is reciprocal and ends when they stop or time runs out; approximate distance only; per-viewer handles; private interest revealed only when mutual; at most 10 interests an evening; all Stage 0 gates apply | Both | P1 | Founder v1.3, D-46 |
+| FR-110 | Message-safety baseline: deterministic on-device rules for M6f, M6g and M6h ship at launch and must pass every labelled vector in `contracts/vocab/guardian_vectors.json` (no misses, no false positives) on every client; a trained model replaces a rule only when it beats it on the held-out evaluation gate (03 §7.7) | Both | P1 | Founder v1.3, D-47 |
+| FR-111 | Safety line staffed 24/7 from launch by a contracted alarm-receiving centre (BS EN 50518, BS 8484) with the on-call T&S rota as backup: acknowledgement within 60 s or the alert moves on; an ARC with no heartbeat for 5 minutes is skipped; if nobody acknowledges, the trusted contact is alerted and the member's phone shows the 999 / Silent Solution screen; alerts carry only alias, callback number, shared location, meet window and reason | BE | P1 | Founder v1.3, D-48 |
+| FR-112 | V2 identity checks run only through a provider with a valid, evidenced liveness certificate (ISO/IEC 30107-3, iBeta Level 2 or equivalent); without a valid injection-attack certificate (CEN/TS 18099 or equivalent) capture is native-app only with platform attestation and the web hands off by QR; with no certified provider, V2 fails closed; certificate expiry is monitored | BE | P1 | Founder v1.3, D-49 |
 
 ### 10.2 Non-functional requirements
 

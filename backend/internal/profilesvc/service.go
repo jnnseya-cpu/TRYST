@@ -54,6 +54,8 @@ type photo struct {
 }
 
 type memberProfile struct {
+	BirthYM     string // copied from the signed-in account; shown as age only
+	Tier        string
 	DisplayName string
 	AreaID      string
 	CityOnly    bool
@@ -68,6 +70,11 @@ type Service struct {
 	mu   sync.Mutex
 	data map[string]*memberProfile
 	mux  *http.ServeMux
+	tn   *tonight
+	// Eligible is the Stage 0 check (production: Broker gates). Nil = dev default.
+	Eligible Eligible
+	// MinDiscoveryTier is the tier needed to use Tonight (V2 in production, E-01).
+	MinDiscoveryTier string
 }
 
 // New returns the service. env "prod" refuses DevModerator.
@@ -78,7 +85,11 @@ func New(auth Authenticator, mod Moderator, env string) (*Service, error) {
 	if _, dev := mod.(DevModerator); dev && env != "dev" {
 		return nil, errors.New("DevModerator is forbidden outside the dev environment")
 	}
-	s := &Service{auth: auth, mod: mod, now: time.Now, data: map[string]*memberProfile{}, mux: http.NewServeMux()}
+	s := &Service{auth: auth, mod: mod, now: time.Now, data: map[string]*memberProfile{}, mux: http.NewServeMux(),
+		tn: newTonight(), MinDiscoveryTier: "V2"}
+	if env == "dev" {
+		s.MinDiscoveryTier = "V0" // dev accounts have no real ID check; production requires V2
+	}
 	m := s.mux
 	m.HandleFunc("GET /v1/profile", s.handleGet)
 	m.HandleFunc("PUT /v1/profile", s.handlePut)
@@ -90,6 +101,11 @@ func New(auth Authenticator, mod Moderator, env string) (*Service, error) {
 	m.HandleFunc("PATCH /v1/profile/photos/{id}", s.handlePatch)
 	m.HandleFunc("POST /v1/profile/photos/{id}/main", s.handleMain)
 	m.HandleFunc("DELETE /v1/profile/photos/{id}", s.handleDelete)
+	m.HandleFunc("GET /v1/tonight", s.handleTonight)
+	m.HandleFunc("PUT /v1/tonight", s.handleTonightStart)
+	m.HandleFunc("DELETE /v1/tonight", s.handleTonightStop)
+	m.HandleFunc("POST /v1/tonight/interest/{handle}", s.handleTonightInterest)
+	m.HandleFunc("GET /v1/tonight/photos/{handle}/{n}", s.handleTonightPhoto)
 	return s, nil
 }
 
@@ -122,6 +138,7 @@ func (s *Service) member(w http.ResponseWriter, r *http.Request) (identity.Accou
 		p = &memberProfile{}
 		s.data[acc.ID] = p
 	}
+	p.BirthYM, p.Tier = acc.BirthYM, acc.Tier.String()
 	return acc, p, true
 }
 

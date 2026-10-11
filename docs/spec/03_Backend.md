@@ -498,6 +498,8 @@ Fairness slices: dialect/register (AAVE, MLE, regional), non-native English, gen
 
 **G. Working with the authorities** (FR-105). A lawful-request process with legal review; emergency disclosure when life is at risk, approved by the DPO and Head of T&S; preservation on request; mandatory reporting of child sexual abuse material to the NCA and IWF; counts published in the transparency report. Court orders (SHPO, restraining or non-molestation) and police notifications are grounds for immediate permanent removal (01 §8.2).
 
+**H. Launch risks closed (v1.3).** (1) *Message-safety models:* a deterministic on-device baseline ships first and must pass every labelled vector; trained models replace a rule only through the gate in [D-47](06_Decisions_and_Changes.md#2-decision-log) (`backend/internal/guardian`, `contracts/vocab/guardian_vectors.json`). (2) *24/7 safety line:* staffed from launch by a contracted alarm-receiving centre with on-call backup, 60-second acknowledgement and heartbeat failover ([D-48](06_Decisions_and_Changes.md#2-decision-log), `backend/internal/meet/escalation.go`). (3) *Fake camera feeds:* certification-gated provider routing; native-app capture with attestation when no injection certificate is on file; V2 fails closed without a liveness certificate ([D-49](06_Decisions_and_Changes.md#2-decision-log), `backend/internal/assurance`).
+
 ---
 
 ## 8. Admission control (L1–L5)

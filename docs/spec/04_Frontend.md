@@ -96,6 +96,7 @@ Implements [02 §3.3](02_Shared_Contracts.md#33-login-assurance--account-holder-
 ### 4.2 Loop B — Discovery
 
 - **Slate view:** up to 18 cards; no infinite scroll, no swipe mechanic.
+- **Tonight** (FR-109): "I'm free tonight" for 1–6 hours within about 5–50 km; a list of members who are also free (photo, name, age, area, approximate distance) with an "Interested" button; "It's mutual" only when both said yes; the safety reminder above the list; "Stop now" hides the member at once.
 - **Each card shows:** main photo, pseudonym, age, area and approximate distance ("About 10 km away"), modes, verification tier (and the dated "both partners verified" statement for couples), and 2–4 reason chips with a "not quite" correction control (FR-025). Paid placement is labelled visibly.
 - **Actions:** Send Intent (shows the Keys cost and the "refunded if they reply" promise), Pass, Save.
 - Intent sending is **never** blocked by the counterparty's inbound cap, and the UI never reveals it.

@@ -182,3 +182,46 @@ for (const [label, viewport, mobile] of [["desktop", { width: 1440, height: 900 
     await shot(page, `profile-card-preview-${label}`, true);
   });
 }
+
+async function withProfile(page: Page, name: string, district: string, photo: string) {
+  await page.goto("/profile");
+  await page.getByTestId("file-input").setInputFiles([FX(photo)]);
+  await page.getByTestId("photo").first().waitFor();
+  await page.getByLabel("Name shown to members").fill(name);
+  await page.getByLabel("Name shown to members").blur();
+  await page.getByLabel("Area").selectOption({ label: district });
+  await page.getByTestId("ready").waitFor();
+}
+
+test("tonight (desktop and phone)", async ({ browser }) => {
+  const me = await signedIn(browser, { width: 1440, height: 900 }, false);
+  const others: Page[] = [];
+  const crowd: [string, string, string][] = [["Juniper", "Camden", "photo-2.jpg"], ["Marlowe", "Hackney", "photo-3.jpg"], ["Sable", "Shoreditch", "photo-4.jpg"]];
+  for (const [name, district, photo] of crowd) {
+    const p = await signedIn(browser, { width: 390, height: 844 }, true);
+    await withProfile(p, name, district, photo);
+    others.push(p);
+  }
+  await withProfile(me, "Velvet", "Islington", "photo-1.jpg");
+  await me.goto("/tonight");
+  await shot(me, "tonight-start-desktop");
+  await me.getByRole("button", { name: /I.m free tonight/ }).click();
+  for (const p of others) {
+    await p.goto("/tonight");
+    await p.getByRole("button", { name: /I.m free tonight/ }).click();
+    await p.getByTestId("tonight-on").waitFor();
+  }
+  await me.reload();
+  await me.getByTestId("person").nth(2).waitFor();
+  await me.getByTestId("person").first().getByRole("button", { name: "Interested" }).click();
+  await me.getByText("Interest sent").waitFor();
+  // Juniper says yes back: mutual.
+  await others[0].reload();
+  await others[0].getByTestId("person").filter({ hasText: "Velvet" }).getByRole("button", { name: "Interested" }).click();
+  await others[0].getByTestId("mutual").waitFor();
+  await shot(others[0], "tonight-mutual-phone", true);
+  await me.reload();
+  await me.getByTestId("mutual").waitFor();
+  await me.waitForTimeout(500);
+  await shot(me, "tonight-free-nearby-desktop", true);
+});

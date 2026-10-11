@@ -5,6 +5,7 @@ import { startAuthentication } from "@simplewebauthn/browser";
 import QRCode from "qrcode";
 import { FACTOR_COPY, GENERIC_FAILURE, type Factor } from "@/lib/login";
 import { Shell } from "@/components/Shell";
+import { Action } from "@/components/Action";
 import { api, problemTitle, setToken } from "@/lib/api";
 
 type AssertionOptions = Parameters<typeof startAuthentication>[0]["optionsJSON"];
@@ -115,7 +116,7 @@ export default function SignIn() {
         <section className="card">
           <h2>Use your passkey</h2>
           <p>Your device will ask for your fingerprint, face, or screen lock.</p>
-          <button type="button" className="button" onClick={firstFactor}>Sign in with passkey</button>
+          <Action className="button" onClick={firstFactor}>Sign in with passkey</Action>
         </section>
       )}
 
@@ -123,7 +124,7 @@ export default function SignIn() {
         <section className="card">
           <h2>{FACTOR_COPY.B2.title}</h2>
           <p>{FACTOR_COPY.B2.body}</p>
-          <button type="button" className="button" onClick={liveness}>Start live check</button>
+          <Action className="button" onClick={liveness}>Start live check</Action>
         </section>
       )}
 
@@ -131,7 +132,7 @@ export default function SignIn() {
         <section className="card">
           <h2>{FACTOR_COPY.F2.title}</h2>
           {!qr ? (
-            <button type="button" className="button" onClick={phoneApproval}>Show code for my phone</button>
+            <Action className="button" onClick={phoneApproval}>Show code for my phone</Action>
           ) : (
             <div>
               <img className="qr" src={qr.img} alt="Scan with your registered phone" width={220} height={220} />
@@ -140,7 +141,7 @@ export default function SignIn() {
             </div>
           )}
           <p className="note">No phone?</p>
-          <button type="button" className="button ghost" onClick={secondKey}>Use my second security key</button>
+          <Action className="button ghost" onClick={secondKey}>Use my second security key</Action>
         </section>
       )}
 

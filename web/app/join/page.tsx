@@ -4,6 +4,7 @@ import { useState } from "react";
 import { startRegistration } from "@simplewebauthn/browser";
 import QRCode from "qrcode";
 import { Shell } from "@/components/Shell";
+import { Action } from "@/components/Action";
 import { api, problemTitle, setToken } from "@/lib/api";
 
 type Step = "contact" | "code" | "passkey" | "second" | "done";
@@ -84,7 +85,7 @@ export default function Join() {
         <section className="card">
           <label htmlFor="contact">Email or mobile number (international format)</label>
           <input id="contact" className="input" value={contact} onChange={(e) => setContact(e.target.value)} autoComplete="off" />
-          <button type="button" className="button" onClick={sendCode}>Send code</button>
+          <Action className="button" onClick={sendCode}>Send code</Action>
         </section>
       )}
 
@@ -93,7 +94,7 @@ export default function Join() {
           <label htmlFor="code">Enter the 6-digit code</label>
           <input id="code" className="input" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" />
           {devCode && <p className="note" data-testid="dev-otp">Development code: {devCode}</p>}
-          <button type="button" className="button" onClick={verify}>Continue</button>
+          <Action className="button" onClick={verify}>Continue</Action>
         </section>
       )}
 
@@ -101,7 +102,7 @@ export default function Join() {
         <section className="card">
           <h2>Create your passkey</h2>
           <p>Your device will ask for your fingerprint, face or screen lock. TRYST never sees it.</p>
-          <button type="button" className="button" onClick={() => addPasskey("platform")}>Create passkey</button>
+          <Action className="button" onClick={() => addPasskey("platform")}>Create passkey</Action>
         </section>
       )}
 
@@ -109,17 +110,17 @@ export default function Join() {
         <section className="card">
           <h2>Add your second check</h2>
           <p>Signing in on a computer needs two checks: this passkey, plus approval from your phone or a second security key.</p>
-          <button type="button" className="button" onClick={linkPhone}>Link my phone</button>
+          <Action className="button" onClick={linkPhone}>Link my phone</Action>
           {enrolLink && (
             <div>
               {qr && <img className="qr" src={qr} alt="Scan with your phone to link it" width={220} height={220} />}
               <p className="note">Or open this one-time link on your phone (valid 10 minutes):</p>
               <p className="note"><a className="code-link" data-testid="enrol-link" href={enrolLink}>{enrolLink}</a></p>
-              <button type="button" className="button" onClick={finish}>I've linked my phone</button>
+              <Action className="button" onClick={finish}>I've linked my phone</Action>
             </div>
           )}
           <p className="note">No phone? Use a second security key instead.</p>
-          <button type="button" className="button ghost" onClick={() => addPasskey("cross-platform")}>Add a security key</button>
+          <Action className="button ghost" onClick={() => addPasskey("cross-platform")}>Add a security key</Action>
         </section>
       )}
 
@@ -127,7 +128,7 @@ export default function Join() {
         <section className="card" role="status">
           <h2>You're set up</h2>
           <p>{surface === "desktop" ? "Sign in with your passkey and your second check." : "Sign in with your fingerprint or face, then a live face check."}</p>
-          <button type="button" className="button" onClick={finish}>Sign in</button>
+          <Action className="button" onClick={finish}>Sign in</Action>
         </section>
       )}
 

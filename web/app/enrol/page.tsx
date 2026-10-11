@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { startRegistration } from "@simplewebauthn/browser";
 import { Shell } from "@/components/Shell";
+import { Action } from "@/components/Action";
 import { api, problemTitle } from "@/lib/api";
 
 function EnrolInner() {
@@ -38,7 +39,7 @@ function EnrolInner() {
       {state === "ready" ? (
         <section className="card">
           <p>This phone will approve sign-ins on your computer using its fingerprint or face unlock.</p>
-          <button type="button" className="button" onClick={enrol}>Link this phone</button>
+          <Action className="button" onClick={enrol}>Link this phone</Action>
         </section>
       ) : (
         <section className="card" role="status">
