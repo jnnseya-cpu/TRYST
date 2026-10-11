@@ -86,6 +86,8 @@ type Service struct {
 	Alerts Alerting
 	// OnSignal is called when an on-device Guardian signal arrives (safety case queue).
 	OnSignal func(threadID, reporter, subject, kind string)
+	// standing holds enforcement outcomes other than good (see standing.go).
+	standing map[string]string
 	// MinDiscoveryTier is the tier needed to use Tonight (V2 in production, E-01).
 	MinDiscoveryTier string
 }
@@ -108,7 +110,7 @@ func NewWithStore(auth Authenticator, mod Moderator, env string, st store.Store,
 		return nil, errors.New("DevModerator is forbidden outside the dev environment")
 	}
 	s := &Service{auth: auth, mod: mod, now: time.Now, data: map[string]*memberProfile{}, mux: http.NewServeMux(),
-		tn: newTonight(), MinDiscoveryTier: "V2", st: st, vault: vault, dirty: map[string]bool{}, th: newThreadState(), mt: newMeetState()}
+		tn: newTonight(), MinDiscoveryTier: "V2", st: st, vault: vault, dirty: map[string]bool{}, th: newThreadState(), mt: newMeetState(), standing: map[string]string{}}
 	if err := s.load(context.Background()); err != nil {
 		return nil, err
 	}
@@ -116,6 +118,9 @@ func NewWithStore(auth Authenticator, mod Moderator, env string, st store.Store,
 		return nil, err
 	}
 	if err := s.loadMeets(context.Background()); err != nil {
+		return nil, err
+	}
+	if err := s.loadStanding(context.Background()); err != nil {
 		return nil, err
 	}
 	if env == "dev" {
@@ -226,6 +231,11 @@ func (s *Service) member(w http.ResponseWriter, r *http.Request) (identity.Accou
 		return acc, nil, false
 	}
 	s.mu.Lock()
+	if removed(s.standing[acc.ID]) {
+		s.mu.Unlock()
+		fail(w, 403, "account_suspended", "Your account is suspended. You can see why and appeal from your account page.")
+		return acc, nil, false
+	}
 	p, ok := s.data[acc.ID]
 	if !ok {
 		p = &memberProfile{}
@@ -416,6 +426,13 @@ func (s *Service) handleUpload(w http.ResponseWriter, r *http.Request) {
 	acc, ok := s.auth.Authenticate(r)
 	if !ok {
 		fail(w, 401, "auth_required", "Please sign in again.")
+		return
+	}
+	s.mu.Lock()
+	suspended := removed(s.standing[acc.ID])
+	s.mu.Unlock()
+	if suspended {
+		fail(w, 403, "account_suspended", "Your account is suspended. You can see why and appeal from your account page.")
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBytes+64<<10)

@@ -81,7 +81,7 @@ func (t *tonight) active(id string, now time.Time) *tonightEntry {
 type Eligible func(viewer, member string) bool
 
 func (s *Service) eligible(viewer, member string) bool {
-	if viewer == member || s.isBlocked(viewer, member) {
+	if viewer == member || s.isBlocked(viewer, member) || s.standing[member] == "shadow_limit" {
 		return false
 	}
 	if s.Eligible != nil {

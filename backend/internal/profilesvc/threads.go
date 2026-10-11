@@ -159,8 +159,11 @@ func (s *Service) saveThread(ctx context.Context, t *thread) {
 	}
 }
 
-// isBlocked reports whether either member blocked the other.
-func (s *Service) isBlocked(a, b string) bool { return s.th.blocked[a][b] || s.th.blocked[b][a] }
+// isBlocked reports whether either member blocked the other, or either has been suspended
+// or removed (their conversations close).
+func (s *Service) isBlocked(a, b string) bool {
+	return s.th.blocked[a][b] || s.th.blocked[b][a] || removed(s.standing[a]) || removed(s.standing[b])
+}
 
 // ensureThread opens the thread for a mutual pair. Caller holds s.mu.
 func (s *Service) ensureThread(ctx context.Context, a, b, origin string) *thread {
@@ -487,7 +490,7 @@ func (s *Service) handleSignal(w http.ResponseWriter, r *http.Request) {
 		Model string `json:"model"`
 		About string `json:"about"` // "received" or "blocked_send"
 	}
-	if json.NewDecoder(io.LimitReader(r.Body, maxJSON)).Decode(&in) != nil {
+	if json.NewDecoder(io.LimitReader(r.Body, maxJSON)).Decode(&in) != nil || (in.About != "received" && in.About != "blocked_send") {
 		fail(w, 422, "validation_failed", "Invalid signal.")
 		return
 	}
@@ -505,7 +508,13 @@ func (s *Service) handleSignal(w http.ResponseWriter, r *http.Request) {
 	t.Signals[fmt.Sprintf("%d:%s", s.now().Unix(), acc.ID[:min(8, len(acc.ID))])] = in.Kind + "/" + in.Model + "/" + in.About
 	s.saveThread(r.Context(), t)
 	if s.OnSignal != nil {
-		s.OnSignal(t.ID, acc.ID, t.other(acc.ID), in.Kind)
+		// "received": the other member sent it. "blocked_send": the caller's own device
+		// refused to send it, so the caller is the subject.
+		subject := t.other(acc.ID)
+		if in.About == "blocked_send" {
+			subject = acc.ID
+		}
+		s.OnSignal(t.ID, acc.ID, subject, in.Kind)
 	}
 	writeJSON(w, 200, map[string]any{"thread": s.viewThread(acc.ID, t)})
 }

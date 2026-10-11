@@ -10,9 +10,11 @@ import "./messages.css";
 export default function Messages() {
   const [threads, setThreads] = useState<ThreadView[] | null>(null);
   const [signedOut, setSignedOut] = useState(false);
+  const [suspended, setSuspended] = useState(false);
 
   useEffect(() => {
     api<{ threads: ThreadView[] }>("/v1/threads", { token: getToken() }).then((r) => {
+      if (r.status === 403) return setSuspended(true);
       if (r.status !== 200) return setSignedOut(true);
       setThreads(r.data.threads);
       registerDevice().catch(() => undefined);
@@ -20,6 +22,7 @@ export default function Messages() {
   }, []);
 
   if (signedOut) return <Shell><h1>Signed out</h1><a className="button inline" href="/sign-in">Sign in</a></Shell>;
+  if (suspended) return <Shell><h1>Account suspended</h1><p>You can see why, and appeal, from your account page.</p><a className="button inline" href="/account">Your account</a></Shell>;
   if (!threads) return <Shell><p>Loading…</p></Shell>;
   return (
     <Shell wide>

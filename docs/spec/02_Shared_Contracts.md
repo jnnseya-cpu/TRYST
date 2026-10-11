@@ -614,13 +614,29 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 
 | Method | Path | Min | Contract |
 |---|---|---|---|
-| POST | `/v1/report` | V0 | `{subject, category, disclosed_content?, training_consent?}` → SLA routing. The reporter is never revealed |
+| GET | `/v1/reports/categories` | V0 | Report categories with member-facing labels |
+| POST | `/v1/reports` | V0 | `{thread_id, category, disclosed[]?, note?}` → `{reference}`. Opens a case with a deadline from the escalation matrix (minor 15 min; image abuse, sextortion, threats 1 h; fraud, commercial sex 4 h; others 24 h). `disclosed` holds only messages the reporter ticked (≤ 20); nothing else from an E2EE thread reaches TRYST. Suspected minor, threats of violence and stalking freeze the subject until a moderator decides (03 §7.3 "Automatic"); corroborating reports close with the decision. The reporter is never revealed and the other member is not told ([FR-116](#10-requirement-catalogue)) |
+| GET | `/v1/me/standing` | V0 | `{standing, decisions[]}`: each enforcement decision with its reason and appeal state |
 | POST | `/v1/block` | V0 | Bidirectional and immediate; removes thread access |
 | POST | `/v1/guardian/signals` | V2 | On-device scores: `{thread_id, model_id, version, score, reason_code}`. **Never content** |
 | POST | `/v1/safety/panic` | V0 | **Emergency.** Live location + preserved evidence → emergency escalation. Overrides TTLs (P7) |
 | POST | `/v1/safety/share-plan` | V2 | Encrypted, unbranded, auto-deleting plan for a trusted contact |
-| POST | `/v1/appeals` | V0 | Appeal an enforcement action; a different reviewer decides within 10 working days |
+| POST | `/v1/appeals` | V0 | `{decision_id, text}` (10–4000 chars). One appeal per decision; a reviewer not involved in the decision (or its confirmation) decides within 10 working days; overturning restores standing |
 | POST | `/v1/attestations/dbs` | V2 | Self-submitted Basic DBS through the issuing route; shown as a dated fact (P3) |
+
+**Moderator console** (`/ops/v1/*`, staff only, separate host behind the company sign-in proxy; identity from `X-Staff-Identity` believed only from that proxy; dev tokens refused outside dev). Every call is written to a hash-chained audit log (`ops.admin_action`).
+
+| Method | Path | Contract |
+|---|---|---|
+| GET | `/ops/v1/cases` | Open cases and pending appeals, most urgent deadline first |
+| GET | `/ops/v1/cases/{id}` | Subject pseudonym and city, disclosed messages, note, number of independent reporters, prior strikes. Reporter shown as `hidden` |
+| GET | `/ops/v1/cases/{id}/photo?reason=` | Subject's main photo; reason ≥ 10 chars, recorded on the case and in the audit log |
+| POST | `/ops/v1/cases/{id}/decision` | `{outcome: dismiss\|uphold, ground?, reason}`. Action follows the ladder (`enforcement.Decide`); one uncorroborated report can't remove anyone (422 `not_enough_grounds`). Permanent removal → `pending_second` with interim suspension |
+| POST | `/ops/v1/cases/{id}/confirm` | `{agree?, reason?}`. A different moderator confirms (permanent) or sends back (case reopens, interim suspension lifted); same person → 403 |
+| POST | `/ops/v1/cases/{id}/appeal` | `{member_wins, reason}`. Anyone involved in the decision → 403 `different_reviewer` |
+| GET | `/ops/v1/audit/verify` · `/ops/v1/stats` | Chain integrity; transparency-report counts (no member data) |
+
+Standing is enforced on the member platform: `suspend` and `permanent` refuse member actions (403 `account_suspended`), close the member's conversations and hide them from Tonight; `shadow_limit` hides them from Tonight only.
 
 ### 5.9 Commerce (web-first)
 
@@ -912,6 +928,7 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-112 | V2 identity checks run only through a provider with a valid, evidenced liveness certificate (ISO/IEC 30107-3, iBeta Level 2 or equivalent); without a valid injection-attack certificate (CEN/TS 18099 or equivalent) capture is native-app only with platform attestation and the web hands off by QR; with no certified provider, V2 fails closed; certificate expiry is monitored | BE | P1 | Founder v1.3, D-49 |
 | FR-113 | Everything a member creates survives restarts: identities, credentials, sessions and profiles persist in per-domain PostgreSQL databases; photos are stored encrypted under the member's own key and unreadable without the key vault; services refuse to start in production without their databases and key-encryption key | BE | P1 | D-50 |
 | FR-114 | End-to-end encrypted conversations: a thread opens only after mutual interest; every message is encrypted on the sender's device separately for each device of both members; the server stores and relays ciphertext only, with expiry from retention; the on-device Guardian warns on fraud, refuses to send child-safety content and freezes threads on child-safety or extortion signals; either member can block, which closes the thread for both and hides them from each other | Both | P1 | A §9.2, D-51 |
+| FR-116 | Report, enforce and appeal: members report from a conversation (category, optionally the messages they choose to share, and block in the same step); on-device Guardian signals open cases automatically; moderators work a deadline-ordered queue where reporters are hidden, photos are blurred until a reason is recorded, decisions follow the enforcement ladder, permanent removal needs a second moderator, every action is in a tamper-evident log; members see each decision with its reason and appeal to a different reviewer | Both | P1 | A §7.3, A §8, FR-033–FR-035, ToS cl. 17–18, D-52 |
 | FR-115 | Meet planning and safety screens: propose and confirm a meet in the conversation (place never sent to TRYST), door-check words and verified photo on arrival, check-ins with duress PIN and "home safe", Share my plan (neutral text), and a Panic screen with a 999 call button and the Silent Solution; server-side timers alert the trusted contact and the safety line | Both | P1 | A §19.7, FR-020–FR-022, FR-099, FR-100 |
 
 ### 10.2 Non-functional requirements

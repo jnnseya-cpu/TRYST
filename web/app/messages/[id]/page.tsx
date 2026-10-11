@@ -7,6 +7,7 @@ import { api, getToken, problemTitle } from "@/lib/api";
 import { check, MODEL } from "@/lib/guardian";
 import { imageURL } from "@/lib/profile";
 import { readSince, registerDevice, sendPayload, threadDetail, type Shown, type ThreadView } from "@/lib/threads";
+import { Report } from "./Report";
 import "../../profile/profile.css";
 import "../messages.css";
 
@@ -25,11 +26,14 @@ export default function Conversation() {
   const [banners, setBanners] = useState<string[]>([]);
   const [photo, setPhoto] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [suspended, setSuspended] = useState(false);
   const last = useRef(0);
   const flagged = useRef(new Set<number>());
 
   const refresh = useCallback(async () => {
     const d = await threadDetail(id);
+    if (d.status === 403) return setSuspended(true);
     if (d.status !== 200) return setMissing(true);
     setThread(d.data.thread);
     const fresh = await readSince(id, last.current);
@@ -72,6 +76,10 @@ export default function Conversation() {
 
   async function block() {
     if (!confirm("Block and close this conversation? They won't be told why, and you won't see each other again.")) return;
+    await doBlock();
+  }
+
+  async function doBlock() {
     const r = await api<{ thread: ThreadView }>(`/v1/threads/${id}/block`, { method: "POST", token: getToken() });
     if (r.status === 200) setThread(r.data.thread);
     else setError(problemTitle(r.data));
@@ -82,6 +90,7 @@ export default function Conversation() {
     if (r.status === 200) setThread(r.data.thread);
   }
 
+  if (suspended) return <Shell><h1>Account paused</h1><p>Your account is paused while our safety team takes a look. You can see more, and appeal, from your account page.</p><a className="button inline" href="/account">Your account</a></Shell>;
   if (missing) return <Shell><h1>Conversation not available</h1><a href="/messages">All messages</a></Shell>;
   if (!thread) return <Shell><p>Loading…</p></Shell>;
   const open = thread.state === "normal";
@@ -133,7 +142,9 @@ export default function Conversation() {
           </select>
         </label>
         {open && <button type="button" className="ms-block" onClick={block}>Block</button>}
+        {!reporting && <button type="button" className="ms-block" onClick={() => setReporting(true)}>Report</button>}
       </section>
+      {reporting && <Report threadId={id} name={thread.name} items={items} canBlock={open} onBlock={doBlock} onClose={() => setReporting(false)} />}
       <p><a href="/messages">All messages</a></p>
     </Shell>
   );

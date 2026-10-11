@@ -23,3 +23,8 @@
 .ms-retain { display: flex; gap: 0.8rem; align-items: center; margin: 0; text-transform: none; letter-spacing: 0; font-size: 0.9rem; color: var(--ink-muted); }
 .ms-retain .input { margin: 0; width: auto; font-size: 1rem; }
 .ms-block { background: none; border: 0; color: var(--ink-muted); text-decoration: underline; cursor: pointer; font-family: var(--sans); font-size: 0.9rem; }
+.ms-report { max-width: 40rem; border-top: 1px solid var(--hairline); padding-top: 1.2rem; }
+.ms-cats { border: 0; padding: 0; margin: 1rem 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.ms-cats legend { font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--tryst-champagne); margin-bottom: 0.6rem; }
+.ms-cats label, .ms-check { text-transform: none; letter-spacing: 0; font-size: 0.95rem; color: var(--tryst-cream); display: flex; gap: 0.6rem; align-items: baseline; margin: 0; }
+.ms-check { margin: 0.8rem 0 1rem; }

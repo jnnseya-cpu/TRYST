@@ -18,11 +18,16 @@
 //	                back to memory when unset)
 //	DATA_KEK        hex, 32 bytes: key-encryption key for member data keys (KMS in
 //	                production; required whenever DATABASE_URL_KEYS is set)
+//	DATABASE_URL_SAFETY  the Trust & Safety database (cases, decisions, audit chain)
+//	STAFF_TRUSTED_PROXIES comma-separated addresses of the staff sign-in proxy whose
+//	                X-Staff-Identity / X-Staff-Roles headers are believed (/ops/v1/*)
+//	STAFF_DEV_TOKENS dev only: id:role:token,... for the moderator console
 package main
 
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"log"
 	"net/http"
@@ -33,6 +38,7 @@ import (
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
 	"github.com/jnnseya-cpu/tryst/backend/internal/profilesvc"
+	"github.com/jnnseya-cpu/tryst/backend/internal/safetysvc"
 	"github.com/jnnseya-cpu/tryst/backend/internal/store"
 )
 
@@ -146,6 +152,25 @@ func main() {
 		prof.Alerts = &profilesvc.LogAlerting{}
 		log.Printf("DEV MODE: safety alerts go to the log, not to real contacts or the alarm-receiving centre.")
 	}
+	staff := safetysvc.StaffAuth{Env: mode, DevTokens: map[string]safetysvc.Staff{}}
+	if v := os.Getenv("STAFF_TRUSTED_PROXIES"); v != "" {
+		staff.TrustedProxies = strings.Split(v, ",")
+	}
+	if v := os.Getenv("STAFF_DEV_TOKENS"); v != "" {
+		for _, item := range strings.Split(v, ",") {
+			parts := strings.SplitN(item, ":", 3)
+			if len(parts) != 3 || len(parts[2]) < 16 {
+				log.Fatal("STAFF_DEV_TOKENS entries are id:role:token with a token of 16+ characters")
+			}
+			h := sha256.Sum256([]byte(parts[2]))
+			staff.DevTokens[hex.EncodeToString(h[:])] = safetysvc.Staff{ID: parts[0], Roles: []string{parts[1]}}
+		}
+	}
+	safety, err := safetysvc.New(srv, staff, prof, openStore(ctx, mode, "DATABASE_URL_SAFETY"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	prof.OnSignal = safety.FromSignal
 	go func() {
 		for range time.Tick(30 * time.Second) {
 			prof.SweepSafety(context.Background())
@@ -161,6 +186,11 @@ func main() {
 	root.Handle("/v1/devices/", prof)
 	root.Handle("/v1/meets/", prof)
 	root.Handle("/v1/safety/", prof)
+	root.Handle("/v1/reports", safety)
+	root.Handle("/v1/reports/", safety)
+	root.Handle("/v1/appeals", safety)
+	root.Handle("/v1/me/standing", safety)
+	root.Handle("/ops/v1/", safety)
 	root.Handle("/", srv)
 	addr := ":" + env("PORT", "8081")
 	log.Printf("identity-svc (%s) listening on %s", mode, addr)

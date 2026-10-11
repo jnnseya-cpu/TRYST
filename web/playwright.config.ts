@@ -2,7 +2,8 @@ import { defineConfig } from "@playwright/test";
 
 // End-to-end tests: real Chromium, virtual WebAuthn authenticators, the real Go identity
 // service (dev mode) and the production Next.js build. Every test browser shares one address
-// (127.0.0.1), so the per-address rate limit is raised for the test run only.
+// (127.0.0.1), so the per-address rate limit is raised for the test run only. The moderator
+// console is routed (OPS_CONSOLE=1) with dev staff tokens.
 const chromium = process.env.CHROMIUM_PATH; // e.g. /opt/pw-browsers/chromium-1194/chrome-linux/chrome
 
 export default defineConfig({
@@ -17,13 +18,13 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "cd ../backend && go build -o ../web/.e2e-identity-svc ./cmd/identity-svc && TRYST_ENV=dev RP_ID=localhost RP_ORIGINS=http://localhost:3000 PORT=8081 RATE_LIMIT_PER_MIN=2000 ../web/.e2e-identity-svc",
+      command: "cd ../backend && go build -o ../web/.e2e-identity-svc ./cmd/identity-svc && TRYST_ENV=dev RP_ID=localhost RP_ORIGINS=http://localhost:3000 PORT=8081 RATE_LIMIT_PER_MIN=2000 STAFF_DEV_TOKENS=mod1:moderator:e2e-mod-one-token-0001,mod2:moderator:e2e-mod-two-token-0002,lead1:lead:e2e-lead-token-00000003 ../web/.e2e-identity-svc",
       url: "http://localhost:8081/healthz",
       timeout: 180_000,
       reuseExistingServer: false,
     },
     {
-      command: "npm run build && npm run start -- -p 3000",
+      command: "OPS_CONSOLE=1 npm run build && OPS_CONSOLE=1 npm run start -- -p 3000",
       url: "http://localhost:3000",
       timeout: 300_000,
       reuseExistingServer: false,

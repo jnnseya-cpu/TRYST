@@ -19,7 +19,12 @@ const IDENTITY_URL = process.env.IDENTITY_URL ?? "http://localhost:8081";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   async rewrites() {
-    return [{ source: "/v1/:path*", destination: `${IDENTITY_URL}/v1/:path*` }];
+    return [
+      { source: "/v1/:path*", destination: `${IDENTITY_URL}/v1/:path*` },
+      // Moderator console API. Production serves it on a separate staff-only host behind the
+      // company sign-in proxy; the member site never routes it.
+      ...(process.env.OPS_CONSOLE === "1" ? [{ source: "/ops/v1/:path*", destination: `${IDENTITY_URL}/ops/v1/:path*` }] : []),
+    ];
   },
   async headers() {
     return [

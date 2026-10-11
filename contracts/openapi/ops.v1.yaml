@@ -1,0 +1,181 @@
+openapi: 3.1.0
+info:
+  title: TRYST Moderator Console API
+  version: 1.0.0
+  summary: Staff-only Trust & Safety console (FR-116, D-52).
+  description: |
+    Generated from docs/spec/02_Shared_Contracts.md §5.8 (moderator console). That section is
+    the source of truth. Served on a separate staff-only host behind the company sign-in
+    proxy; staff identity comes from `X-Staff-Identity` / `X-Staff-Roles`, believed only from
+    that proxy. Every call is written to a hash-chained audit log. Reporters are never shown.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: https://ops.tryst.example/ops/v1
+    description: Placeholder staff-only host.
+security:
+  - staffProxy: []
+tags:
+  - name: cases
+    description: Case queue, decisions and appeals
+  - name: audit
+    description: Audit log and transparency counts
+paths:
+  /cases:
+    get:
+      tags: [cases]
+      operationId: listCases
+      summary: Open cases and pending appeals, most urgent deadline first.
+      responses:
+        '200':
+          description: Queue
+          content: { application/json: { schema: { type: object, properties: { cases: { type: array, items: { $ref: '#/components/schemas/CaseSummary' } } } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /cases/{id}:
+    parameters: [{ $ref: '#/components/parameters/CaseId' }]
+    get:
+      tags: [cases]
+      operationId: getCase
+      summary: Case detail. Reporter shown as "hidden".
+      responses:
+        '200':
+          description: Case
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  case: { $ref: '#/components/schemas/CaseSummary' }
+                  subject: { type: object, properties: { name: { type: string }, area: { type: string } } }
+                  disclosed: { type: [array, 'null'], items: { type: string } }
+                  note: { type: string }
+                  reporter: { const: hidden }
+                  independent_reporters: { type: integer }
+                  prior_strikes: { type: integer }
+                  decision: { type: [object, 'null'] }
+                  appeal: { type: [object, 'null'] }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /cases/{id}/photo:
+    parameters: [{ $ref: '#/components/parameters/CaseId' }]
+    get:
+      tags: [cases]
+      operationId: revealCasePhoto
+      summary: The subject's main photo, only with a recorded reason (audited).
+      parameters:
+        - { name: reason, in: query, required: true, schema: { type: string, minLength: 10 } }
+      responses:
+        '200': { description: Image, content: { image/jpeg: { schema: { type: string, format: binary } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /cases/{id}/decision:
+    parameters: [{ $ref: '#/components/parameters/CaseId' }]
+    post:
+      tags: [cases]
+      operationId: decideCase
+      summary: Dismiss or uphold. The action follows the enforcement ladder; permanent removal waits for a second moderator.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outcome, reason]
+              properties:
+                outcome: { type: string, enum: [dismiss, uphold] }
+                ground: { type: string, enum: ['', g1, g2, g3, g4, g5, g6] }
+                reason: { type: string, minLength: 10 }
+      responses:
+        '200': { description: Decision recorded, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /cases/{id}/confirm:
+    parameters: [{ $ref: '#/components/parameters/CaseId' }]
+    post:
+      tags: [cases]
+      operationId: confirmRemoval
+      summary: A different moderator confirms a permanent removal, or sends it back.
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { agree: { type: boolean, default: true }, reason: { type: string } } }
+      responses:
+        '200': { description: Confirmed or sent back, content: { application/json: { schema: { type: object } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /cases/{id}/appeal:
+    parameters: [{ $ref: '#/components/parameters/CaseId' }]
+    post:
+      tags: [cases]
+      operationId: decideAppeal
+      summary: Decide an appeal. Anyone involved in the decision is refused.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [member_wins, reason]
+              properties:
+                member_wins: { type: boolean }
+                reason: { type: string, minLength: 10 }
+      responses:
+        '200': { description: Appeal decided, content: { application/json: { schema: { type: object } } } }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /audit/verify:
+    get:
+      tags: [audit]
+      operationId: verifyAudit
+      summary: Verify the hash chain of console actions.
+      responses:
+        '200': { description: Result, content: { application/json: { schema: { type: object, properties: { ok: { type: boolean }, entries: { type: integer } } } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /stats:
+    get:
+      tags: [audit]
+      operationId: stats
+      summary: Transparency-report counts. No member data.
+      responses:
+        '200': { description: Counts, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+components:
+  securitySchemes:
+    staffProxy:
+      type: apiKey
+      in: header
+      name: X-Staff-Identity
+      description: Set by the company sign-in proxy (Cloudflare Access or oauth2-proxy); believed only from that proxy's address.
+  parameters:
+    CaseId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, pattern: '^cs_[0-9a-f]{18}$' }
+  responses:
+    Problem:
+      description: RFC 9457 problem
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required: [title, status, code]
+            properties:
+              title: { type: string }
+              status: { type: integer }
+              code: { type: string }
+  schemas:
+    CaseSummary:
+      type: object
+      properties:
+        id: { type: string }
+        category: { type: string }
+        label: { type: string }
+        source: { type: string, enum: [report, guardian] }
+        opened: { type: string, format: date-time }
+        due: { type: string, format: date-time }
+        overdue: { type: boolean }
+        state: { type: string, enum: [open, pending_second, closed] }
+        appeal_pending: { type: boolean }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { api, getToken, setToken } from "@/lib/api";
 import { forgetDevice } from "@/lib/e2ee";
+import { Standing } from "./Standing";
 
 type Me = { session_kind: string; surface: string; tier: string; passkeys: number; expires_at: string };
 
@@ -54,6 +55,7 @@ export default function Account() {
         <p>Signed in with two checks ({me.surface === "desktop" ? "computer" : "phone"}).</p>
         <p className="note">Passkeys registered: {me.passkeys} · Verification: {me.tier}</p>
       </section>
+      <Standing />
       <a className="button" href="/tonight" style={{ marginBottom: "0.8rem" }}>Free tonight?</a>
       <a className="button ghost" href="/messages" style={{ marginBottom: "0.8rem" }}>Messages</a>
       <a className="button ghost" href="/profile" style={{ marginBottom: "0.8rem" }}>Your profile and photos</a>

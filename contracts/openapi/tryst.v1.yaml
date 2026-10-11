@@ -1444,10 +1444,30 @@ paths:
       responses: { '204': { description: Recorded privately; never shown to the counterparty } }
 
   # ---------------------------------------------------------------- safety (02 §5.8)
-  /report:
+  /reports/categories:
+    get:
+      tags: [safety]
+      operationId: reportCategories
+      summary: Report categories with member-facing labels.
+      x-min-tier: V0
+      responses:
+        '200':
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items: { type: object, properties: { key: { $ref: '#/components/schemas/ReportCategory' }, label: { type: string } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /reports:
     post:
       tags: [safety]
       operationId: report
+      summary: Report the other member of a conversation. The reporter is never revealed and the other member is not told (FR-116).
+      description: Opens a case with a deadline from the escalation matrix (03 §7.3). `disclosed` holds only messages the reporter chose to share; nothing else from an end-to-end encrypted thread reaches TRYST. Suspected minor, threats of violence and stalking freeze the subject until a moderator decides.
       x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
@@ -1456,13 +1476,46 @@ paths:
           application/json:
             schema:
               type: object
-              required: [subject, category]
+              required: [thread_id, category]
               properties:
-                subject: { type: string, format: uuid }
+                thread_id: { type: string, pattern: '^th_[0-9a-f]{24}$' }
                 category: { $ref: '#/components/schemas/ReportCategory' }
-                disclosed_content: { type: string, description: 'Reporter-decrypted content, explicitly disclosed' }
-                training_consent: { type: boolean, default: false }
-      responses: { '202': { description: Routed by SLA; reporter never revealed } }
+                disclosed: { type: array, maxItems: 20, items: { type: string }, description: 'Reporter-decrypted messages, explicitly disclosed' }
+                note: { type: string, maxLength: 2000 }
+      responses:
+        '201':
+          description: Case opened
+          content: { application/json: { schema: { type: object, properties: { reference: { type: string }, message: { type: string } } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /me/standing:
+    get:
+      tags: [safety]
+      operationId: myStanding
+      summary: Enforcement decisions about the caller, with reasons and appeal state.
+      x-min-tier: V0
+      responses:
+        '200':
+          description: Standing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  standing: { type: string, enum: [good, warn, shadow_limit, suspend, permanent] }
+                  under_review: { type: boolean, description: Paused until a moderator decides an open case }
+                  decisions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        decision_id: { type: string }
+                        action: { type: string, enum: [warn, shadow_limit, suspend, permanent] }
+                        reason: { type: string }
+                        at: { type: string, format: date-time }
+                        appeal: { type: object }
+        '401': { $ref: '#/components/responses/Problem' }
   /block:
     post:
       tags: [safety]
@@ -1527,6 +1580,7 @@ paths:
     post:
       tags: [safety]
       operationId: appeal
+      summary: Appeal an enforcement decision. Someone not involved in it decides within 10 working days; overturning restores standing.
       x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
@@ -1535,11 +1589,17 @@ paths:
           application/json:
             schema:
               type: object
-              required: [enforcement_id]
+              required: [decision_id, text]
               properties:
-                enforcement_id: { type: string, format: uuid }
-                statement: { type: string, maxLength: 4000 }
-      responses: { '202': { description: Different reviewer; 10 working days } }
+                decision_id: { type: string }
+                text: { type: string, minLength: 10, maxLength: 4000 }
+      responses:
+        '201':
+          description: Appeal received
+          content: { application/json: { schema: { type: object, properties: { due: { type: string, format: date-time }, message: { type: string } } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
   /attestations/dbs:
     post:
       tags: [safety]

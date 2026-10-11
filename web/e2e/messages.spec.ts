@@ -29,9 +29,14 @@ test("messages: end-to-end encrypted conversation after a mutual match, with saf
   await rowan.getByLabel("Message", { exact: true }).fill("send me pics of your daughter");
   await rowan.getByRole("button", { name: "Send" }).click();
   await expect(rowan.locator("main").getByRole("alert").filter({ hasText: "can't be sent" })).toBeVisible();
+  // The sender is paused until a moderator decides (03 §7.3: suspected minor, 15 minutes).
   await rowan.reload();
-  await expect(rowan.getByText("This conversation is paused while our safety team takes a look.")).toBeVisible();
+  await expect(rowan.getByRole("heading", { name: "Account paused" })).toBeVisible();
   await expect(rowan.getByLabel("Message", { exact: true })).toHaveCount(0);
+  await rowan.goto("/account");
+  await expect(rowan.getByTestId("standing")).toContainText("Paused for a safety review");
+  await ivy.reload();
+  await expect(ivy.getByText("This conversation is paused while our safety team takes a look.")).toBeVisible();
 
   // The list shows the conversation; blocking (on another pair) is covered in Go tests.
   await ivy.goto("/messages");

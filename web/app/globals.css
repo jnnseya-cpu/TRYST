@@ -104,3 +104,4 @@ label { display: block; margin-bottom: 0.5rem; font-size: 0.78rem; letter-spacin
   .reveal.d1 { animation-delay: 0.15s; } .reveal.d2 { animation-delay: 0.35s; } .reveal.d3 { animation-delay: 0.55s; } .reveal.d4 { animation-delay: 0.8s; }
   @keyframes reveal { to { opacity: 1; transform: none; } }
 }
+.st-list { list-style: none; padding: 0; margin: 1rem 0; display: flex; flex-direction: column; gap: 1.2rem; }
