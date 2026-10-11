@@ -278,7 +278,7 @@ func (s *Service) handleTonightPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer s.mu.Unlock()
-	_, other, ok := s.resolve(acc.ID, r.PathValue("handle"))
+	otherID, other, ok := s.resolve(acc.ID, r.PathValue("handle"))
 	n, err := strconv.Atoi(r.PathValue("n"))
 	if !ok || err != nil {
 		fail(w, 404, "not_found", "Not found")
@@ -289,6 +289,11 @@ func (s *Service) handleTonightPhoto(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "not_found", "Not found")
 		return
 	}
+	data, err := s.photoBytes(r.Context(), otherID, shown[n])
+	if err != nil {
+		fail(w, 404, "not_found", "Not found")
+		return
+	}
 	w.Header().Set("Content-Type", shown[n].ContentType)
-	_, _ = w.Write(shown[n].Data)
+	_, _ = w.Write(data)
 }

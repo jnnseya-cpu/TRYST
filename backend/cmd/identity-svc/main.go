@@ -13,9 +13,16 @@
 //	TRUSTED_PROXIES comma-separated proxy addresses whose X-Forwarded-For is believed
 //	                (the web app's proxy, the edge gateway); dev default 127.0.0.1,::1
 //	RATE_LIMIT_PER_MIN requests per client address per minute (default 120)
+//	DATABASE_URL_IDENTITY, DATABASE_URL_PROFILE, DATABASE_URL_KEYS
+//	                PostgreSQL DSNs, one database per domain (required in prod; dev falls
+//	                back to memory when unset)
+//	DATA_KEK        hex, 32 bytes: key-encryption key for member data keys (KMS in
+//	                production; required whenever DATABASE_URL_KEYS is set)
 package main
 
 import (
+	"context"
+	"crypto/rand"
 	"encoding/hex"
 	"log"
 	"net/http"
@@ -26,6 +33,7 @@ import (
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
 	"github.com/jnnseya-cpu/tryst/backend/internal/profilesvc"
+	"github.com/jnnseya-cpu/tryst/backend/internal/store"
 )
 
 type logSender struct{}
@@ -42,6 +50,41 @@ func env(k, def string) string {
 		return v
 	}
 	return def
+}
+
+// openStore connects to the database named by envVar. Production refuses to run without
+// it; development falls back to memory (data is lost on restart) and says so.
+func openStore(ctx context.Context, mode, envVar string) store.Store {
+	dsn := os.Getenv(envVar)
+	if dsn == "" {
+		if mode != "dev" {
+			log.Fatalf("%s is required in production", envVar)
+		}
+		log.Printf("DEV MODE: %s not set; using memory (lost on restart)", envVar)
+		return store.NewMemory()
+	}
+	p, err := store.OpenPostgres(ctx, dsn)
+	if err != nil {
+		log.Fatalf("%s: %v", envVar, err)
+	}
+	return p
+}
+
+func openVault(mode string, keys store.Store) *store.Vault {
+	kek, err := hex.DecodeString(os.Getenv("DATA_KEK"))
+	if err != nil || len(kek) != 32 {
+		if mode != "dev" {
+			log.Fatal("DATA_KEK (hex, 32 bytes) is required in production")
+		}
+		kek = make([]byte, 32)
+		_, _ = rand.Read(kek)
+		log.Printf("DEV MODE: DATA_KEK not set; using a random key (stored photos unreadable after restart)")
+	}
+	v, err := store.NewVault(keys, kek)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return v
 }
 
 func main() {
@@ -80,6 +123,12 @@ func main() {
 		}
 		log.Printf("DEV MODE: liveness auto-approves and OTPs are returned in X-Dev-OTP. Never use in production.")
 	}
+	ctx := context.Background()
+	idStore := openStore(ctx, mode, "DATABASE_URL_IDENTITY")
+	profStore := openStore(ctx, mode, "DATABASE_URL_PROFILE")
+	keyStore := openStore(ctx, mode, "DATABASE_URL_KEYS")
+	vault := openVault(mode, keyStore)
+	cfg.Persist = idStore
 	srv, err := identity.New(cfg, identity.NewStore())
 	if err != nil {
 		log.Fatal(err)
@@ -89,7 +138,7 @@ func main() {
 		mod = profilesvc.DevModerator{}
 		log.Printf("DEV MODE: photo moderation vendors are simulated; AI-label checks run for real.")
 	}
-	prof, err := profilesvc.New(srv, mod, mode)
+	prof, err := profilesvc.NewWithStore(srv, mod, mode, profStore, vault)
 	if err != nil {
 		log.Fatal(err)
 	}

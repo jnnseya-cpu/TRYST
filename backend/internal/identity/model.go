@@ -155,6 +155,21 @@ type Store struct {
 	enrols      map[string]*enrolEntry
 	approvals   map[string]*approvalEntry // qr token -> approval
 	startCounts map[string][]time.Time    // contact hash -> recent OTP sends
+
+	// Write-through persistence (D-50): identities and sessions touched by a request are
+	// saved when it finishes. Pending logins, OTPs and approvals are short-lived and stay
+	// in memory.
+	dirty     map[string]bool     // identity IDs to save
+	sessDirty map[string]*Session // token hash -> session to save (nil = delete)
+}
+
+// get returns an identity and marks it to be saved after the request.
+func (st *Store) get(id string) *Identity {
+	if i, ok := st.identities[id]; ok {
+		st.dirty[id] = true
+		return i
+	}
+	return nil
 }
 
 func NewStore() *Store {
@@ -162,6 +177,7 @@ func NewStore() *Store {
 		identities: map[string]*Identity{}, byContact: map[string]string{}, sessions: map[string]*Session{},
 		regPending: map[string]*webauthn.SessionData{}, logins: map[string]*LoginAttempt{}, otps: map[string]*otpEntry{},
 		enrols: map[string]*enrolEntry{}, approvals: map[string]*approvalEntry{}, startCounts: map[string][]time.Time{},
+		dirty: map[string]bool{}, sessDirty: map[string]*Session{},
 	}
 }
 

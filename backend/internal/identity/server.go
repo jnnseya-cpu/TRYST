@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -21,6 +22,7 @@ import (
 	"github.com/jnnseya-cpu/tryst/backend/internal/auth"
 	"github.com/jnnseya-cpu/tryst/backend/internal/gate"
 	"github.com/jnnseya-cpu/tryst/backend/internal/problem"
+	"github.com/jnnseya-cpu/tryst/backend/internal/store"
 )
 
 const (
@@ -51,6 +53,9 @@ type Config struct {
 	TrustedProxies []string
 	// RateLimitPerMin per client address; default 120.
 	RateLimitPerMin int
+	// Persist saves identities and sessions (PostgreSQL in production, D-50). Nil keeps
+	// everything in memory (tests).
+	Persist store.Store
 	// DevBirthYM stands in for the age-assurance provider in dev only: new accounts get this
 	// verified birth year-month so profile screens can show an age. Refused in prod.
 	DevBirthYM string
@@ -93,6 +98,9 @@ func New(cfg Config, store *Store) (*Server, error) {
 		return nil, err
 	}
 	s := &Server{cfg: cfg, wa: wa, store: store, mux: http.NewServeMux(), rl: map[string][]time.Time{}}
+	if err := s.load(context.Background()); err != nil {
+		return nil, fmt.Errorf("loading identities: %w", err)
+	}
 	s.routes()
 	return s, nil
 }
@@ -107,6 +115,94 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mux.ServeHTTP(w, r)
+	s.flush(r.Context())
+}
+
+// flush writes identities and sessions changed by the request (D-50).
+func (s *Server) flush(ctx context.Context) {
+	if s.cfg.Persist == nil {
+		return
+	}
+	s.store.mu.Lock()
+	dirty, sess := s.store.dirty, s.store.sessDirty
+	s.store.dirty, s.store.sessDirty = map[string]bool{}, map[string]*Session{}
+	docs := map[string][]byte{}
+	for id := range dirty {
+		if i, ok := s.store.identities[id]; ok {
+			b, err := json.Marshal(i)
+			if err == nil {
+				docs[id] = b
+			}
+		} else {
+			docs[id] = nil
+		}
+	}
+	sdocs := map[string][]byte{}
+	for th, se := range sess {
+		if se == nil {
+			sdocs[th] = nil
+			continue
+		}
+		b, _ := json.Marshal(se)
+		sdocs[th] = b
+	}
+	s.store.mu.Unlock()
+	for id, b := range docs {
+		var err error
+		if b == nil {
+			err = s.cfg.Persist.Delete(ctx, "identity", id)
+		} else {
+			err = s.cfg.Persist.Put(ctx, "identity", id, b)
+		}
+		if err != nil {
+			log.Printf("persist identity failed: %v", err) // no identifiers logged
+		}
+	}
+	for th, b := range sdocs {
+		var err error
+		if b == nil {
+			err = s.cfg.Persist.Delete(ctx, "session", th)
+		} else {
+			err = s.cfg.Persist.Put(ctx, "session", th, b)
+		}
+		if err != nil {
+			log.Printf("persist session failed: %v", err)
+		}
+	}
+}
+
+// load restores identities and sessions at start-up.
+func (s *Server) load(ctx context.Context) error {
+	if s.cfg.Persist == nil {
+		return nil
+	}
+	ids, err := s.cfg.Persist.All(ctx, "identity")
+	if err != nil {
+		return err
+	}
+	for k, b := range ids {
+		var i Identity
+		if err := json.Unmarshal(b, &i); err != nil {
+			return fmt.Errorf("identity %s: %w", k, err)
+		}
+		s.store.identities[i.ID()] = &i
+		s.store.byContact[i.ContactHash] = i.ID()
+	}
+	sess, err := s.cfg.Persist.All(ctx, "session")
+	if err != nil {
+		return err
+	}
+	now := s.cfg.Now()
+	for th, b := range sess {
+		var se Session
+		if json.Unmarshal(b, &se) != nil || now.After(se.ExpiresAt) {
+			_ = s.cfg.Persist.Delete(ctx, "session", th)
+			continue
+		}
+		se.LastSeen = now
+		s.store.sessions[th] = &se
+	}
+	return nil
 }
 
 func (s *Server) routes() {
@@ -244,6 +340,7 @@ func (s *Server) sessionFrom(r *http.Request) (*Session, string, bool) {
 	now := s.cfg.Now()
 	if now.After(sess.ExpiresAt) || (sess.IdleFor > 0 && now.Sub(sess.LastSeen) > sess.IdleFor) {
 		delete(s.store.sessions, th)
+		s.store.sessDirty[th] = nil
 		return nil, "", false
 	}
 	sess.LastSeen = now
@@ -267,7 +364,7 @@ func (s *Server) Authenticate(r *http.Request) (Account, bool) {
 	if !ok || sess.Kind != Full {
 		return Account{}, false
 	}
-	id, ok := s.store.identities[sess.IdentityID]
+	id, ok := s.store.identities[sess.IdentityID] // read-only: not marked for saving
 	if !ok {
 		return Account{}, false
 	}
@@ -285,6 +382,7 @@ func (s *Server) issueSession(id *Identity, kind SessionKind, surface auth.Surfa
 		sess.ExpiresAt, sess.IdleFor = now.Add(max), idle
 	}
 	s.store.sessions[tokenHash(tok)] = sess
+	s.store.sessDirty[tokenHash(tok)] = sess
 	return map[string]any{"access_token": tok, "expires_at": sess.ExpiresAt.UTC().Format(time.RFC3339), "surface": surface, "kind": kind}
 }
 
@@ -376,7 +474,7 @@ func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
 	delete(s.store.otps, ch)
 
 	if existingID, exists := s.store.byContact[ch]; exists {
-		id := s.store.identities[existingID]
+		id := s.store.get(existingID)
 		// An OTP can never add a passkey to an account that already has one: that would make
 		// the contact handle a login factor (FR-056). Members sign in with passkeys.
 		if id.Sealed || len(id.Credentials) > 0 {
@@ -389,6 +487,7 @@ func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
 	handle := mustDecodeB64(randomToken(32)) // 32 random bytes; never derived from the contact
 	id := &Identity{Handle: handle, ContactHash: ch, Tier: gate.V0, Jurisdiction: jur, CreatedAt: now, BirthYM: s.cfg.DevBirthYM}
 	s.store.identities[id.ID()] = id
+	s.store.dirty[id.ID()] = true
 	s.store.byContact[ch] = id.ID()
 	writeJSON(w, 201, s.issueSession(id, Onboarding, ""))
 }
@@ -413,7 +512,7 @@ func (s *Server) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
 		fail(w, 401, "auth_required", "Sign in required")
 		return
 	}
-	id := s.store.identities[sess.IdentityID]
+	id := s.store.get(sess.IdentityID)
 	if !s.canRegister(sess, id) {
 		fail(w, 403, "step_up_required", "Adding a device to an existing account needs both sign-in checks")
 		return
@@ -467,7 +566,7 @@ func (s *Server) handleRegisterFinish(w http.ResponseWriter, r *http.Request) {
 		fail(w, 401, "auth_required", "Sign in required")
 		return
 	}
-	id := s.store.identities[sess.IdentityID]
+	id := s.store.get(sess.IdentityID)
 	data, pending := s.store.regPending[th]
 	if !pending || !s.canRegister(sess, id) {
 		fail(w, 403, "step_up_required", "Registration not allowed")
@@ -495,7 +594,7 @@ func (s *Server) handleEnrolBegin(w http.ResponseWriter, r *http.Request) {
 		fail(w, 401, "auth_required", "Sign in required")
 		return
 	}
-	id := s.store.identities[sess.IdentityID]
+	id := s.store.get(sess.IdentityID)
 	if !s.canRegister(sess, id) {
 		fail(w, 403, "step_up_required", "Adding a device to an existing account needs both sign-in checks")
 		return
@@ -523,7 +622,7 @@ func (s *Server) handleEnrolRedeem(w http.ResponseWriter, r *http.Request) {
 		fail(w, 422, "validation_failed", "This link has expired")
 		return
 	}
-	id := s.store.identities[e.IdentityID]
+	id := s.store.get(e.IdentityID)
 	if id.Sealed {
 		fail(w, 403, "step_up_required", "Adding a device to an existing account needs both sign-in checks")
 		return
@@ -589,7 +688,8 @@ func (s *Server) handleLoginPasskey(w http.ResponseWriter, r *http.Request) {
 	}
 	var owner *Identity
 	handler := func(_, userHandle []byte) (webauthn.User, error) {
-		id, ok := s.store.identities[hex.EncodeToString(userHandle)]
+		id := s.store.get(hex.EncodeToString(userHandle))
+		ok := id != nil
 		if !ok {
 			return nil, errors.New("unknown user")
 		}
@@ -631,7 +731,7 @@ func (s *Server) handleLoginPasskey(w http.ResponseWriter, r *http.Request) {
 
 // finish issues the full session once both factors passed and seals the account.
 func (s *Server) finish(w http.ResponseWriter, la *LoginAttempt) {
-	id := s.store.identities[la.IdentityID]
+	id := s.store.get(la.IdentityID)
 	if !la.Attempt.Complete() {
 		genericLoginFailure(w)
 		return
@@ -672,7 +772,7 @@ func (s *Server) handleLoginLiveness(w http.ResponseWriter, r *http.Request) {
 		fail(w, 503, "liveness_unavailable", "Live face check is unavailable. Please try again later.")
 		return
 	}
-	id := s.store.identities[identityID]
+	id := s.store.get(identityID)
 	if err != nil || !match {
 		s.recordFailure(id)
 		genericLoginFailure(w)
@@ -757,7 +857,7 @@ func (s *Server) handleApprovalBegin(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "not_found", "This code has expired")
 		return
 	}
-	id := s.store.identities[la.IdentityID]
+	id := s.store.get(la.IdentityID)
 	allowed := s.mobileCreds(id)
 	if len(allowed) == 0 {
 		fail(w, 422, "validation_failed", "No registered phone. Use your second security key instead.")
@@ -801,7 +901,7 @@ func (s *Server) handleApprovalFinish(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "not_found", "This code has expired")
 		return
 	}
-	id := s.store.identities[la.IdentityID]
+	id := s.store.get(la.IdentityID)
 	cred, err := s.wa.ValidateLogin(webauthnUser{id}, *data, parsed)
 	if err != nil || !cred.Flags.UserVerified || cred.Authenticator.CloneWarning {
 		s.recordFailure(id)
@@ -842,7 +942,7 @@ func (s *Server) handleSecondKeyBegin(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "auth_required", "This sign-in has expired. Start again.")
 		return
 	}
-	id := s.store.identities[la.IdentityID]
+	id := s.store.get(la.IdentityID)
 	var allowed []protocol.CredentialDescriptor
 	for _, c := range id.Credentials {
 		if !c.Revoked && c.Kind == KindRoamingKey && !bytes.Equal(c.Cred.ID, la.FirstCredID) {
@@ -882,7 +982,7 @@ func (s *Server) handleSecondKeyFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	data := la.Assertion
 	la.Assertion = nil
-	id := s.store.identities[la.IdentityID]
+	id := s.store.get(la.IdentityID)
 	cred, err := s.wa.ValidateLogin(webauthnUser{id}, *data, parsed)
 	if err != nil || !cred.Flags.UserVerified || cred.Authenticator.CloneWarning || bytes.Equal(cred.ID, la.FirstCredID) {
 		s.recordFailure(id)
@@ -912,7 +1012,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		fail(w, 401, "auth_required", "Sign in required")
 		return
 	}
-	id := s.store.identities[sess.IdentityID]
+	id := s.store.get(sess.IdentityID)
 	active := 0
 	for _, c := range id.Credentials {
 		if !c.Revoked {
@@ -930,6 +1030,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	defer s.store.mu.Unlock()
 	if _, th, ok := s.sessionFrom(r); ok {
 		delete(s.store.sessions, th)
+		s.store.sessDirty[th] = nil
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -947,9 +1048,10 @@ func (s *Server) handleBurn(w http.ResponseWriter, r *http.Request) {
 	for th, other := range s.store.sessions {
 		if other.IdentityID == sess.IdentityID {
 			delete(s.store.sessions, th)
+			s.store.sessDirty[th] = nil
 		}
 	}
-	s.store.identities[sess.IdentityID].record(s.cfg.Now(), "burn", "")
+	s.store.get(sess.IdentityID).record(s.cfg.Now(), "burn", "")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -970,7 +1072,7 @@ func (s *Server) handleSecurity(w http.ResponseWriter, r *http.Request) {
 		fail(w, 401, "auth_required", "Sign in required")
 		return
 	}
-	id := s.store.identities[sess.IdentityID]
+	id := s.store.get(sess.IdentityID)
 	now := s.cfg.Now().UTC()
 	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, -(days - 1))
 	type day struct {

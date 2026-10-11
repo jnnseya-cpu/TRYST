@@ -19,6 +19,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
+	"log"
 	"net/http"
 	"sort"
 	"sync"
@@ -27,6 +28,7 @@ import (
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
 	"github.com/jnnseya-cpu/tryst/backend/internal/problem"
 	"github.com/jnnseya-cpu/tryst/backend/internal/profile"
+	"github.com/jnnseya-cpu/tryst/backend/internal/store"
 )
 
 const (
@@ -49,7 +51,7 @@ type photo struct {
 	MainOK      bool // passes the main-photo rules (face clearly matched, not explicit)
 	MainReason  string
 	ContentType string
-	Data        []byte
+	Data        []byte `json:"-"` // sealed in the blob store under the member's key; never in the document
 	Added       time.Time
 }
 
@@ -73,12 +75,26 @@ type Service struct {
 	tn   *tonight
 	// Eligible is the Stage 0 check (production: Broker gates). Nil = dev default.
 	Eligible Eligible
+	// Persistence (D-50): profile documents and sealed photo blobs in the profile database;
+	// per-member photo keys in the key vault (crypto-erasure).
+	st    store.Store
+	vault *store.Vault
+	dirty map[string]bool
 	// MinDiscoveryTier is the tier needed to use Tonight (V2 in production, E-01).
 	MinDiscoveryTier string
 }
 
 // New returns the service. env "prod" refuses DevModerator.
+// New returns an in-memory service (tests, quick local runs).
 func New(auth Authenticator, mod Moderator, env string) (*Service, error) {
+	kek := make([]byte, 32)
+	_, _ = rand.Read(kek)
+	vault, _ := store.NewVault(store.NewMemory(), kek)
+	return NewWithStore(auth, mod, env, store.NewMemory(), vault)
+}
+
+// NewWithStore returns a service that loads and saves through st, sealing photos with vault.
+func NewWithStore(auth Authenticator, mod Moderator, env string, st store.Store, vault *store.Vault) (*Service, error) {
 	if mod == nil {
 		mod = NoModerator{}
 	}
@@ -86,7 +102,10 @@ func New(auth Authenticator, mod Moderator, env string) (*Service, error) {
 		return nil, errors.New("DevModerator is forbidden outside the dev environment")
 	}
 	s := &Service{auth: auth, mod: mod, now: time.Now, data: map[string]*memberProfile{}, mux: http.NewServeMux(),
-		tn: newTonight(), MinDiscoveryTier: "V2"}
+		tn: newTonight(), MinDiscoveryTier: "V2", st: st, vault: vault, dirty: map[string]bool{}}
+	if err := s.load(context.Background()); err != nil {
+		return nil, err
+	}
 	if env == "dev" {
 		s.MinDiscoveryTier = "V0" // dev accounts have no real ID check; production requires V2
 	}
@@ -113,6 +132,53 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	s.mux.ServeHTTP(w, r)
+	if r.Method != http.MethodGet {
+		s.flush(r.Context())
+	}
+}
+
+func (s *Service) load(ctx context.Context) error {
+	docs, err := s.st.All(ctx, "profile")
+	if err != nil {
+		return err
+	}
+	for id, b := range docs {
+		var p memberProfile
+		if err := json.Unmarshal(b, &p); err != nil {
+			return err
+		}
+		s.data[id] = &p
+	}
+	return nil
+}
+
+// flush saves profiles changed by the request.
+func (s *Service) flush(ctx context.Context) {
+	s.mu.Lock()
+	docs := map[string][]byte{}
+	for id := range s.dirty {
+		if p, ok := s.data[id]; ok {
+			docs[id], _ = json.Marshal(p)
+		}
+	}
+	s.dirty = map[string]bool{}
+	s.mu.Unlock()
+	for id, b := range docs {
+		if err := s.st.Put(ctx, "profile", id, b); err != nil {
+			log.Printf("persist profile failed: %v", err)
+		}
+	}
+}
+
+func blobID(account, photoID string) string { return "photo/" + account + "/" + photoID }
+
+// photoBytes loads and opens a stored photo.
+func (s *Service) photoBytes(ctx context.Context, account string, ph *photo) ([]byte, error) {
+	ct, err := s.st.GetBlob(ctx, blobID(account, ph.ID))
+	if err != nil {
+		return nil, err
+	}
+	return s.vault.Open(ctx, account, ct, []byte("photo:"+ph.ID))
 }
 
 func fail(w http.ResponseWriter, status int, code, title string) {
@@ -139,6 +205,9 @@ func (s *Service) member(w http.ResponseWriter, r *http.Request) (identity.Accou
 		s.data[acc.ID] = p
 	}
 	p.BirthYM, p.Tier = acc.BirthYM, acc.Tier.String()
+	if r.Method != http.MethodGet {
+		s.dirty[acc.ID] = true
+	}
 	return acc, p, true
 }
 
@@ -369,7 +438,16 @@ func (s *Service) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	mainD := profile.Moderate(checks, 1, true)
-	ph := &photo{ID: newID(), Revealed: true, Outcome: d.Outcome, Reason: d.Reason, ContentType: ctype, Data: data,
+	phID := newID()
+	sealed, err := s.vault.Seal(r.Context(), acc.ID, data, []byte("photo:"+phID))
+	if err == nil {
+		err = s.st.PutBlob(r.Context(), blobID(acc.ID, phID), sealed)
+	}
+	if err != nil {
+		fail(w, 503, "storage_unavailable", "We couldn't save that photo. Please try again.")
+		return
+	}
+	ph := &photo{ID: phID, Revealed: true, Outcome: d.Outcome, Reason: d.Reason, ContentType: ctype,
 		MainOK: mainD.Outcome == profile.Approve, Added: s.now()}
 	if !ph.MainOK && mainD.Outcome == profile.Reject {
 		ph.MainReason = mainD.Reason
@@ -381,6 +459,7 @@ func (s *Service) handleUpload(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, "gallery_full", "You already have 10 photos. Remove one to add another.")
 		return
 	}
+	s.dirty[acc.ID] = true
 	hasMain := false
 	for _, x := range p.Photos {
 		hasMain = hasMain || x.Main
@@ -395,7 +474,7 @@ func (s *Service) handleUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) handleImage(w http.ResponseWriter, r *http.Request) {
-	_, p, ok := s.member(w, r)
+	acc, p, ok := s.member(w, r)
 	if !ok {
 		return
 	}
@@ -407,7 +486,12 @@ func (s *Service) handleImage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", ph.ContentType)
 	w.Header().Set("Content-Disposition", "inline")
-	_, _ = w.Write(ph.Data)
+	data, err := s.photoBytes(r.Context(), acc.ID, ph)
+	if err != nil {
+		fail(w, 404, "not_found", "Not found")
+		return
+	}
+	_, _ = w.Write(data)
 }
 
 func (s *Service) handlePatch(w http.ResponseWriter, r *http.Request) {
@@ -476,6 +560,9 @@ func (s *Service) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.Photos = append(p.Photos[:i], p.Photos[i+1:]...)
+	if err := s.st.DeleteBlob(r.Context(), blobID(acc.ID, ph.ID)); err != nil {
+		log.Printf("delete photo blob failed: %v", err)
+	}
 	writeJSON(w, 200, s.ownerView(acc, p))
 }
 
