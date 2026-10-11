@@ -152,3 +152,16 @@ func TestInterruptedErasureIsFinishedBySweep(t *testing.T) {
 		t.Fatalf("proof after sweep: %d %v", c, got)
 	}
 }
+
+func TestExportNeedsStepUp(t *testing.T) {
+	s, _ := New(auth, store.NewMemory(), seed(), &fakePart{name: "profile", log: &[]string{}, data: map[string]string{"ana": "photos"}})
+	stepped := false
+	s.StepUp = func(*http.Request) bool { return stepped }
+	if c, out := call(s, "POST", "/v1/account/export", "ana", nil); c != 403 || out["code"] != "step_up_required" {
+		t.Fatalf("export without step-up: %d %v", c, out)
+	}
+	stepped = true
+	if c, _ := call(s, "POST", "/v1/account/export", "ana", nil); c != 200 {
+		t.Fatalf("export after step-up: %d", c)
+	}
+}

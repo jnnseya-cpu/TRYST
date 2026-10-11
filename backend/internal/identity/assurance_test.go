@@ -35,7 +35,7 @@ type assuranceRig struct {
 func newAssuranceRig(t *testing.T, st store.Store, p AssuranceProvider) *assuranceRig {
 	ck := &clock{t: time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)}
 	s, err := New(Config{RPID: "localhost", RPDisplayName: "Member services", RPOrigins: []string{"http://localhost:3000"},
-		Env: "dev", ContactPepper: []byte("dev-pepper"), Liveness: DevLiveness{}, Now: ck.now, Persist: st, Assurance: p}, NewStore())
+		Env: "dev", ContactPepper: []byte("dev-pepper"), Liveness: DevLiveness{}, Now: ck.now, Persist: st, Assurance: p, RateLimitPerMin: 1000}, NewStore())
 	if err != nil {
 		t.Fatal(err)
 	}

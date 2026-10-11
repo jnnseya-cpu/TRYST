@@ -324,11 +324,13 @@ paths:
               schema:
                 type: object
                 properties:
-                  session_kind: { type: string, enum: [onboarding, full] }
+                  session_kind: { type: string, enum: [onboarding, full, recovery] }
                   surface: { $ref: '#/components/schemas/Surface' }
                   tier: { $ref: '#/components/schemas/Tier' }
                   passkeys: { type: integer }
                   expires_at: { type: string, format: date-time }
+                  step_up: { type: boolean }
+                  recovery_pending: { type: [object, 'null'], description: Open recovery on this account (state and hold_until) }
         '401': { $ref: '#/components/responses/Problem' }
   /auth/logout:
     post:
@@ -340,37 +342,134 @@ paths:
     post:
       tags: [auth]
       operationId: stepUp
+      summary: Starts the sign-in ceremony bound to this session and account (FR-125, D-62). Continue with /auth/login/passkey and the second factor; finishing marks this session stepped up for 5 minutes instead of issuing a new session.
       x-min-tier: V0
-      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       responses:
         '200':
-          description: Step-up token valid 5 minutes
+          description: WebAuthn options for the first factor
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  step_up_token: { type: string }
-                  expires_at: { type: string, format: date-time }
+                  login_id: { type: string }
+                  options: { type: object }
+        '401': { $ref: '#/components/responses/Problem' }
   /auth/recovery/begin:
     post:
       tags: [auth]
       operationId: recoveryBegin
+      summary: Uniform for any contact; an unknown contact gets a recovery that can never complete. 3 a day per contact. The account is told (FR-061, FR-125).
       security: []
       x-min-tier: none
-      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact]
+              properties:
+                contact: { type: string }
       responses:
-        '202': { description: B2 + fresh V2 with matching document anchor required; 24 h hold }
-  /auth/recovery/finish:
+        '202':
+          description: Recovery started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recovery_id: { type: string, description: Bearer secret held by the recovering browser }
+                  hold_hours: { type: integer }
+        '422': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+  /auth/recovery/{id}:
+    get:
+      tags: [auth]
+      operationId: recoveryStatus
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: Recovery state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  state: { type: string, enum: [checks, hold, ready, failed, cancelled, expired, done] }
+                  liveness_done: { type: boolean }
+                  id_done: { type: boolean }
+                  hold_until: { type: string, format: date-time }
+        '404': { $ref: '#/components/responses/Problem' }
+  /auth/recovery/{id}/check:
+    post:
+      tags: [auth]
+      operationId: recoveryCheck
+      summary: Provider hand-off for the face check or the ID check. The ID check needs the face check first and must be on the document the account was verified with; a different document ends the recovery.
+      security: []
+      x-min-tier: none
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind: { type: string, enum: [liveness, age] }
+      responses:
+        '201':
+          description: Provider session
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id: { type: string }
+                  url: { type: string }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/Problem' }
+  /auth/recovery/{id}/finish:
     post:
       tags: [auth]
       operationId: recoveryFinish
+      summary: After the 24-hour hold, revokes every passkey and session and issues a 15-minute recovery session that may only register a passkey.
       security: []
       x-min-tier: none
-      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
       responses:
-        '201': { description: New passkey registered after hold }
+        '200':
+          description: Recovery session
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+                  expires_at: { type: string, format: date-time }
+                  kind: { type: string, const: recovery }
+        '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /auth/recovery/cancel:
+    post:
+      tags: [auth]
+      operationId: recoveryCancel
+      summary: Cancels every open recovery of the caller's account, from any signed-in device. Never needs step-up.
+      x-min-tier: V0
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cancelled: { type: integer }
+        '401': { $ref: '#/components/responses/Problem' }
   /auth/refresh:
     post:
       tags: [auth]
@@ -399,29 +498,35 @@ paths:
                 device_id: { type: string, minLength: 8, maxLength: 64 }
                 public_jwk: { type: object, required: [kty, crv, x, y], properties: { kty: { const: EC }, crv: { const: P-256 }, x: { type: string }, y: { type: string } } }
       responses: { '200': { description: Updated }, '201': { description: Added }, '422': { $ref: '#/components/responses/Problem' } }
-  /devices:
+  /auth/devices:
     get:
       tags: [auth]
       operationId: listDevices
-      summary: Requires step-up.
+      summary: The account's passkeys. Requires step-up (403 step_up_required).
       x-min-tier: V0
       responses:
         '200':
           description: Devices
           content:
             application/json:
-              schema: { type: array, items: { $ref: '#/components/schemas/Device' } }
-  /devices/{id}:
+              schema:
+                type: object
+                properties:
+                  devices: { type: array, items: { $ref: '#/components/schemas/Device' } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /auth/devices/{id}:
     delete:
       tags: [auth]
       operationId: revokeDevice
-      summary: Requires step-up.
+      summary: Requires step-up. The only active passkey can't be removed (409 last_device).
       x-min-tier: V0
-      parameters:
-        - { $ref: '#/components/parameters/Id' }
-        - { $ref: '#/components/parameters/IdempotencyKey' }
+      parameters: [{ $ref: '#/components/parameters/Id' }]
       responses:
         '204': { description: Revoked }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
 
   # ---------------------------------------------------------------- assurance (02 §3, §5.1)
   /assurance/session:
@@ -561,7 +666,7 @@ paths:
     post:
       tags: [account]
       operationId: exportAccount
-      summary: Everything TRYST holds about the member, built on request and returned over the signed-in session (nothing is kept on the server). Messages are end-to-end encrypted, so only their metadata is included. Step-up applies once 02 §3.3 step-up ships; until then a full two-factor session is required.
+      summary: Everything TRYST holds about the member, built on request and returned over the signed-in session (nothing is kept on the server). Messages are end-to-end encrypted, so only their metadata is included. Requires step-up (403 step_up_required, 02 §3.3).
       x-min-tier: V0
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       responses:
@@ -2083,10 +2188,11 @@ components:
     Device:
       type: object
       properties:
-        device_id: { type: string, format: uuid }
-        platform: { type: string, enum: [ios, android, web] }
+        id: { type: string, description: 'First 8 bytes of the credential ID, in hex' }
         surface: { $ref: '#/components/schemas/Surface' }
-        revoked_at: { type: [string, 'null'], format: date-time }
+        kind: { type: string, enum: [platform_biometric, platform_uv, roaming_key] }
+        added: { type: string, format: date-time }
+        revoked: { type: boolean }
     ConsentKind:
       type: string
       enum: [art9_processing, media_view, meet, couple_link, retention, conduct_attestation, safety_training_use, biometric_login]

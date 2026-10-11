@@ -68,6 +68,8 @@ type Config struct {
 	// it (internal/assurance; G-NG-4).
 	AssuranceRoute     func() error
 	AssuranceReturnURL string
+	// RecoveryReturnURL is where the provider sends a recovering member back (/recover).
+	RecoveryReturnURL string
 	// AnchorPepper keys the one-way document codes (HSM-held in production; ≥ 32 bytes).
 	AnchorPepper []byte
 	// Consent appends to the member's consent ledger (consents service). May be nil.
@@ -82,6 +84,7 @@ type Server struct {
 	mux   *http.ServeMux
 	rl    map[string][]time.Time
 	as    *assuranceState
+	rec   *recoveryState
 }
 
 // New validates configuration. It refuses dev-only shortcuts outside the dev environment.
@@ -129,6 +132,9 @@ func New(cfg Config, store *Store) (*Server, error) {
 	}
 	if err := s.loadAssurance(context.Background()); err != nil {
 		return nil, fmt.Errorf("loading assurance: %w", err)
+	}
+	if err := s.loadRecovery(context.Background()); err != nil {
+		return nil, fmt.Errorf("loading recoveries: %w", err)
 	}
 	s.routes()
 	return s, nil
@@ -256,6 +262,14 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /v1/me/security", s.handleSecurity)
 	m.HandleFunc("POST /v1/auth/logout", s.handleLogout)
 	m.HandleFunc("POST /v1/burn", s.handleBurn)
+	m.HandleFunc("POST /v1/auth/step-up", s.handleStepUpBegin)
+	m.HandleFunc("GET /v1/auth/devices", s.handleDevices)
+	m.HandleFunc("DELETE /v1/auth/devices/{id}", s.handleDeviceRevoke)
+	m.HandleFunc("POST /v1/auth/recovery/begin", s.handleRecoveryBegin)
+	m.HandleFunc("GET /v1/auth/recovery/{id}", s.handleRecoveryStatus)
+	m.HandleFunc("POST /v1/auth/recovery/{id}/check", s.handleRecoveryCheck)
+	m.HandleFunc("POST /v1/auth/recovery/{id}/finish", s.handleRecoveryFinish)
+	m.HandleFunc("POST /v1/auth/recovery/cancel", s.handleRecoveryCancel)
 	m.HandleFunc("POST /v1/assurance/session", s.handleAssuranceStart)
 	m.HandleFunc("POST /v1/assurance/callback", s.handleAssuranceCallback)
 	m.HandleFunc("GET /v1/assurance/status", s.handleAssuranceStatus)
@@ -401,6 +415,7 @@ type Account struct {
 	ID      string
 	Tier    gate.Tier
 	BirthYM string
+	StepUp  bool // both sign-in checks repeated in the last 5 minutes
 }
 
 // Authenticate checks the caller's bearer token and returns their account. Only full
@@ -417,7 +432,7 @@ func (s *Server) Authenticate(r *http.Request) (Account, bool) {
 	if !ok || id.Refused != "" {
 		return Account{}, false
 	}
-	return Account{ID: id.ID(), Tier: id.Tier, BirthYM: id.BirthYM}, true
+	return Account{ID: id.ID(), Tier: id.Tier, BirthYM: id.BirthYM, StepUp: s.stepUpOK(sess)}, true
 }
 
 func (s *Server) issueSession(id *Identity, kind SessionKind, surface auth.Surface) map[string]any {
@@ -543,10 +558,10 @@ func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
 
 // ---------------------------------------------------------------- passkey registration
 
-// canRegister: onboarding sessions only (before the account is sealed). Adding a device to a
-// sealed account needs step-up (02 §3.3), which is not part of this iteration.
+// canRegister: during onboarding (before the account is sealed), after a step-up (adding
+// a device), or in the short session a completed recovery issues.
 func (s *Server) canRegister(sess *Session, id *Identity) bool {
-	return sess.Kind == Onboarding && !id.Sealed
+	return (sess.Kind == Onboarding && !id.Sealed) || (sess.Kind == Full && s.stepUpOK(sess)) || sess.Kind == RecoverySession
 }
 
 func (s *Server) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
@@ -566,7 +581,13 @@ func (s *Server) handleRegisterBegin(w http.ResponseWriter, r *http.Request) {
 		fail(w, 403, "step_up_required", "Adding a device to an existing account needs both sign-in checks")
 		return
 	}
-	if len(id.Credentials) >= maxOnboardingCreds {
+	active := 0
+	for _, c := range id.Credentials {
+		if !c.Revoked {
+			active++
+		}
+	}
+	if active >= maxOnboardingCreds {
 		fail(w, 422, "validation_failed", "Too many passkeys")
 		return
 	}
@@ -763,7 +784,7 @@ func (s *Server) handleLoginPasskey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sc := findCred(owner, cred.ID)
-	if sc == nil {
+	if sc == nil || (la.ExpectID != "" && owner.ID() != la.ExpectID) {
 		genericLoginFailure(w)
 		return
 	}
@@ -787,6 +808,10 @@ func (s *Server) finish(w http.ResponseWriter, la *LoginAttempt) {
 	id := s.store.get(la.IdentityID)
 	if !la.Attempt.Complete() {
 		genericLoginFailure(w)
+		return
+	}
+	if la.StepUpFor != "" {
+		s.finishStepUp(w, la)
 		return
 	}
 	if id.Refused != "" {
@@ -1079,6 +1104,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"session_kind": sess.Kind, "surface": sess.Surface, "tier": id.Tier.String(),
 		"passkeys": active, "expires_at": sess.ExpiresAt.UTC().Format(time.RFC3339),
+		"step_up": s.stepUpOK(sess), "recovery_pending": s.recoveryPending(id.ID()),
 	})
 }
 

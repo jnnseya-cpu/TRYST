@@ -82,6 +82,9 @@ type Service struct {
 	// no personal data. It is kept and backed up apart from the service databases so that
 	// erasures can be applied again after a restore.
 	Ledger store.Store
+	// StepUp, if set, must report a fresh step-up before an export is built (02 §3.3).
+	// Deleting the account never needs it.
+	StepUp func(*http.Request) bool
 }
 
 // LedgerEntry is one completed erasure.
@@ -144,6 +147,10 @@ func (s *Service) handleExport(w http.ResponseWriter, r *http.Request) {
 	acc, ok := s.members(r)
 	if !ok {
 		fail(w, 401, "auth_required", "Please sign in again.")
+		return
+	}
+	if s.StepUp != nil && !s.StepUp(r) {
+		fail(w, 403, "step_up_required", "Confirm it's you to download your data.")
 		return
 	}
 	out, err := s.Export(r.Context(), acc)

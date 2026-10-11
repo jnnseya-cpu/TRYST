@@ -19,6 +19,7 @@ package identity
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -44,6 +45,7 @@ type AssuranceSession struct {
 	State    string    `json:"state"` // pending | passed | failed | refused | duplicate | not_eligible
 	Created  time.Time `json:"created"`
 	Finished time.Time `json:"finished,omitempty"`
+	Recovery string    `json:"recovery,omitempty"` // set when the check is part of a recovery
 }
 
 // AssuranceResult is what the provider reports.
@@ -124,6 +126,15 @@ func (s *Server) saveAssurance(ctx context.Context, a *AssuranceSession) {
 	if err := s.cfg.Persist.Put(ctx, "assurance", a.ID, b); err != nil {
 		log.Printf("persist assurance failed: %v", err)
 	}
+}
+
+// fullSessionQuiet is fullSession without writing an error. Caller holds the store lock.
+func (s *Server) fullSessionQuiet(r *http.Request) *Identity {
+	sess, _, ok := s.sessionFrom(r)
+	if !ok || sess.Kind != Full {
+		return nil
+	}
+	return s.store.get(sess.IdentityID)
 }
 
 // fullSession returns the caller's identity for a full session. Caller holds the store lock.
@@ -209,13 +220,15 @@ func (s *Server) handleDevComplete(w http.ResponseWriter, r *http.Request) {
 	var res AssuranceResult
 	_ = decode(r, &res)
 	s.store.mu.Lock()
-	id := s.fullSession(w, r)
 	a := s.as.sessions[res.SessionID]
-	s.store.mu.Unlock()
-	if id == nil {
-		return
+	var owner bool
+	if a != nil && a.Recovery != "" {
+		owner = subtle.ConstantTimeCompare([]byte(tokenHash(r.URL.Query().Get("recovery"))), []byte(a.Recovery)) == 1
+	} else if id := s.fullSessionQuiet(r); id != nil && a != nil {
+		owner = a.Account == id.ID()
 	}
-	if a == nil || a.Account != id.ID() {
+	s.store.mu.Unlock()
+	if !owner {
 		fail(w, 404, "not_found", "Not found")
 		return
 	}
@@ -244,6 +257,8 @@ func (s *Server) applyAssurance(ctx context.Context, res AssuranceResult) (strin
 	now := s.cfg.Now()
 	a.Finished = now
 	switch {
+	case a.Recovery != "":
+		a.State = s.recoveryResult(a, id, res, now)
 	case id == nil:
 		a.State = "failed"
 	case res.Result != "pass":
@@ -260,6 +275,9 @@ func (s *Server) applyAssurance(ctx context.Context, res AssuranceResult) (strin
 	state := a.State
 	s.store.mu.Unlock()
 	s.saveAssurance(ctx, a)
+	if a.Recovery != "" {
+		s.saveRecovery(ctx, a.Recovery)
+	}
 	s.flush(ctx)
 	return state, nil
 }

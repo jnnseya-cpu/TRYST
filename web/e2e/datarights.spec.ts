@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { member } from "./helpers";
+import { member, stepUp } from "./helpers";
 
 test("data rights: download everything, then delete by cryptographic erasure with a signed proof", async ({ browser }) => {
   const tag = String(Date.now()).slice(-5);
@@ -8,7 +8,9 @@ test("data rights: download everything, then delete by cryptographic erasure wit
   const page = await member(browser, name, "Islington", "photo-1.jpg");
   await page.goto("/account");
 
-  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download my data" }).click()]);
+  // The export needs both sign-in checks again (step-up).
+  await page.getByRole("button", { name: "Download my data" }).click();
+  const [download] = await Promise.all([page.waitForEvent("download"), stepUp(page)]);
   expect(download.suggestedFilename()).toBe("member-data.json");
   const data = JSON.parse(readFileSync((await download.path())!, "utf8"));
   expect(data.profile.profile.display_name).toBe(name);

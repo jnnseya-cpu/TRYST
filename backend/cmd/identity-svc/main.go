@@ -233,6 +233,7 @@ func build() *app {
 		log.Fatal("ASSURANCE_URL is required in production: nobody can be verified without the identity provider (D-61)")
 	}
 	cfg.AssuranceReturnURL = env("PUBLIC_URL", cfg.RPOrigins[0]) + "/verify"
+	cfg.RecoveryReturnURL = env("PUBLIC_URL", cfg.RPOrigins[0]) + "/recover"
 	if v := os.Getenv("ANCHOR_PEPPER"); v != "" {
 		b, err := hex.DecodeString(v)
 		if err != nil || len(b) < 32 {
@@ -336,6 +337,7 @@ func build() *app {
 	// erasures newer than the backup are applied again (admin reapply-erasures, D-57).
 	ledger := openStore(ctx, mode, "DATABASE_URL_LEDGER")
 	rights.Ledger = ledger
+	rights.StepUp = srv.StepUpOK
 	return &app{mode: mode, srv: srv, prof: prof, commerce: commerce, notifier: notifier, rights: rights, vault: vault,
 		signals: signals, signalKick: signalKick, toSafety: toSafety,
 		stores: map[string]store.Store{"identity": idStore, "profile": profStore, "keys": keyStore, "commerce": commerceStore, "ledger": ledger}}

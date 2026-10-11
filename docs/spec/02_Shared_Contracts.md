@@ -147,8 +147,9 @@ Part of the [TRYST v1.1 baseline](00_README.md). This document is the **single s
 - change contact handle or payment method;
 - co-sign or change a couple link or veto mode;
 - export data;
-- view the device list;
-- start account recovery.
+- view the device list.
+
+(Account recovery is the path for a member with **no** working device, so it can't need step-up; it has its own checks and hold below, [D-62](06_Decisions_and_Changes.md#2-decision-log).)
 
 It is **never** required for Burn, Panic, report, block, subscription cancel or account deletion. Deletion requires B1 only, so it stays one step (ToS cl. 16.3, 25.1).
 
@@ -163,6 +164,8 @@ It is **never** required for Burn, Panic, report, block, subscription cancel or 
 4. New passkey registration.
 
 No staff member can bypass recovery.
+
+As built ([FR-125](#10-requirement-catalogue), [D-62](06_Decisions_and_Changes.md#2-decision-log)): `begin` answers the same for any contact (an unknown one gets a recovery that can never complete) and is limited to 3 a day per contact. The member is told when recovery starts and again when the hold begins. A document that doesn't match ends the attempt. Checks must finish within 24 hours of `begin`; the hold is 24 hours; `finish` must follow within 7 days. `finish` revokes every passkey and session and issues a 15-minute recovery session that can only register a passkey. Only V2 accounts (with a document code) can be recovered. Recovery never changes the tier.
 
 ---
 
@@ -513,15 +516,19 @@ The **Min** column is the minimum verification tier. `sys` means server-to-serve
 | POST | `/v1/auth/login/liveness` | — | Mobile: start B2 provider session → provider callback (`sys`) → **session issued only on match** |
 | POST | `/v1/auth/login/cross-device` | — | Desktop: → QR token (60 s); `GET .../{id}` polls status → **session issued only on approval** |
 | POST | `/v1/auth/approvals/{qr_token}` | V1 | Called from the registered mobile app with a fresh B1 assertion; approves or denies the desktop login |
-| POST | `/v1/auth/step-up` | V0 | Same factor flow as login → step-up token (5 min) for §3.3 sensitive actions |
+| POST | `/v1/auth/step-up` | V0 | Same factor flow as login (`/login/passkey`, then the second factor) bound to the caller's session and account; finishing marks **this session** stepped up for 5 minutes (`{step_up, until}`) instead of issuing a new one. A passkey of another account fails |
 | POST | `/v1/auth/enrol-device` · `/v1/auth/enrol-device/redeem` | V0 (onboarding) | During onboarding only: one-time 10-minute link that lets the member's phone register its own passkey on the same account. Refused once the account is sealed (device add then needs step-up) |
 | POST | `/v1/auth/login/second-key/begin` · `/v1/auth/login/second-key` | — | Desktop F2 alternative: assertion with a **different** registered security key |
 | POST | `/v1/auth/approvals/{qr_token}/begin` | — | Assertion options restricted to the account's registered **phone** passkeys |
-| GET | `/v1/me` | V0 | Session summary (kind, surface, tier, passkey count). No contact or identity data |
+| GET | `/v1/me` | V0 | Session summary (kind, surface, tier, passkey count, `step_up`, `recovery_pending`). No contact or identity data |
 | POST | `/v1/auth/logout` | V0 | Ends this session |
-| POST | `/v1/auth/recovery/begin` · `/finish` | — | B2 + fresh V2 with matching `anchor_doc` → 24 h hold → new passkey (FR-061) |
+| POST | `/v1/auth/recovery/begin` | — | `{contact}` → 202 `{recovery_id}`, uniform for any contact; 3 a day per contact (FR-061, FR-125) |
+| GET | `/v1/auth/recovery/{id}` | — | `{state: checks\|hold\|ready\|failed\|cancelled\|expired\|done, liveness_done, id_done, hold_until?}` |
+| POST | `/v1/auth/recovery/{id}/check` | — | `{kind: liveness\|age}` → provider hand-off; `age` needs liveness first; the document must match `anchor_doc` |
+| POST | `/v1/auth/recovery/{id}/finish` | — | After the hold: revoke every passkey and session → 15-minute recovery session that may only register a passkey. 409 `recovery_hold` during the hold |
+| POST | `/v1/auth/recovery/cancel` | V0 | Any signed-in device cancels every open recovery of the account. Never needs step-up |
 | POST | `/v1/auth/refresh` | V0 | DPoP refresh |
-| GET / DELETE | `/v1/devices` · `/v1/devices/{id}` | V0 | List and revoke devices (**step-up required**, §3.3) |
+| GET / DELETE | `/v1/auth/devices` · `/v1/auth/devices/{id}` | V0 | List and revoke passkeys (**step-up required**, §3.3). The only active passkey can't be revoked (409 `last_device`); use Burn. (`/v1/devices/*` is the E2EE device-key directory) |
 | POST | `/v1/assurance/session` | V0 | `{kind: liveness\|age}` → `{session_id, url}` (provider hand-off). `age` needs V1. 503 while no provider holds a valid certificate for web capture (G-NG-4) ([FR-124](#10-requirement-catalogue), [D-61](06_Decisions_and_Changes.md#2-decision-log)) |
 | POST | `/v1/assurance/callback` | sys | Signed provider result → liveness pass raises to V1; ID pass + conduct declaration raises to V2. TRYST re-checks over-18 itself (FR-094); under-18 → account refused and signed out everywhere. The document number becomes a one-way code at once (one account per document; banned documents refused; recovery must match it). Raw document and biometric never stored. Applied once per session |
 | GET | `/v1/assurance/status` | V0 | `{tier, liveness_done, conduct_accepted, id_checked, age_check, refused}` |
@@ -939,6 +946,7 @@ Envelope: `{event_id, pseudo_subject, type, ts, context:{surface, app_version}, 
 | FR-113 | Everything a member creates survives restarts: identities, credentials, sessions and profiles persist in per-domain PostgreSQL databases; photos are stored encrypted under the member's own key and unreadable without the key vault; services refuse to start in production without their databases and key-encryption key | BE | P1 | D-50 |
 | FR-114 | End-to-end encrypted conversations: a thread opens only after mutual interest; every message is encrypted on the sender's device separately for each device of both members; the server stores and relays ciphertext only, with expiry from retention; the on-device Guardian warns on fraud, refuses to send child-safety content and freezes threads on child-safety or extortion signals; either member can block, which closes the thread for both and hides them from each other | Both | P1 | A §9.2, D-51 |
 | FR-124 | Identity and age assurance: liveness (V1) and photo-ID (V2) checks at a certified provider through a signed hand-off and callback; V2 also needs the conduct declaration; TRYST re-checks over-18 itself and locks out anyone under 18; one account per ID document and banned documents refused, using a one-way document code; discovery needs V2 in every environment; checks refused while no provider holds a valid certificate | Both | P1 | A §8.1, FR-094, FR-097, D-39, D-41, D-44, D-61 |
+| FR-125 | Step-up and recovery: step-up repeats both sign-in checks inside the session and allows sensitive actions for 5 minutes (device list, adding or removing a passkey, data export); never for Burn, Panic, report, block, cancel or deletion. Recovery for a member with no device: provider face check and an ID check on the same document (matched by its one-way code), a 24-hour hold the member is told about and can cancel from any signed-in device, then every old passkey and session revoked and a 15-minute session to register a new passkey; uniform answers, rate-limited, no staff bypass | Both | P1 | FR-060, FR-061, D-16, D-62 |
 | FR-123 | Standalone Trust & Safety service with its own database: member reports (20 a day each), cases with deadlines from the escalation matrix, interim freezes, the moderator console with hidden reporters, reason-gated photos and a hash-chained audit log, two-person permanent removal, independent appeals, mandatory NCA reporting for upheld CSEA cases, staff sign-in by the proxy's verified token and a roster; it reaches the member platform only through signed internal APIs, with bans, freezes, notices and on-device signals delivered from durable outboxes so an outage or restart loses none; it takes part in data export, erasure and restores | Both | P1 | A §7.3, A §8, FR-116, D-59 |
 | FR-122 | Security testing gates on every change: reachability-aware Go vulnerability scan, static analysis and gosec, npm audit, container image scan, a route-authorisation test generated from both OpenAPI contracts, web security-header tests and the restore drill; an independent penetration test before launch | Both | P1 | NFR-09, D-58 |
 | FR-121 | Operability: container images (non-root, distroless API), infrastructure as code for a UK region, readiness checks on every database, graceful drain that lets safety alerts finish, Prometheus metrics with no member identifiers and on-call alerts for overdue urgent safety cases, failed safety alerts, error rate, erasure time and billing events; encrypted logical backups with the key database on a 7-day retention; an erasure ledger kept apart so every restore re-applies deletions; a restore drill run automatically in CI | BE | P1 | 03 §12, NFR-01, 02 §7, D-57 |

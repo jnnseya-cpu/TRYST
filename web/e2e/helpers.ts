@@ -5,7 +5,7 @@ export const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)
 export const fx = (n: string) => pathJoin(__dirname, "fixtures", n);
 
 /** A signed-in member with a complete profile (dev services). */
-export async function member(browser: Browser, name: string, district: string, photo: string, opts: { verify?: boolean } = {}): Promise<Page> {
+export async function member(browser: Browser, name: string, district: string, photo: string, opts: { verify?: boolean; contact?: string } = {}): Promise<Page> {
   const ctx = await browser.newContext({ userAgent: IPHONE_UA, viewport: { width: 1280, height: 900 } });
   const page = await ctx.newPage();
   const cdp = await ctx.newCDPSession(page);
@@ -14,7 +14,7 @@ export async function member(browser: Browser, name: string, district: string, p
     options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
   });
   await page.goto("/join");
-  await page.getByLabel(/Email or mobile/).fill(`${name.toLowerCase()}${Date.now()}@example.com`);
+  await page.getByLabel(/Email or mobile/).fill(opts.contact ?? `${name.toLowerCase()}${Date.now()}@example.com`);
   await page.getByRole("button", { name: "Send code" }).click();
   const code = (await page.getByTestId("dev-otp").textContent())!.match(/\d{6}/)![0];
   await page.getByLabel(/6-digit code/).fill(code);
@@ -49,6 +49,14 @@ export async function verify(page: Page, doc: string, birth = "1990-05") {
   await page.getByLabel(/Birth month/).fill(birth);
   await page.getByLabel("Document number").fill(doc);
   await page.getByRole("button", { name: "Pass" }).click();
+  await page.waitForURL("**/verify");
+}
+
+/** Repeats both sign-in checks inside the session (step-up) from the open prompt. */
+export async function stepUp(page: Page) {
+  const box = page.getByTestId("step-up");
+  await box.getByRole("button", { name: "Confirm with passkey" }).click();
+  await box.getByRole("button", { name: "Start live check" }).click();
 }
 
 /** Makes two members a mutual Tonight match and returns the thread URL. */

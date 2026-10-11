@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { getToken, problemTitle, setToken } from "@/lib/api";
 import { forgetDevice } from "@/lib/e2ee";
+import { StepUp } from "@/components/StepUp";
 
 const PHRASE = "delete my account";
 
@@ -12,13 +13,18 @@ export function DataRights() {
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [typed, setTyped] = useState("");
+  const [stepUp, setStepUp] = useState(false);
 
   async function download() {
     setBusy(true);
     setMsg("");
     const res = await fetch("/v1/account/export", { method: "POST", headers: { Authorization: `Bearer ${getToken()}` }, cache: "no-store" });
     setBusy(false);
-    if (!res.ok) return setMsg(problemTitle(await res.json().catch(() => ({}))));
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 403 && body.code === "step_up_required") return setStepUp(true);
+      return setMsg(problemTitle(body));
+    }
     const url = URL.createObjectURL(await res.blob());
     const a = document.createElement("a");
     a.href = url;
@@ -56,7 +62,11 @@ export function DataRights() {
     <section className="card" aria-label="Your data">
       <h2>Your data</h2>
       <p className="note">Download everything we hold about you, or delete your account. Deleting destroys the key that protects your data, so it can never be read again. It can&rsquo;t be undone.</p>
-      <button type="button" className="button ghost" disabled={busy} onClick={download}>Download my data</button>
+      {stepUp ? (
+        <StepUp reason="Your data export is protected." onDone={() => { setStepUp(false); download(); }} />
+      ) : (
+        <button type="button" className="button ghost" disabled={busy} onClick={download}>Download my data</button>
+      )}
       {!deleting ? (
         <button type="button" className="button ghost" onClick={() => setDeleting(true)}>Delete my account</button>
       ) : (

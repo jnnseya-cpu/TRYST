@@ -109,6 +109,8 @@ type SessionKind string
 const (
 	Onboarding SessionKind = "onboarding"
 	Full       SessionKind = "full"
+	// RecoverySession may only register a new passkey, after a completed recovery.
+	RecoverySession SessionKind = "recovery"
 )
 
 // Session is server-side; only the SHA-256 of the bearer token is stored.
@@ -119,10 +121,16 @@ type Session struct {
 	ExpiresAt  time.Time
 	IdleFor    time.Duration
 	LastSeen   time.Time
+	// StepUpUntil: both sign-in checks were repeated in this session; sensitive actions
+	// are allowed until then (5 minutes, 02 §3.3).
+	StepUpUntil time.Time `json:",omitempty"`
 }
 
 // LoginAttempt is an in-flight two-factor login.
 type LoginAttempt struct {
+	// StepUpFor is the session (token hash) being stepped up; ExpectID its identity.
+	StepUpFor   string
+	ExpectID    string
 	IdentityID  string
 	Attempt     *auth.Attempt
 	FirstCredID []byte

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Shell } from "@/components/Shell";
+import { Action } from "@/components/Action";
 import { api, getToken, problemTitle } from "@/lib/api";
 import "../../billing/billing.css";
 
@@ -9,19 +10,21 @@ import "../../billing/billing.css";
 export default function DevVerify() {
   const params = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
   const kind = params?.get("kind") ?? "liveness";
+  const recovery = params?.get("recovery") ?? "";
   const [birth, setBirth] = useState("1990-05");
   const [doc, setDoc] = useState("");
   const [adult, setAdult] = useState(true);
   const [error, setError] = useState("");
 
   async function finish(result: "pass" | "fail") {
-    const r = await api<{ state: string }>("/v1/assurance/dev/complete", {
+    const q = recovery ? `?recovery=${encodeURIComponent(recovery)}` : "";
+    const r = await api<{ state: string }>(`/v1/assurance/dev/complete${q}`, {
       method: "POST",
-      token: getToken(),
+      token: recovery ? null : getToken(),
       body: { session_id: params?.get("session"), result, is_adult: adult, birth_year_month: birth, document_number: doc },
     });
     if (r.status !== 200) return setError(problemTitle(r.data));
-    window.location.assign("/verify");
+    window.location.assign(recovery ? "/recover" : "/verify");
   }
 
   return (
@@ -38,8 +41,8 @@ export default function DevVerify() {
           <label className="bl-check"><input type="checkbox" checked={adult} onChange={(e) => setAdult(e.target.checked)} /> Provider says adult</label>
         </>
       )}
-      <button type="button" className="button" onClick={() => finish("pass")}>Pass</button>
-      <button type="button" className="button ghost" onClick={() => finish("fail")}>Fail</button>
+      <Action className="button" onClick={() => finish("pass")}>Pass</Action>
+      <Action className="button ghost" onClick={() => finish("fail")}>Fail</Action>
       {error && <p role="alert">{error}</p>}
     </Shell>
   );
