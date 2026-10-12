@@ -192,3 +192,14 @@ func failures() int {
 	}
 	return n
 }
+
+func TestTrustedContactMustBeEmailWithoutSMS(t *testing.T) {
+	w, _, id := confirmedMeet(t)
+	w.s.EmailOnlyAlerts = true
+	if c, out := w.do("ana", "POST", "/v1/meets/"+id+"/safety", `{"every_minutes":30,"pin":"2468","duress_pin":"1357","trusted_contact":"+447700900111","safety_line":true}`); c != 422 || out["code"] != "email_only" {
+		t.Fatalf("phone trusted contact without SMS: %d %v", c, out)
+	}
+	if c, _ := w.do("ana", "POST", "/v1/meets/"+id+"/safety", `{"every_minutes":30,"pin":"2468","duress_pin":"1357","trusted_contact":"friend@example.com","safety_line":true}`); c != 200 {
+		t.Fatalf("email trusted contact: %d", c)
+	}
+}

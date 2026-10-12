@@ -44,13 +44,14 @@ credentials into Secrets Manager ☐ entry in the records of processing.
   case reference returned on every alert, data retention terms.
 * **Settings:** `ARC_URL`, `ARC_API_KEY`, `ARC_SECRET` (required in production).
 
-### Sign-up code delivery
+### Sign-up code delivery (email only at launch, D-67)
 
-* **Postmark** (email): server token `POSTMARK_SERVER_TOKEN`, sender `OTP_EMAIL_FROM`; open
-  and link tracking off; neutral wording that never names TRYST (D-55).
-* **Twilio** (SMS): `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` or
-  `TWILIO_MESSAGING_SERVICE`; UK sender registration.
-* At least one is required in production.
+* **Hostinger mailbox** (existing provider) over SMTP with TLS: `SMTP_HOST=smtp.hostinger.com`,
+  `SMTP_PORT=465`, `SMTP_USER`, `SMTP_PASSWORD`, sender `OTP_EMAIL_FROM` with a neutral
+  name. Set SPF, DKIM and DMARC for the sending domain in Hostinger's DNS so codes reach
+  inboxes. Sign-up and trusted contacts take email addresses only.
+* Later, optional: Twilio for SMS (`TWILIO_*`), which turns phone numbers back on; Postmark
+  if email volume outgrows the mailbox.
 
 ### Stripe (payments, D-22, D-53)
 
@@ -105,8 +106,7 @@ Without these, every photo goes to a person (fail closed, FR-120).
 | Identity provider 1 | ☐ | ☐ | ☐ | ☐ | ☐ |
 | Identity provider 2 | ☐ | ☐ | ☐ | ☐ | ☐ |
 | Alarm-receiving centre | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Postmark | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Twilio | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Hostinger mailbox (SPF, DKIM, DMARC) | ☐ | ☐ | — | ☐ | ☐ |
 | Stripe | ☐ | ☐ | ☐ | ☐ | ☐ |
 | Google Cloud | ☐ | ☐ | ☐ | ☐ | ☐ |
 | Hostinger | ☐ | ☐ | ☐ | — | ☐ |

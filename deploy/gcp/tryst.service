@@ -7,7 +7,7 @@ Requires=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-Environment=ENV=prod
+EnvironmentFile=/etc/tryst/env
 WorkingDirectory=/opt/tryst
 ExecStartPre=/opt/tryst/deploy/gcp/fetch-secrets.sh
 ExecStart=/usr/bin/docker compose -f /opt/tryst/deploy/gcp/compose.yml --env-file /etc/tryst/images.env up -d --wait

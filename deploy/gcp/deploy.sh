@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Rolls out new images by digest on the VM.
+# Rolls out new images by digest on the VM (run by .github/workflows/deploy.yml).
 #
-#   deploy/gcp/deploy.sh <api@sha256:...> <web@sha256:...> <ops@sha256:...>
+#   LB_IP=<load balancer address> deploy/gcp/deploy.sh <api@sha256:...> <web@sha256:...> <ops@sha256:...>
 #
 # api and safety keep their working state in memory and must never run twice: the old
 # container is stopped before the new one starts (a database lock also enforces it, and
@@ -13,9 +13,19 @@ images=/etc/tryst/images.env
 for i in "$@"; do [[ "$i" == *@sha256:* ]] || { echo "pin images by digest: $i"; exit 2; }; done
 install -d -m 0755 /etc/tryst
 cp -f "$images" "$images.previous" 2>/dev/null || true
-{ grep -E '^(LB_IP|SITE_HOST|CONSOLE_HOST)=' "$images" 2>/dev/null || true
+{ if [ -n "${LB_IP:-}" ]; then echo "LB_IP=$LB_IP"; else grep -E '^LB_IP=' "$images" 2>/dev/null || true; fi
+  grep -E '^(SITE_HOST|CONSOLE_HOST)=' "$images" 2>/dev/null || true
   echo "API_IMAGE=$1"; echo "WEB_IMAGE=$2"; echo "OPS_IMAGE=$3"; } >"$images.new"
 mv "$images.new" "$images"
+grep -q '^LB_IP=' "$images" || { echo "LB_IP is required on the first deploy"; exit 2; }
+# Units and timers ship with the code; secrets are fetched fresh into memory each deploy.
+cp "$here/tryst.service" "$here/tryst-offsite-backup.service" "$here/tryst-offsite-backup.timer" /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable -q tryst tryst-offsite-backup.timer
+systemctl start tryst-offsite-backup.timer
+# shellcheck disable=SC1091
+. /etc/tryst/env
+ENV="$ENV" "$here/fetch-secrets.sh"
 dc() { docker compose -f "$here/compose.yml" --env-file "$images" "$@"; }
 dc pull api web ops
 for svc in safety api; do      # one copy only: stop, then start

@@ -17,7 +17,7 @@ are present (see the header of `backend/cmd/identity-svc/main.go`):
 | `DATA_KEK` | Wraps every member data key (crypto-erasure) |
 | `DSR_SIGNING_KEY` | Signs deletion completion proofs |
 | `CONTACT_PEPPER` (≥ 32 bytes) | Contact hashes |
-| `POSTMARK_SERVER_TOKEN` and/or `TWILIO_*` | Sign-up codes must be deliverable |
+| `SMTP_*` (the Hostinger mailbox), `POSTMARK_SERVER_TOKEN` or `TWILIO_*` | Sign-up codes must be deliverable; without `TWILIO_*` sign-up and trusted contacts are email only |
 | `ARC_URL`, `ARC_SECRET` (+ a message channel) | Meet safety can't run without the safety line (D-48) |
 | `SAFETY_INTERNAL_URL`, `INTERNAL_SECRET_SAFETY`, `INTERNAL_SECRET_PLATFORM` | The API reaches the standalone safety service (D-59) |
 | `ASSURANCE_URL`, `ASSURANCE_SECRET`, `ASSURANCE_CALLBACK_SECRET` (≥ 32 chars) | Nobody can be verified without the identity provider (D-61) |

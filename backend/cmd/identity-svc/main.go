@@ -31,7 +31,10 @@
 //	VAPID_PRIVATE_KEY base64url P-256 scalar for content-free Web Push; VAPID_SUBJECT
 //	                mailto: or https contact for push services (push is off without a key
 //	                outside dev)
-//	POSTMARK_SERVER_TOKEN, OTP_EMAIL_FROM  sign-up codes by email (neutral sender name)
+//	SMTP_HOST, SMTP_PORT (465), SMTP_USER, SMTP_PASSWORD, OTP_EMAIL_FROM  sign-up codes and
+//	                trusted-contact alerts by email through a mailbox (e.g. smtp.hostinger.com)
+//	POSTMARK_SERVER_TOKEN  the same through Postmark instead
+//	Without TWILIO_*, sign-up and trusted contacts take email addresses only.
 //	TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_MESSAGING_SERVICE (or TWILIO_FROM)
 //	                sign-up codes by SMS. Production needs at least one channel.
 //	LIVENESS_URL, LIVENESS_API_KEY, LIVENESS_SECRET  identity provider gateway for the B2
@@ -217,8 +220,9 @@ func build() *app {
 	if out != nil {
 		cfg.Sender = out
 	} else if mode != "dev" {
-		log.Fatal("sign-up codes can't be delivered: set POSTMARK_SERVER_TOKEN and/or TWILIO_* (see the header of this file)")
+		log.Fatal("sign-up codes can't be delivered: set SMTP_* (a mailbox such as Hostinger's), POSTMARK_SERVER_TOKEN and/or TWILIO_* (see the header of this file)")
 	}
+	cfg.EmailOnly = mode != "dev" && !out.Phones()
 	idGateway := gateway("LIVENESS")
 	if idGateway != nil {
 		cfg.Liveness = &vendors.Liveness{G: idGateway}
@@ -297,12 +301,13 @@ func build() *app {
 	}
 	prof.Notify = notifyFn
 	prof.Consent = consents.Granted
+	prof.EmailOnlyAlerts = mode != "dev" && !out.Phones()
 	prof.ShieldKeyOf, prof.BlindShield = srv.ShieldKeyOf, srv.BlindShield
 	consents.OnChange = prof.ConsentChanged
 	notifier = openNotify(mode, srv, profStore)
 	if arc := gateway("ARC"); arc != nil {
 		if out == nil {
-			log.Fatal("the safety line needs a message channel for trusted contacts (POSTMARK_* or TWILIO_*)")
+			log.Fatal("the safety line needs a message channel for trusted contacts (SMTP_*, POSTMARK_* or TWILIO_*)")
 		}
 		prof.Alerts = &vendors.ARCAlerting{ARC: arc, Contact: out}
 	} else if mode != "dev" {
@@ -519,8 +524,15 @@ func openNotify(mode string, members *identity.Server, st store.Store) *notify.S
 // otpSender returns the configured email/SMS sender, or nil if none is configured.
 func otpSender() *outbound.Sender {
 	var out outbound.Sender
+	from := env("OTP_EMAIL_FROM", "Member services <codes@example.invalid>")
 	if t := os.Getenv("POSTMARK_SERVER_TOKEN"); t != "" {
-		out.Email = &outbound.Postmark{Token: t, From: env("OTP_EMAIL_FROM", "Member services <codes@example.invalid>")}
+		out.Email = &outbound.Postmark{Token: t, From: from}
+	} else if h := os.Getenv("SMTP_HOST"); h != "" {
+		m := &outbound.SMTP{Host: h, Port: env("SMTP_PORT", "465"), User: os.Getenv("SMTP_USER"), Password: os.Getenv("SMTP_PASSWORD"), From: from}
+		if m.User == "" || m.Password == "" {
+			log.Fatal("SMTP_HOST needs SMTP_USER and SMTP_PASSWORD")
+		}
+		out.Email = m
 	}
 	if sid := os.Getenv("TWILIO_ACCOUNT_SID"); sid != "" {
 		out.SMS = &outbound.Twilio{AccountSID: sid, AuthToken: os.Getenv("TWILIO_AUTH_TOKEN"),

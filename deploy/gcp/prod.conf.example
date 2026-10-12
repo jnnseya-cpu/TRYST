@@ -1,0 +1,22 @@
+# deploy/gcp/<env>.conf: copy to prod.conf (and staging.conf), fill in, then
+#   deploy/gcp/setup.sh prod
+# No secrets here. Secrets go in <env>.secrets.env (never committed).
+PROJECT_ID=tryst-prod-123456
+DOMAIN=tryst.example                     # member site
+CONSOLE_DOMAIN=console.tryst.example     # staff console (Identity-Aware Proxy)
+STAFF_GROUP=safety-team@company.example  # Google group allowed into the console
+ALERT_EMAIL=oncall@company.example       # outages and alerts
+GITHUB_REPO=jnnseya-cpu/TRYST            # repository allowed to deploy (main branch only)
+ROSTER_FILE=/secure/roster.txt           # "email role[,role]" per line, outside the repository
+# Email through your Hostinger mailbox (SMTP_PASSWORD goes in <env>.secrets.env)
+SMTP_HOST=smtp.hostinger.com
+SMTP_PORT=465
+SMTP_USER=codes@tryst.example
+OTP_EMAIL_FROM="Member services <codes@tryst.example>"
+SALE_ITEMS=tryst_plus,tryst_plus_annual
+# Set to google-2sv-security-keys-only once the staff group's 2-Step Verification is security keys only
+STAFF_ACCESS_KEYS_CONFIRMED=
+# Smaller, cheaper staging: MACHINE_TYPE=e2-standard-2 DB_TIER_MAIN=db-custom-1-3840 DB_HA=false
+MACHINE_TYPE=e2-standard-4
+DB_TIER_MAIN=db-custom-2-7680
+DB_HA=true

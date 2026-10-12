@@ -1,0 +1,8 @@
+[Unit]
+Description=TRYST encrypted off-site backup copy (Hostinger)
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/tryst/env
+ExecStart=/opt/tryst/deploy/gcp/offsite-backup.sh

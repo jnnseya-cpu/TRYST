@@ -21,3 +21,6 @@ playwright-report/
 deploy/.env
 **/.terraform/
 *.tfstate*
+# Google Cloud setup: vendor credentials and local Terraform state stay out of the repository
+deploy/gcp/*.secrets.env
+deploy/gcp/terraform/.terraform/

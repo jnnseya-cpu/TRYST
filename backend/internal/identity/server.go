@@ -47,6 +47,8 @@ type Config struct {
 	ContactPepper []byte // HSM-held in production
 	Liveness      LivenessProvider
 	Sender        Sender
+	// EmailOnly: no SMS channel exists, so sign-up takes email addresses only.
+	EmailOnly bool
 	// Notify records a masked notice for a member (notification service). May be nil.
 	Notify        func(account, kind, link string)
 	Jurisdictions gate.Jurisdictions
@@ -482,6 +484,10 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := decode(r, &req); err != nil || !ValidContact(NormaliseContact(req.Contact)) {
 		fail(w, 422, "validation_failed", "Enter a valid email or phone number in international format")
+		return
+	}
+	if s.cfg.EmailOnly && !strings.Contains(req.Contact, "@") {
+		fail(w, 422, "email_only", "Sign up with your email address. Codes by text message aren't available yet.")
 		return
 	}
 	ch := contactHash(s.cfg.ContactPepper, req.Contact)

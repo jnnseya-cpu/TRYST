@@ -1,0 +1,9 @@
+[Unit]
+Description=Weekly TRYST off-site backup copy
+
+[Timer]
+OnCalendar=Sun *-*-* 03:30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

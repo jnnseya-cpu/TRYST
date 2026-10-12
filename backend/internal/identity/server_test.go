@@ -576,3 +576,17 @@ func TestClientIPThroughAChainOfTrustedProxies(t *testing.T) {
 		t.Fatalf("untrusted caller: %s", got)
 	}
 }
+
+func TestEmailOnlySignUpWithoutSMS(t *testing.T) {
+	srv, err := New(Config{RPID: "localhost", RPDisplayName: "x", RPOrigins: []string{"http://localhost:3000"}, Env: "dev",
+		ContactPepper: []byte("p"), EmailOnly: true}, NewStore())
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &harness{t: t, srv: httptest.NewServer(srv), clock: &clock{t: time.Now()}}
+	defer h.srv.Close()
+	if r := h.do("POST", "/v1/auth/start", map[string]string{"contact": "+447700900123"}, "", ""); r.status != 422 || r.json(t)["code"] != "email_only" {
+		t.Fatalf("phone sign-up without SMS: %d %s", r.status, r.body)
+	}
+	h.mustStatus(h.do("POST", "/v1/auth/start", map[string]string{"contact": "ana@example.com"}, "", ""), 202)
+}

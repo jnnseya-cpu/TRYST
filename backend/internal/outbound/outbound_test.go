@@ -61,7 +61,7 @@ func TestPostmarkAndTwilio(t *testing.T) {
 			t.Fatalf("message names the service: %q", text)
 		}
 	}
-	s.Email.Token = "wrong"
+	s.Email.(*Postmark).Token = "wrong"
 	if err := s.Send("ana@example.com", "1"); err == nil || strings.Contains(err.Error(), "ana@") {
 		t.Fatalf("error leaks or missing: %v", err)
 	}

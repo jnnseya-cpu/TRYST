@@ -294,6 +294,11 @@ func (s *Service) handleSafetyStart(w http.ResponseWriter, r *http.Request) {
 		fail(w, 422, "validation_failed", "Give your trusted contact as an email or a phone number starting with +.")
 		return
 	}
+	if in.Trusted != "" && !strings.Contains(in.Trusted, "@") && s.EmailOnlyAlerts {
+		// No SMS channel: an alert to a phone number would go nowhere.
+		fail(w, 422, "email_only", "Give your trusted contact's email address. Alerts by text message aren't available yet.")
+		return
+	}
 	salt := []byte(randHex(16))
 	plan, err := meet.NewPlan(m.Start, m.End, time.Duration(in.EveryMinutes)*time.Minute, in.PIN, in.DuressPIN, salt, in.Trusted != "", in.SafetyLine)
 	if err != nil {

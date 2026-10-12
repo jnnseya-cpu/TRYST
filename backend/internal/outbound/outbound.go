@@ -1,4 +1,5 @@
-// Package outbound delivers sign-up codes by email (Postmark) and SMS (Twilio) (02 §3.3 V0;
+// Package outbound delivers sign-up codes by email (an SMTP mailbox such as Hostinger's, or
+// Postmark) and SMS (Twilio) (02 §3.3 V0;
 // FR-119; D-55). It implements identity.Sender. Messages are neutral: they never name TRYST
 // or describe the service, because a code can arrive on a shared phone or inbox. Nothing is
 // stored, and neither the contact nor the code is ever logged.
@@ -44,9 +45,12 @@ var ErrNoChannel = errors.New("no delivery channel configured for this contact t
 
 // Sender routes a code by contact type.
 type Sender struct {
-	Email *Postmark
+	Email Mailer // *SMTP or *Postmark
 	SMS   *Twilio
 }
+
+// Phones reports whether codes and alerts can go to phone numbers (an SMS channel exists).
+func (s *Sender) Phones() bool { return s != nil && s.SMS != nil }
 
 // Send implements identity.Sender.
 func (s Sender) Send(contact, code string) error {

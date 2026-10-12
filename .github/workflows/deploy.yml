@@ -1,0 +1,82 @@
+name: deploy
+# Every change to main that passes the integration pipeline (end-to-end tests, images,
+# infrastructure checks) is built once, deployed to staging automatically, then to
+# production after a person approves (GitHub → Settings → Environments → production →
+# Required reviewers). Google credentials are short-lived (Workload Identity Federation);
+# nothing secret is stored in GitHub. Variables per environment come from setup.sh.
+on:
+  workflow_run:
+    workflows: ["integration (end-to-end, images, infrastructure)"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ github.event.workflow_run.head_sha || github.sha }}" }
+      - name: Build the three images
+        run: |
+          docker build -t tryst-api backend
+          docker build -f frontend/Dockerfile -t tryst-web .
+          docker build -f frontend/Dockerfile --build-arg OPS_CONSOLE=1 -t tryst-ops .
+          docker save tryst-api tryst-web tryst-ops | gzip > images.tar.gz
+          tar czf deploy-files.tgz deploy scripts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          retention-days: 7
+          path: |
+            images.tar.gz
+            deploy-files.tgz
+
+  staging:
+    needs: build
+    if: vars.GCP_PROJECT_STAGING != ''
+    environment: staging
+    runs-on: ubuntu-latest
+    env:
+      PROJECT: ${{ vars.GCP_PROJECT_STAGING }}
+      ENV_NAME: staging
+      DOMAIN: ${{ vars.TRYST_DOMAIN_STAGING }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: release }
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_STAGING }}
+          service_account: ${{ vars.GCP_DEPLOY_SA_STAGING }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Push images and deploy
+        run: tar -xzf deploy-files.tgz deploy/gcp/ci-deploy.sh && deploy/gcp/ci-deploy.sh
+
+  production:
+    needs: [build, staging]
+    if: always() && needs.build.result == 'success' && (needs.staging.result == 'success' || needs.staging.result == 'skipped') && vars.GCP_PROJECT_PROD != ''
+    environment: production
+    runs-on: ubuntu-latest
+    env:
+      PROJECT: ${{ vars.GCP_PROJECT_PROD }}
+      ENV_NAME: prod
+      DOMAIN: ${{ vars.TRYST_DOMAIN_PROD }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: release }
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_PROD }}
+          service_account: ${{ vars.GCP_DEPLOY_SA_PROD }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Push images and deploy
+        run: tar -xzf deploy-files.tgz deploy/gcp/ci-deploy.sh && deploy/gcp/ci-deploy.sh
