@@ -169,3 +169,40 @@ func TestRequireHardwareKey(t *testing.T) {
 		}
 	}
 }
+
+func TestGoogleIAP(t *testing.T) {
+	env := map[string]string{"STAFF_ACCESS_PROVIDER": "iap", "STAFF_ACCESS_AUDIENCE": "/projects/123/global/backendServices/456",
+		"STAFF_ROSTER": "lead@corp.example:lead,moderator;a@corp.example:moderator;b@corp.example:moderator"}
+	a, err := FromEnv("prod", func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Access.Issuer != IAPIssuer || a.Access.JWKSURL != IAPJWKS || a.Access.Header != HeaderIAP {
+		t.Fatalf("IAP presets: %+v", a.Access)
+	}
+	// IAP's ES256 token, in IAP's header; the Cloudflare header is ignored.
+	ek, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	jwks := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		eb, _ := ek.PublicKey.Bytes()
+		json.NewEncoder(w).Encode(map[string]any{"keys": []map[string]string{
+			{"kid": "iap1", "kty": "EC", "alg": "ES256", "crv": "P-256", "x": enc.EncodeToString(eb[1:33]), "y": enc.EncodeToString(eb[33:])}}})
+	}))
+	defer jwks.Close()
+	now := time.Unix(1_800_000_000, 0)
+	a.Access.JWKSURL, a.Access.Now = jwks.URL, func() time.Time { return now }
+	tok := sign(t, ek, "iap1", map[string]any{"iss": IAPIssuer, "aud": env["STAFF_ACCESS_AUDIENCE"],
+		"exp": now.Add(10 * time.Minute).Unix(), "iat": now.Unix(), "email": "lead@corp.example"})
+	r := httptest.NewRequest("GET", "/ops/v1/cases", nil)
+	r.Header.Set(HeaderCloudflare, tok)
+	if _, ok := a.Authenticate(r); ok {
+		t.Fatal("token accepted from the wrong header")
+	}
+	r.Header.Set(HeaderIAP, tok)
+	if s, ok := a.Authenticate(r); !ok || !s.Has("lead") {
+		t.Fatalf("IAP sign-in: %+v %v", s, ok)
+	}
+	env["STAFF_ACCESS_REQUIRE_AMR"] = "hwk"
+	if _, err := FromEnv("prod", func(k string) string { return env[k] }); err == nil {
+		t.Fatal("IAP with an amr requirement accepted: IAP tokens carry no amr")
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jnnseya-cpu/tryst/backend/internal/staffauth"
 	"os"
 	"strings"
 	"time"
@@ -61,6 +62,10 @@ func preflight(ctx context.Context, a *app) ([]check, bool) {
 		add("sign-in proxy keys", err == nil && n > 0, "%d usable keys from %s%s", n, a.staff.Access.JWKSURL, errText(err))
 		if a.staff.Access.RequireAMR != "" {
 			add("hardware key", true, "tokens must show sign-in method %q", a.staff.Access.RequireAMR)
+		} else if a.staff.Access.Header == staffauth.HeaderIAP {
+			// IAP tokens don't say how someone signed in: the operator confirms Google's policy.
+			add("hardware key", a.mode == "dev" || os.Getenv("STAFF_ACCESS_KEYS_CONFIRMED") == "google-2sv-security-keys-only",
+				"not visible to TRYST with IAP: set the safety team's Google 2-Step Verification to security keys only, then STAFF_ACCESS_KEYS_CONFIRMED=google-2sv-security-keys-only")
 		} else {
 			add("hardware key", a.mode == "dev", "not checked by TRYST: the Access policy must require a hardware key (or set STAFF_ACCESS_REQUIRE_AMR=hwk after confirming with check-token)")
 		}

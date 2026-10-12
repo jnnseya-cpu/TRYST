@@ -13,7 +13,7 @@ images=/etc/tryst/images.env
 for i in "$@"; do [[ "$i" == *@sha256:* ]] || { echo "pin images by digest: $i"; exit 2; }; done
 install -d -m 0755 /etc/tryst
 cp -f "$images" "$images.previous" 2>/dev/null || true
-{ grep -E '^(SITE_HOST|CONSOLE_HOST)=' "$images" 2>/dev/null || true
+{ grep -E '^(LB_IP|SITE_HOST|CONSOLE_HOST)=' "$images" 2>/dev/null || true
   echo "API_IMAGE=$1"; echo "WEB_IMAGE=$2"; echo "OPS_IMAGE=$3"; } >"$images.new"
 mv "$images.new" "$images"
 dc() { docker compose -f "$here/compose.yml" --env-file "$images" "$@"; }

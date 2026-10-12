@@ -1,0 +1,15 @@
+# Development or demo copy on a VPS (compose profile "vps"). Caddy gets certificates
+# automatically. Production doesn't use this: Google's load balancer terminates TLS there.
+{$SITE_HOST} {
+	encode zstd gzip
+	header -Server
+	reverse_proxy web:3000
+}
+
+# The console in dev mode uses dev staff tokens; keep this host unlisted or leave
+# CONSOLE_HOST unset to not serve it at all.
+{$CONSOLE_HOST} {
+	encode zstd gzip
+	header -Server
+	reverse_proxy ops:3000
+}

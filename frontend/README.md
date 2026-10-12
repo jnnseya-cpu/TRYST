@@ -15,7 +15,7 @@ npm run e2e                  # builds and starts the backend, then runs Playwrig
 |---|---|---|
 | `IDENTITY_URL` | build time | Backend member API, e.g. `https://api.example.com` |
 | `SAFETY_URL` | build time | Safety service, e.g. `https://safety.example.com` |
-| `OPS_CONSOLE=1` | build time | Build the staff console instead (separate host, behind Cloudflare Access) |
+| `OPS_CONSOLE=1` | build time | Build the staff console instead (separate host, behind Google Identity-Aware Proxy) |
 
 Brand assets come from `../shared/brand` at build time (`scripts/sync-brand.mjs`).
 Deploying: [docs/runbooks/go-live.md](../docs/runbooks/go-live.md).

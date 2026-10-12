@@ -83,7 +83,11 @@ func (a Auth) withRoles(id string, headerRoles string) (Staff, bool) {
 // Authenticate returns the staff member for a request, if any.
 func (a Auth) Authenticate(r *http.Request) (Staff, bool) {
 	if a.Access != nil {
-		if tok := r.Header.Get("Cf-Access-Jwt-Assertion"); tok != "" {
+		h := a.Access.Header
+		if h == "" {
+			h = HeaderCloudflare
+		}
+		if tok := r.Header.Get(h); tok != "" {
 			if email, err := a.Access.Verify(tok); err == nil {
 				return a.withRoles(email, "")
 			}
@@ -142,8 +146,19 @@ func HashToken(tok string) string {
 	return hex.EncodeToString(h[:])
 }
 
+// Sign-in proxies with built-in settings (STAFF_ACCESS_PROVIDER).
+const (
+	HeaderCloudflare = "Cf-Access-Jwt-Assertion"
+	HeaderIAP        = "X-Goog-Iap-Jwt-Assertion"
+	IAPIssuer        = "https://cloud.google.com/iap"
+	IAPJWKS          = "https://www.gstatic.com/iap/verify/public_key-jwk"
+)
+
 // FromEnv builds the staff sign-in from the environment:
 //
+//	STAFF_ACCESS_PROVIDER  iap (Google Cloud IAP: issuer, keys and header preset; set only
+//	                       STAFF_ACCESS_AUDIENCE = /projects/<number>/global/backendServices/<id>)
+//	                       or cloudflare (default)
 //	STAFF_ACCESS_ISSUER, STAFF_ACCESS_AUDIENCE, STAFF_ACCESS_JWKS_URL  verified proxy token
 //	STAFF_ACCESS_REQUIRE_AMR  optional sign-in method the token must show (e.g. hwk)
 //	STAFF_TRUSTED_PROXIES  addresses of a header-asserting proxy (alternative)
@@ -151,8 +166,19 @@ func HashToken(tok string) string {
 //	STAFF_DEV_TOKENS       id:role:token,...       (dev only)
 func FromEnv(mode string, getenv func(string) string) (Auth, error) {
 	a := Auth{Env: mode, DevTokens: map[string]Staff{}}
-	if iss := getenv("STAFF_ACCESS_ISSUER"); iss != "" {
-		a.Access = &Access{Issuer: iss, Audience: getenv("STAFF_ACCESS_AUDIENCE"), JWKSURL: getenv("STAFF_ACCESS_JWKS_URL"),
+	iss, jwks, header := getenv("STAFF_ACCESS_ISSUER"), getenv("STAFF_ACCESS_JWKS_URL"), HeaderCloudflare
+	switch getenv("STAFF_ACCESS_PROVIDER") {
+	case "iap":
+		if getenv("STAFF_ACCESS_REQUIRE_AMR") != "" {
+			return a, errors.New("IAP tokens carry no sign-in method: enforce security keys in Google's 2-Step Verification policy, not STAFF_ACCESS_REQUIRE_AMR")
+		}
+		iss, jwks, header = IAPIssuer, IAPJWKS, HeaderIAP
+	case "", "cloudflare":
+	default:
+		return a, errors.New("STAFF_ACCESS_PROVIDER is iap or cloudflare")
+	}
+	if iss != "" {
+		a.Access = &Access{Issuer: iss, Audience: getenv("STAFF_ACCESS_AUDIENCE"), JWKSURL: jwks, Header: header,
 			RequireAMR: getenv("STAFF_ACCESS_REQUIRE_AMR")}
 		if a.Access.Audience == "" || !strings.HasPrefix(a.Access.JWKSURL, "https://") {
 			return a, errors.New("STAFF_ACCESS_AUDIENCE and an https STAFF_ACCESS_JWKS_URL are required with STAFF_ACCESS_ISSUER")

@@ -39,7 +39,16 @@ are refused in production.
 Do these in order. Nothing here involves putting a secret or an email address in the
 repository or in Terraform.
 
-**1. Cloudflare Access application (Cloudflare Zero Trust dashboard)**
+**1. Sign-in proxy for the console host**
+
+Recommended (only Google Cloud, D-66): **Identity-Aware Proxy** on the console's backend
+service, set up as in [go-live.md](go-live.md) §2, with `STAFF_ACCESS_PROVIDER=iap` and
+`STAFF_ACCESS_AUDIENCE` in the safety service's settings. Security keys are enforced by the
+safety team's Google 2-Step Verification policy (IAP tokens don't report how someone signed
+in, so `STAFF_ACCESS_REQUIRE_AMR` stays unset). Then skip to step 3.
+
+Alternative, if the AWS route is used: a Cloudflare Access application (Cloudflare Zero
+Trust dashboard):
 
 1. Access → Applications → Add an application → **Self-hosted**. Application domain: the
    console host (`ops_host`, e.g. `ops.<your-domain>`). Session duration: 1 hour.

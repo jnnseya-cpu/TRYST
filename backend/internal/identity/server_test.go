@@ -550,13 +550,26 @@ func TestClientIPThroughAChainOfTrustedProxies(t *testing.T) {
 		req.Header.Set("X-Forwarded-For", xff)
 		return srv.clientIP(req)
 	}
-	// Client -> Cloudflare -> Caddy -> web -> API: each trusted hop appends the previous one.
+	// Client -> edge proxy -> reverse proxy -> web -> API: each trusted hop appends the previous one.
 	if got := ip("172.18.0.5", "203.0.113.5, 173.245.48.10, 172.18.0.3"); got != "203.0.113.5" {
 		t.Fatalf("client through the chain: %s", got)
 	}
 	// A forged entry to the left of the real client is never used.
 	if got := ip("172.18.0.5", "6.6.6.6, 203.0.113.5, 173.245.48.10, 172.18.0.3"); got != "203.0.113.5" {
 		t.Fatalf("forged prefix: %s", got)
+	}
+	// Google's load balancer appends "<client>, <load balancer address>"; the web
+	// container passes it on unchanged.
+	lb, err := New(Config{RPID: "localhost", RPDisplayName: "x", RPOrigins: []string{"http://localhost:3000"}, Env: "dev",
+		ContactPepper: []byte("p"), TrustedProxies: []string{"172.30.0.0/16", "35.191.0.0/16", "130.211.0.0/22", "34.120.1.2"}}, NewStore())
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest("GET", "/", nil)
+	req.RemoteAddr = "172.30.2.4:5000"
+	req.Header.Set("X-Forwarded-For", "6.6.6.6, 203.0.113.5, 34.120.1.2")
+	if got := lb.clientIP(req); got != "203.0.113.5" {
+		t.Fatalf("behind Google's load balancer: %s", got)
 	}
 	// An untrusted caller's header is ignored.
 	if got := ip("198.51.100.1", "203.0.113.5"); got != "198.51.100.1" {

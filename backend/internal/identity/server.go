@@ -308,8 +308,8 @@ func decode(r *http.Request, v any) error {
 	return dec.Decode(v)
 }
 
-// clientIP is the caller's address. Behind trusted proxies (for example Cloudflare, then
-// Caddy, then the web server), X-Forwarded-For is read from the right, skipping every
+// clientIP is the caller's address. Behind trusted proxies (for example Google's load
+// balancer, then the web server), X-Forwarded-For is read from the right, skipping every
 // trusted hop: the first address that isn't a trusted proxy is the client. A client can't
 // spoof it by sending its own header, because only entries appended by trusted hops are
 // passed over.

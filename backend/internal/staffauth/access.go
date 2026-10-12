@@ -17,9 +17,12 @@ import (
 	"time"
 )
 
-// Access verifies the sign-in proxy's JWT (Cloudflare Access; any OIDC-style proxy that
-// signs with RS256 or ES256 and publishes a JWKS works the same way).
+// Access verifies the sign-in proxy's JWT: Google Cloud Identity-Aware Proxy (IAP) or
+// Cloudflare Access; any proxy that signs with RS256 or ES256 and publishes a JWKS works
+// the same way.
 type Access struct {
+	// Header carries the token: X-Goog-Iap-Jwt-Assertion (IAP) or Cf-Access-Jwt-Assertion.
+	Header   string
 	Issuer   string // e.g. https://<team>.cloudflareaccess.com
 	Audience string // the Access application's AUD tag
 	JWKSURL  string // e.g. https://<team>.cloudflareaccess.com/cdn-cgi/access/certs

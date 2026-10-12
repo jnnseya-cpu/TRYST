@@ -7,11 +7,12 @@ goes before production. It never holds real members' data.
 
 Owner: engineering lead. Before you start: [deploy.md](deploy.md) and [restore.md](restore.md).
 
-**Two ways to run it.** The recommended production is Google Cloud ([go-live.md](go-live.md)).
-Its staging twin is a VPS (for example Hostinger, UK or EU data centre) running the same
-`deploy/gcp/compose.yml` with `--profile localdb`, `ENV=staging` secrets and the vendor
-sandboxes: follow go-live.md §2 on the VPS, skipping Cloud SQL. The AWS route below stays
-available if production goes to AWS instead; sections 3, 5, 6 and 7 apply either way.
+**Recommended: a second Google Cloud project** (`tryst-staging`) set up exactly as
+production in [go-live.md](go-live.md) §2, with smaller machine and database tiers,
+`ENV=staging` secrets (`tryst-staging-<NAME>`), the vendor sandboxes, its own IAP group and
+the hosts `staging.<domain>` and `console.staging.<domain>`. The Hostinger VPS is for the
+dev-mode demo copy, not staging (go-live.md §6). The AWS route below stays available if
+production goes to AWS instead; sections 3, 5, 6 and 7 apply either way.
 
 ## 1. Account and access
 

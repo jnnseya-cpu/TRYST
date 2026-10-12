@@ -64,15 +64,24 @@ credentials into Secrets Manager ☐ entry in the records of processing.
   `/v1/billing/stripe/webhook`; renewal reminder emails at least 7 days ahead; a neutral
   statement descriptor. Secrets `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
 
-### Cloudflare Access (staff sign-in, D-59)
+### Google Cloud (hosting, London; D-66)
 
-* Access application for the console host, safety-team group, hardware-key sign-in
-  (`require_amr = "hwk"`). Separate applications for staging and production.
+* Compute Engine, Cloud SQL, Secret Manager, Artifact Registry, the external Application
+  Load Balancer with Cloud Armor, and Identity-Aware Proxy for staff sign-in to the console
+  (safety-team Google group; 2-Step Verification with security keys only). Separate
+  production and staging projects. DPA: Google's Cloud Data Processing Addendum; data
+  location europe-west2. Setup: [go-live.md](../runbooks/go-live.md).
 
-### AWS (hosting, London)
+### Hostinger (development and demo copy, off-site encrypted backup copy, outside uptime check)
 
-* Business support plan; KMS keys per environment; organisation SCPs; the Terraform in
-  `deploy/terraform`. DPA is AWS's standard GDPR addendum.
+* No member data in clear: dev mode with stand-in vendors, and backups encrypted with a
+  key that stays in Google Cloud. Choose a UK or EU data centre. DPA: Hostinger's standard
+  terms.
+
+### Vercel and Firebase
+
+* Not used at launch (go-live.md §1). Firebase Cloud Messaging joins when the native apps
+  ship; Vercel only for a separate marketing site without member data.
 
 ## Photo safety (required for photos to be published automatically)
 
@@ -99,7 +108,7 @@ Without these, every photo goes to a person (fail closed, FR-120).
 | Postmark | ☐ | ☐ | ☐ | ☐ | ☐ |
 | Twilio | ☐ | ☐ | ☐ | ☐ | ☐ |
 | Stripe | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Cloudflare Access | ☐ | ☐ | ☐ | ☐ | ☐ |
-| AWS | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Google Cloud | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Hostinger | ☐ | ☐ | ☐ | — | ☐ |
 | Sightengine | ☐ | ☐ | ☐ | ☐ | ☐ |
 | PhotoDNA / IWF | ☐ | ☐ | ☐ | ☐ | ☐ |
