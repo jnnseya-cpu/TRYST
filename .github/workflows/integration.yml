@@ -31,7 +31,7 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version-file: backend/go.mod }
       - uses: actions/setup-node@v4
-        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+        with: { node-version: "22", check-latest: true, cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e
@@ -41,8 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t tryst-api:ci backend
-      - run: docker build -f frontend/Dockerfile -t tryst-web:ci .
+      - run: docker build --pull -t tryst-api:ci backend
+      - run: docker build --pull -f frontend/Dockerfile -t tryst-web:ci .
       - name: API container starts and answers its health check
         run: |
           docker run -d --name api -e TRYST_ENV=dev -p 8081:8081 tryst-api:ci

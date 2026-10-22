@@ -39,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "22" }
+        with: { node-version: "22", check-latest: true }
       - run: npx --yes @redocly/cli@1 lint shared/contracts/openapi/tryst.v1.yaml shared/contracts/openapi/ops.v1.yaml shared/contracts/openapi/internal.v1.yaml --config shared/contracts/openapi/redocly.yaml
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }

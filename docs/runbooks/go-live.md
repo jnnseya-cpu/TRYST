@@ -66,6 +66,10 @@ You need: a Google Cloud billing account, two empty projects (staging and produc
   deploy, then `--finish-rotation`, deploy.
 * Restores: [restore.md](restore.md). Run the restore drill on staging monthly.
 * Growing: raise `MACHINE_TYPE` or `DB_TIER_MAIN` in the conf and run `setup.sh`.
+* A Node.js security release (the member site and console run on Node 22): raise
+  `NODE_MIN` in `frontend/Dockerfile` to the fixed version and merge. The next deploy
+  rebuilds on a freshly pulled base image, and the build fails on anything older. The API
+  and safety service are Go and unaffected; the public site on Vercel is static.
 
 ## 5. Before opening sign-up
 

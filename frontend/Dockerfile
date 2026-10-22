@@ -6,8 +6,13 @@
 # reports, appeals, standing and the console API go; OPS_CONSOLE=1
 # only for the staff-only console build.
 ARG NODE_IMAGE=node:22-alpine
+# Lowest Node.js 22 with the 20 Oct 2026 security fixes (remote code execution). Raise it
+# with each Node security release; the build fails on anything older.
+ARG NODE_MIN=22.23.4
 
 FROM ${NODE_IMAGE} AS build
+ARG NODE_MIN
+RUN node -e 'const [a,b,c]=process.versions.node.split(".").map(Number),[x,y,z]=process.argv[1].split(".").map(Number);if(a!==x||b<y||(b===y&&c<z)){console.error("Node "+process.versions.node+" is older than "+process.argv[1]+": pull a patched base image");process.exit(1)}' "$NODE_MIN"
 WORKDIR /repo
 COPY frontend/package.json frontend/package-lock.json frontend/
 RUN --mount=type=secret,id=ca,required=false \
@@ -21,6 +26,8 @@ ENV NEXT_TELEMETRY_DISABLED=1 IDENTITY_URL=${IDENTITY_URL} SAFETY_URL=${SAFETY_U
 RUN cd frontend && npm run build
 
 FROM ${NODE_IMAGE}
+ARG NODE_MIN
+RUN node -e 'const [a,b,c]=process.versions.node.split(".").map(Number),[x,y,z]=process.argv[1].split(".").map(Number);if(a!==x||b<y||(b===y&&c<z)){console.error("Node "+process.versions.node+" is older than "+process.argv[1]+": pull a patched base image");process.exit(1)}' "$NODE_MIN"
 # The server needs only node: drop the package managers (and their dependency trees, where
 # scanners find advisories) from the runtime image.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \

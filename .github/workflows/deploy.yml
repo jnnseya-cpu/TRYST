@@ -28,9 +28,9 @@ jobs:
         with: { ref: "${{ github.event.workflow_run.head_sha || github.sha }}" }
       - name: Build the three images
         run: |
-          docker build -t tryst-api backend
-          docker build -f frontend/Dockerfile -t tryst-web .
-          docker build -f frontend/Dockerfile --build-arg OPS_CONSOLE=1 -t tryst-ops .
+          docker build --pull -t tryst-api backend
+          docker build --pull -f frontend/Dockerfile -t tryst-web .
+          docker build --pull -f frontend/Dockerfile --build-arg OPS_CONSOLE=1 -t tryst-ops .
           docker save tryst-api tryst-web tryst-ops | gzip > images.tar.gz
           tar czf deploy-files.tgz deploy scripts
       - uses: actions/upload-artifact@v4
