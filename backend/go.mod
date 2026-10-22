@@ -2,7 +2,7 @@ module github.com/jnnseya-cpu/tryst/backend
 
 go 1.26.0
 
-toolchain go1.26.9
+toolchain go1.26.10
 
 require (
 	github.com/fxamacker/cbor/v2 v2.9.4

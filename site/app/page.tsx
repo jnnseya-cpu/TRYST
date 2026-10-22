@@ -1,5 +1,6 @@
 import { allPosts, TOPICS, type Topic } from "@/lib/posts";
-import { APP_URL, TAGLINE } from "@/lib/site";
+import { TAGLINE } from "@/lib/site";
+import { JoinButton } from "@/components/JoinButton";
 import { PostCard } from "@/components/PostCard";
 
 export default function Home() {
@@ -10,7 +11,7 @@ export default function Home() {
         <p className="eyebrow">The TRYST journal</p>
         <h1>{TAGLINE}</h1>
         <p className="lede">Every feature of TRYST, explained plainly: what it does, what makes it different, and what it can&rsquo;t do. No hype, no promises we can&rsquo;t keep.</p>
-        <a className="button" href={`${APP_URL}/join`}>Join free</a>
+        <JoinButton label="Join free" />
       </section>
 
       <section aria-labelledby="why-h" className="usp-grid-wrap">

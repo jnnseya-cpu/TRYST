@@ -49,6 +49,6 @@ When a feature changes in the app, change its post in the same pull request.
 ## Vercel
 
 New project → import the repository → **Root Directory `site`** (framework: Next.js).
-Environment variables: `NEXT_PUBLIC_SITE_URL` (for example `https://www.<domain>`) and
+Environment variables: `NEXT_PUBLIC_APP_OPEN` (`true` once the app takes members; until then every join button reads "Opening soon"), `NEXT_PUBLIC_SITE_URL` (for example `https://www.<domain>`) and
 `NEXT_PUBLIC_APP_URL` (`https://<domain>`, where "Join" links go). Point `www.<domain>` at
 Vercel in Hostinger's DNS. Security headers come from `vercel.json`.

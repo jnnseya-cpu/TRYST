@@ -3,7 +3,8 @@ import type { Metadata, Viewport } from "next";
 import "./brand-tokens.css";
 import "./globals.css";
 import { QuickExit } from "@/components/QuickExit";
-import { APP_URL, SITE_NAME, SITE_URL, TAGLINE } from "@/lib/site";
+import { SITE_NAME, SITE_URL, TAGLINE } from "@/lib/site";
+import { JoinButton } from "@/components/JoinButton";
 import { TOPICS } from "@/lib/posts";
 
 export const metadata: Metadata = {
@@ -37,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="site-foot">
           <p className="tag">{TAGLINE}</p>
           <p>For verified adults over 18 in the UK. Verified membership is free.</p>
-          <p><a className="button" href={`${APP_URL}/join`}>Become a member</a></p>
+          <p><JoinButton /></p>
           <p className="note">This site sets no cookies and runs no trackers. Press Esc twice, or Leave, to exit instantly; it can&rsquo;t clear your browser history, so use a private window if that matters.</p>
           <p className="note"><a href="/feed.xml">RSS</a></p>
         </footer>

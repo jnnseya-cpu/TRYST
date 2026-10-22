@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { allPosts, getPost, minutes, related, TOPICS } from "@/lib/posts";
-import { APP_URL, SITE_NAME, SITE_URL } from "@/lib/site";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { PostCard } from "@/components/PostCard";
+import { JoinButton } from "@/components/JoinButton";
 
 export const dynamicParams = false;
 export function generateStaticParams() {
@@ -54,7 +55,7 @@ export default async function PostPage({ params }: Props) {
           <>
             <h2>Try it yourself</h2>
             <p>Verified membership is free: every feature in this journal marked as available is included, with three intents a week. TRYST+ makes intents unlimited.</p>
-            <a className="button" href={`${APP_URL}/join`}>Become a member</a>
+            <JoinButton />
           </>
         ) : (
           <>
