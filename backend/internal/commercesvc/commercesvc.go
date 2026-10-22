@@ -50,7 +50,9 @@ type Item struct {
 // Catalogue is the UK price list. Plans are mutually exclusive; GHOST is an add-on.
 var Catalogue = []Item{
 	{Key: "tryst_plus", Name: "TRYST+", PriceMinor: 2499, Currency: "GBP", Period: "month", Kind: "plan", Rank: 1, subscription: true,
-		Description: "Unlimited intents, filters, incognito, travel mode, extended media, read-receipt control"},
+		// Only what TRYST+ actually unlocks today: selling unbuilt features is a misleading
+		// commercial practice (CPUT, DMCC Act; 01 §15.1). Add each feature here when it ships.
+		Description: "Unlimited intents to the people on your daily introductions (Verified includes 3 a week)"},
 	{Key: "tryst_plus_annual", Name: "TRYST+ (annual)", PriceMinor: 17988, Currency: "GBP", Period: "year", Kind: "plan", Rank: 1, subscription: true,
 		Description: "TRYST+ billed yearly: £14.99 a month"},
 	{Key: "duo", Name: "DUO", PriceMinor: 3999, Currency: "GBP", Period: "month", Kind: "plan", Rank: 2, subscription: true,

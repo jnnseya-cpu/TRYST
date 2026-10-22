@@ -24,3 +24,6 @@ deploy/.env
 # Google Cloud setup: vendor credentials and local Terraform state stay out of the repository
 deploy/gcp/*.secrets.env
 deploy/gcp/terraform/.terraform/
+site/public/brand/
+site/app/brand-tokens.css
+site/out/

@@ -81,8 +81,9 @@ credentials into Secrets Manager ☐ entry in the records of processing.
 
 ### Vercel and Firebase
 
-* Not used at launch (go-live.md §1). Firebase Cloud Messaging joins when the native apps
-  ship; Vercel only for a separate marketing site without member data.
+* Vercel hosts the public website and journal (`site/`): static pages, no member data, no
+  cookies. Firebase isn't used at launch; Firebase Cloud Messaging joins when the native
+  apps ship.
 
 ## Photo safety (required for photos to be published automatically)
 
