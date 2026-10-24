@@ -46,4 +46,4 @@ jobs:
       - run: |
           pip install grpcio-tools
           mkdir -p /tmp/protoout
-          python3 -m grpc_tools.protoc -Icontracts/proto --python_out=/tmp/protoout $(find shared/contracts/proto -name '*.proto')
+          python3 -m grpc_tools.protoc -Ishared/contracts/proto --python_out=/tmp/protoout $(find shared/contracts/proto -name '*.proto')

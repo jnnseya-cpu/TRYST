@@ -22,6 +22,7 @@ export default function Conversation() {
   const [thread, setThread] = useState<ThreadView | null>(null);
   const [items, setItems] = useState<Shown[]>([]);
   const [text, setText] = useState("");
+  const sending = useRef(false);
   const [error, setError] = useState("");
   const [banners, setBanners] = useState<string[]>([]);
   const [photo, setPhoto] = useState<string | null>(null);
@@ -67,9 +68,15 @@ export default function Conversation() {
       await api(`/v1/threads/${id}/signal`, { method: "POST", token: getToken(), body: { kind: s.kind, model: MODEL, about: "blocked_send" } });
       return;
     }
+    if (sending.current) return; // a double tap sends once
+    sending.current = true;
+    setText(""); // cleared as it's sent, so a late reply can't wipe what's typed next
     const r = await sendPayload(id, { v: 1, type: "text", text: body });
-    if (!r.ok) return setError(r.error ?? "Not sent.");
-    setText("");
+    sending.current = false;
+    if (!r.ok) {
+      setText((now) => now || body); // give the unsent text back
+      return setError(r.error ?? "Not sent.");
+    }
     setError("");
     refresh();
   }

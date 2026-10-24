@@ -38,6 +38,7 @@ export default function MeetPage() {
   const [trusted, setTrusted] = useState("");
   const [line, setLine] = useState(true);
   const [checkPin, setCheckPin] = useState("");
+  const [checking, setChecking] = useState(false);
 
   const load = useCallback(async () => {
     await registerDevice();
@@ -98,9 +99,14 @@ export default function MeetPage() {
   }
 
   async function checkIn(end: boolean) {
-    if (!meet) return;
-    const r = await api<{ message: string; ended?: boolean }>(`/v1/meets/${meet.id}/checkin`, { method: "POST", token: getToken(), body: { pin: checkPin, end } });
+    if (!meet || checking) return;
+    // The PIN is cleared as it's sent, not when the answer comes back: on a slow connection
+    // a reply arriving late would otherwise wipe the next PIN the member has typed.
+    const pin = checkPin;
     setCheckPin("");
+    setChecking(true);
+    const r = await api<{ message: string; ended?: boolean }>(`/v1/meets/${meet.id}/checkin`, { method: "POST", token: getToken(), body: { pin, end } });
+    setChecking(false);
     if (r.status !== 200) return setErr(problemTitle(r.data));
     setErr("");
     setMsg(r.data.message);
@@ -231,8 +237,8 @@ export default function MeetPage() {
                 <label htmlFor="checkpin">PIN</label>
                 <input id="checkpin" className="input" inputMode="numeric" type="password" value={checkPin} onChange={(e) => setCheckPin(e.target.value)} />
                 <div className="mt-row">
-                  <button type="button" className="button inline" onClick={() => checkIn(false)}>Check in</button>
-                  <button type="button" className="button ghost inline" onClick={() => checkIn(true)}>I&rsquo;m home safe</button>
+                  <button type="button" className="button inline" disabled={checking} onClick={() => checkIn(false)}>Check in</button>
+                  <button type="button" className="button ghost inline" disabled={checking} onClick={() => checkIn(true)}>I&rsquo;m home safe</button>
                 </div>
               </div>
             )}
