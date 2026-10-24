@@ -37,7 +37,7 @@ No code-level P0 or P1 defect is open.
 
 | Gate | Status | Evidence | Remaining risk |
 |---|---|---|---|
-| 1 Build integrity | PASS (CI on `492819c` to confirm) | E1–E13 | — |
+| 1 Build integrity | PASS | E1–E13; all CI workflows green on `492819c` | — |
 | 2 Truth and fitness | PARTIAL | Truth audit: all claims real or removed | No timed walkthrough by a person on real phones |
 | 3 Critical functionality | PARTIAL | 24/24 browser journeys, dev stand-ins | Real provider, ARC, email and Stripe flows untested |
 | 4 Security | BLOCKED | Scans clean, fuzz clean, no secrets in history | No pen test; authenticated fuzzing not done |

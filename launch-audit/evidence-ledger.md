@@ -21,7 +21,7 @@ environment**; nothing below was run against a deployed system.
 | E10 Site | content rules, typecheck, static build | 211 pass, build OK | PASS |
 | E11 Contracts | Redocly lint, Protobuf compile, spec check | Valid; D=69 | PASS |
 | E12 Terraform | `validate` both stacks (provider mirror) | Valid (AWS stack since removed) | PASS |
-| E13 CI on GitHub | Actions runs for this branch | integration and shared were **red** (D11, D13); fixes pushed in `492819c`, result pending | PARTIAL |
+| E13 CI on GitHub | Actions runs for this branch | integration and shared were **red** (D11, D13); on `492819c` backend, frontend, shared and integration (browser tests, image scan, Terraform) all pass ([run 40121556041](https://github.com/jnnseya-cpu/TRYST/actions/runs/40121556041)) | PASS |
 
 ## Adversarial and non-functional
 
