@@ -35,6 +35,9 @@ type harness struct {
 type failingLiveness struct{}
 
 func (failingLiveness) Verify(context.Context, string, string) (bool, error) { return false, nil }
+func (failingLiveness) Start(context.Context, string, string) (string, string, error) {
+	return "ref", "https://provider.example/capture", nil
+}
 
 func newHarness(t *testing.T, liveness LivenessProvider) *harness {
 	t.Helper()
@@ -64,6 +67,12 @@ func (r resp) json(t *testing.T) map[string]any {
 		t.Fatalf("not JSON (%d): %s", r.status, r.body)
 	}
 	return m
+}
+
+// live runs the phone face check: open the hosted capture, then finish the sign-in.
+func (h *harness) live(loginID string) resp {
+	h.do("POST", "/v1/auth/login/liveness/begin", map[string]string{"login_id": loginID}, "", uaIPhone)
+	return h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone)
 }
 
 func (h *harness) do(method, path string, body any, token, ua string, extra ...string) resp {
@@ -159,7 +168,7 @@ func TestMobileLoginNeedsTwoBiometricFactors(t *testing.T) {
 	if f1["next_factor"] != "B2" || f1["access_token"] != nil {
 		t.Fatalf("after B1 there must be no session yet: %v", f1)
 	}
-	r := h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone)
+	r := h.live(loginID)
 	h.mustStatus(r, 200)
 	tok := r.json(t)["access_token"].(string)
 	me := h.me(tok)
@@ -335,7 +344,7 @@ func TestOnboardingSessionCannotAddDevicesAfterSealing(t *testing.T) {
 	onb := h.signUp("rae@example.com")
 	h.register(onb, uaIPhone, phone)
 	loginID, _ := h.firstFactor(phone, uaIPhone)
-	h.mustStatus(h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone), 200)
+	h.mustStatus(h.live(loginID), 200)
 	// The account is now sealed; the old onboarding token can no longer register passkeys.
 	h.mustStatus(h.do("POST", "/v1/auth/passkeys/register/begin", nil, onb, uaIPhone), 403)
 	h.mustStatus(h.do("POST", "/v1/auth/enrol-device", nil, onb, uaIPhone), 403)
@@ -346,8 +355,9 @@ func TestLivenessFailsClosedWithoutProvider(t *testing.T) {
 	phone := newSoftAuth(t, "platform")
 	h.register(h.signUp("jo@example.com"), uaIPhone, phone)
 	loginID, _ := h.firstFactor(phone, uaIPhone)
+	h.mustStatus(h.do("POST", "/v1/auth/login/liveness/begin", map[string]string{"login_id": loginID}, "", uaIPhone), 503)
 	r := h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone)
-	h.mustStatus(r, 503)
+	h.mustStatus(r, 409) // no capture was started, so there is nothing to check
 	if r.json(t)["access_token"] != nil {
 		t.Fatal("no session without B2")
 	}
@@ -359,7 +369,7 @@ func TestLockoutAfterRepeatedFailures(t *testing.T) {
 	h.register(h.signUp("max@example.com"), uaIPhone, phone)
 	for i := 0; i < lockoutThreshold; i++ {
 		loginID, _ := h.firstFactor(phone, uaIPhone)
-		h.mustStatus(h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone), 401)
+		h.mustStatus(h.live(loginID), 401)
 	}
 	// Now locked: even a valid passkey gets the generic failure.
 	r := h.do("POST", "/v1/auth/login/begin", nil, "", uaIPhone)
@@ -413,7 +423,7 @@ func TestBurnSignsOutEverywhere(t *testing.T) {
 	var toks []string
 	for i := 0; i < 2; i++ {
 		loginID, _ := h.firstFactor(phone, uaIPhone)
-		r := h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone)
+		r := h.live(loginID)
 		toks = append(toks, r.json(t)["access_token"].(string))
 	}
 	h.mustStatus(h.do("POST", "/v1/burn", nil, toks[0], uaIPhone), 204)
@@ -465,7 +475,7 @@ func TestSecurityActivityIsRealAndPrivate(t *testing.T) {
 	h.register(onb, uaIPhone, phone)
 	// One failed second factor...
 	loginID, _ := h.firstFactor(phone, uaIPhone)
-	h.mustStatus(h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone), 401)
+	h.mustStatus(h.live(loginID), 401)
 	// Onboarding sessions cannot read security activity.
 	h.mustStatus(h.do("GET", "/v1/me/security", nil, onb, ""), 401)
 
@@ -475,7 +485,7 @@ func TestSecurityActivityIsRealAndPrivate(t *testing.T) {
 	var tok string
 	for i := 0; i < 2; i++ {
 		lid, _ := h2.firstFactor(p2, uaIPhone)
-		tok = h2.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": lid}, "", uaIPhone).json(t)["access_token"].(string)
+		tok = h2.live(lid).json(t)["access_token"].(string)
 	}
 	r := h2.do("GET", "/v1/me/security?days=7", nil, tok, "")
 	h2.mustStatus(r, 200)
@@ -589,4 +599,22 @@ func TestEmailOnlySignUpWithoutSMS(t *testing.T) {
 		t.Fatalf("phone sign-up without SMS: %d %s", r.status, r.body)
 	}
 	h.mustStatus(h.do("POST", "/v1/auth/start", map[string]string{"contact": "ana@example.com"}, "", ""), 202)
+}
+
+// The face check result is the provider session the server opened, never evidence from the
+// browser: finishing without starting is refused, a session is checked once, and the
+// capture address comes from the provider.
+func TestLivenessUsesTheServerHeldProviderSession(t *testing.T) {
+	h := newHarness(t, DevLiveness{})
+	phone := newSoftAuth(t, "platform")
+	h.register(h.signUp("ref@example.com"), uaIPhone, phone)
+	loginID, _ := h.firstFactor(phone, uaIPhone)
+	h.mustStatus(h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID, "evidence": "someone-elses-capture"}, "", uaIPhone), 422)
+	h.mustStatus(h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone), 409)
+	b := h.do("POST", "/v1/auth/login/liveness/begin", map[string]string{"login_id": loginID}, "", uaIPhone)
+	h.mustStatus(b, 200)
+	if b.json(t)["url"] == "" {
+		t.Fatal("no capture address")
+	}
+	h.mustStatus(h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone), 200)
 }

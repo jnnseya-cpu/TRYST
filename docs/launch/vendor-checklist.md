@@ -30,7 +30,11 @@ credentials into Secret Manager (via `setup.sh`) ☐ entry in the records of pro
   signed callback to `/v1/assurance/callback` (`X-Provider-Timestamp`,
   `X-Provider-Signature`). Settings: `ASSURANCE_URL`, `ASSURANCE_API_KEY`,
   `ASSURANCE_SECRET`, `ASSURANCE_CALLBACK_SECRET`, `ASSURANCE_PROVIDER`, `ASSURANCE_CERTS`;
-  B2 sign-in: `LIVENESS_URL`, `LIVENESS_API_KEY`, `LIVENESS_SECRET`. If the provider's API
+  B2 sign-in: `LIVENESS_URL`, `LIVENESS_API_KEY`, `LIVENESS_SECRET`, through the same signed
+  gateway: `POST /liveness/sessions` (`reference`, `return_url`) → `session_id` and a hosted
+  capture `url` (https); the member returns to `/liveness-done`; then
+  `POST /liveness/verify` (`reference`, `evidence` = that session id) → `match`,
+  `confidence`, `pad_passed`, `injection_detected`. If the provider's API
   differs, a thin gateway translates it (D-56).
 * **Two providers** so one outage or lapsed certificate doesn't stop sign-ups (G-P0).
 

@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 import { Action } from "@/components/Action";
 import { api, getToken, problemTitle } from "@/lib/api";
 import { FACTOR_COPY, GENERIC_FAILURE, type Factor } from "@/lib/login";
+import { openLiveCheck, whenLiveCheckDone } from "@/lib/liveness";
 
 type AssertionOptions = Parameters<typeof startAuthentication>[0]["optionsJSON"];
 
@@ -18,6 +19,8 @@ export function StepUp({ reason, onDone }: { reason: string; onDone: () => void 
   const [next, setNext] = useState<Factor | null>(null);
   const [qr, setQr] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const [live, setLive] = useState<{ url: string; opened: boolean } | null>(null);
+  const finishing = useRef(false);
   const poller = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => () => { if (poller.current) clearInterval(poller.current); }, []);
 
@@ -44,7 +47,23 @@ export function StepUp({ reason, onDone }: { reason: string; onDone: () => void 
   }
 
   async function liveness() {
+    setMsg("");
+    const watch = whenLiveCheckDone();
+    const o = await openLiveCheck(loginId!);
+    if (!o.ok) {
+      watch.cancel();
+      return setMsg(o.msg);
+    }
+    finishing.current = false;
+    setLive({ url: o.url, opened: o.opened });
+    watch.done.then(finishLiveness);
+  }
+
+  async function finishLiveness() {
+    if (finishing.current) return;
+    finishing.current = true;
     const r = await api("/v1/auth/login/liveness", { method: "POST", body: { login_id: loginId } });
+    setLive(null);
     finished(r.status, r.data);
   }
 
@@ -78,7 +97,14 @@ export function StepUp({ reason, onDone }: { reason: string; onDone: () => void 
       <h3>Confirm it&rsquo;s you</h3>
       <p className="note">{reason} You&rsquo;ll do both sign-in checks again; this lasts 5 minutes.</p>
       {!loginId && <Action className="button" onClick={first}>Confirm with passkey</Action>}
-      {next === "B2" && <Action className="button" onClick={liveness}>Start live check</Action>}
+      {next === "B2" && !live && <Action className="button" onClick={liveness}>Start live check</Action>}
+      {next === "B2" && live && (
+        <>
+          <p className="note" role="status">Finish the check in the tab that opened.</p>
+          {!live.opened && <a className="button" href={live.url} target="_blank" rel="noopener noreferrer">Open the live check</a>}
+          <Action className="button ghost" onClick={finishLiveness}>I&rsquo;ve finished the check</Action>
+        </>
+      )}
       {next === "F2" && (
         <>
           <p className="note">{FACTOR_COPY.F2.body}</p>

@@ -243,6 +243,7 @@ func build() *app {
 	}
 	cfg.AssuranceReturnURL = env("PUBLIC_URL", cfg.RPOrigins[0]) + "/verify"
 	cfg.RecoveryReturnURL = env("PUBLIC_URL", cfg.RPOrigins[0]) + "/recover"
+	cfg.LivenessReturnURL = env("PUBLIC_URL", cfg.RPOrigins[0]) + "/liveness-done"
 	if v := os.Getenv("ANCHOR_PEPPER"); v != "" {
 		b, err := hex.DecodeString(v)
 		if err != nil || len(b) < 32 {

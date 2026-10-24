@@ -138,6 +138,9 @@ func (s *Session) End(pin string) bool {
 }
 
 // Tick returns the actions due at now. Call it every minute and on every event.
+// Duress reports whether the duress PIN was used, so responders are told how urgent it is.
+func (s *Session) Duress() bool { return !s.duressAt.IsZero() }
+
 func (s *Session) Tick(now time.Time) []Action {
 	if s.ended && !s.emergency {
 		return nil

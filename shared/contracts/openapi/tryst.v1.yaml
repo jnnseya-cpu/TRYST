@@ -194,24 +194,61 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/LoginState' }
         '401': { $ref: '#/components/responses/Problem' }
-  /auth/login/liveness:
+  /auth/login/liveness/begin:
     post:
       tags: [auth]
-      operationId: loginLiveness
-      summary: Mobile second factor (B2). Session issued only after provider match callback.
+      operationId: loginLivenessBegin
+      summary: Mobile second factor (B2), step 1. Opens the provider's hosted face check; the provider session stays on the server.
       security: []
       x-min-tier: none
-      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login_id]
+              additionalProperties: false
+              properties:
+                login_id: { type: string }
       responses:
         '200':
-          description: Provider hand-off
+          description: Address of the hosted capture; the provider returns the member to /liveness-done
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  handoff_url: { type: string, format: uri }
-                  login_state: { $ref: '#/components/schemas/LoginState' }
+                  url: { type: string }
+        '503': { description: "No liveness provider, or it is unavailable (fails closed)" }
+  /auth/login/liveness:
+    post:
+      tags: [auth]
+      operationId: loginLiveness
+      summary: Mobile second factor (B2), step 2. Checks the provider session opened in step 1 (never evidence from the browser), once.
+      security: []
+      x-min-tier: none
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login_id]
+              additionalProperties: false
+              properties:
+                login_id: { type: string }
+      responses:
+        '200':
+          description: Session issued, or the session is stepped up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: { type: string }
+                  step_up: { type: boolean }
+        '409': { description: "liveness_not_started: step 1 hasn't run for this sign-in" }
   /auth/login/cross-device:
     post:
       tags: [auth]

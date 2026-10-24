@@ -72,6 +72,8 @@ type Config struct {
 	AssuranceReturnURL string
 	// RecoveryReturnURL is where the provider sends a recovering member back (/recover).
 	RecoveryReturnURL string
+	// LivenessReturnURL is where the hosted sign-in face check ends (/liveness-done).
+	LivenessReturnURL string
 	// AnchorPepper keys the one-way document codes (HSM-held in production; ≥ 32 bytes).
 	AnchorPepper []byte
 	// Consent appends a grant to the member's consent ledger. May be nil.
@@ -259,6 +261,7 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /v1/auth/enrol-device/redeem", s.handleEnrolRedeem)
 	m.HandleFunc("POST /v1/auth/login/begin", s.handleLoginBegin)
 	m.HandleFunc("POST /v1/auth/login/passkey", s.handleLoginPasskey)
+	m.HandleFunc("POST /v1/auth/login/liveness/begin", s.handleLoginLivenessBegin)
 	m.HandleFunc("POST /v1/auth/login/liveness", s.handleLoginLiveness)
 	m.HandleFunc("POST /v1/auth/login/cross-device", s.handleCrossDeviceBegin)
 	m.HandleFunc("GET /v1/auth/login/cross-device/{qr}", s.handleCrossDeviceStatus)
@@ -854,10 +857,14 @@ func (s *Server) finish(w http.ResponseWriter, la *LoginAttempt) {
 
 // ---------------------------------------------------------------- mobile second factor: B2 liveness
 
-func (s *Server) handleLoginLiveness(w http.ResponseWriter, r *http.Request) {
+// livenessHosted is how long a sign-in waits for the hosted face check once it has started.
+const livenessHosted = 10 * time.Minute
+
+// handleLoginLivenessBegin opens the provider's hosted face check for a phone sign-in or
+// step-up and returns its address. The provider's session stays on the server.
+func (s *Server) handleLoginLivenessBegin(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		LoginID  string `json:"login_id"`
-		Evidence string `json:"evidence"` // provider session reference
+		LoginID string `json:"login_id"`
 	}
 	if err := decode(r, &req); err != nil {
 		fail(w, 422, "validation_failed", "Malformed request")
@@ -872,8 +879,49 @@ func (s *Server) handleLoginLiveness(w http.ResponseWriter, r *http.Request) {
 	}
 	identityID := la.IdentityID
 	s.store.mu.Unlock()
+	starter, ok := s.cfg.Liveness.(LivenessStarter)
+	if !ok {
+		fail(w, 503, "liveness_unavailable", "Live face check is unavailable. Please try again later.")
+		return
+	}
+	ref, url, err := starter.Start(r.Context(), identityID, s.cfg.LivenessReturnURL)
+	if err != nil || ref == "" || url == "" {
+		log.Printf("liveness start: %v", err)
+		fail(w, 503, "liveness_unavailable", "Live face check is unavailable. Please try again later.")
+		return
+	}
+	s.store.mu.Lock()
+	defer s.store.mu.Unlock()
+	la.LivenessRef = ref
+	if until := s.cfg.Now().Add(livenessHosted); la.ExpiresAt.Before(until) {
+		la.ExpiresAt = until
+	}
+	writeJSON(w, 200, map[string]any{"url": url})
+}
 
-	match, err := s.cfg.Liveness.Verify(context.Background(), identityID, req.Evidence)
+func (s *Server) handleLoginLiveness(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		LoginID string `json:"login_id"`
+	}
+	if err := decode(r, &req); err != nil {
+		fail(w, 422, "validation_failed", "Malformed request")
+		return
+	}
+	s.store.mu.Lock()
+	la, ok := s.loginFrom(req.LoginID)
+	if !ok || la.Attempt == nil || la.Attempt.Surface == auth.Desktop || la.Attempt.Complete() {
+		s.store.mu.Unlock()
+		fail(w, 400, "auth_required", "This sign-in has expired. Start again.")
+		return
+	}
+	identityID, ref := la.IdentityID, la.LivenessRef
+	s.store.mu.Unlock()
+	if ref == "" {
+		fail(w, 409, "liveness_not_started", "Start the live check first.")
+		return
+	}
+
+	match, err := s.cfg.Liveness.Verify(context.Background(), identityID, ref)
 
 	s.store.mu.Lock()
 	defer s.store.mu.Unlock()
@@ -882,6 +930,7 @@ func (s *Server) handleLoginLiveness(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := s.store.get(identityID)
+	la.LivenessRef = "" // each provider session is checked once
 	if err != nil || !match {
 		s.recordFailure(id)
 		genericLoginFailure(w)

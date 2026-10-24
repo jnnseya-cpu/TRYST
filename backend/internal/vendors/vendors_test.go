@@ -239,3 +239,22 @@ func TestAssuranceAdapter(t *testing.T) {
 		}
 	}
 }
+
+func TestLivenessStartOpensAHostedCapture(t *testing.T) {
+	v := newVendor(t)
+	l := &Liveness{G: v.gw()}
+	v.answers["/liveness/sessions"] = `{"session_id":"lv_1","url":"https://capture.provider.example/lv_1"}`
+	ref, url, err := l.Start(context.Background(), "acc-1", "https://app.example/liveness-done")
+	if err != nil || ref != "lv_1" || url != "https://capture.provider.example/lv_1" {
+		t.Fatalf("start: %q %q %v", ref, url, err)
+	}
+	if b := v.bodies["/liveness/sessions"]; b["reference"] != "acc-1" || b["return_url"] != "https://app.example/liveness-done" || len(b) != 2 {
+		t.Fatalf("start body: %v", b)
+	}
+	for _, ans := range []string{`{"session_id":"lv_1","url":"http://capture.provider.example/lv_1"}`, `{"url":"https://capture.provider.example/x"}`} {
+		v.answers["/liveness/sessions"] = ans
+		if _, _, err := l.Start(context.Background(), "acc-1", "https://app.example/liveness-done"); err == nil {
+			t.Fatalf("accepted %s", ans)
+		}
+	}
+}

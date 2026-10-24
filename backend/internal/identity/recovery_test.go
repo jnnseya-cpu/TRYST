@@ -21,7 +21,7 @@ func (g *assuranceRig) phoneMember(contact string) (*softAuth, string) {
 
 func (g *assuranceRig) login(phone *softAuth) string {
 	loginID, _ := g.h.firstFactor(phone, uaIPhone)
-	r := g.h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone)
+	r := g.h.live(loginID)
 	g.h.mustStatus(r, 200)
 	return r.json(g.h.t)["access_token"].(string)
 }
@@ -40,7 +40,7 @@ func (g *assuranceRig) stepUp(tok string, phone *softAuth) int {
 	if r.status != 200 {
 		return r.status
 	}
-	return g.h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": begin.LoginID}, "", uaIPhone).status
+	return g.h.live(begin.LoginID).status
 }
 
 func TestStepUpGuardsDevices(t *testing.T) {

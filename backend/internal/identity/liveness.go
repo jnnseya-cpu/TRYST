@@ -15,11 +15,27 @@ type LivenessProvider interface {
 	Verify(ctx context.Context, identityID string, evidence string) (match bool, err error)
 }
 
+// LivenessStarter opens the provider's hosted capture for a sign-in or step-up face check.
+// The provider sends the member back to returnURL. ref is the provider's session; the server
+// keeps it on the sign-in attempt and passes it to Verify as the evidence, so a browser can
+// never present someone else's capture.
+type LivenessStarter interface {
+	Start(ctx context.Context, identityID, returnURL string) (ref, url string, err error)
+}
+
 // DevLiveness approves every check. It exists for local development and automated tests only
 // and the service refuses to start with it outside the "dev" environment.
 type DevLiveness struct{}
 
 func (DevLiveness) Verify(context.Context, string, string) (bool, error) { return true, nil }
+
+// Start skips the capture: the member goes straight to the return page.
+func (DevLiveness) Start(_ context.Context, _, returnURL string) (string, string, error) {
+	if returnURL == "" {
+		returnURL = "/liveness-done"
+	}
+	return "dev", returnURL, nil
+}
 
 // NoLiveness is the fail-closed default when no provider is configured.
 type NoLiveness struct{}

@@ -141,6 +141,7 @@ type LoginAttempt struct {
 	FirstCredID []byte
 	Assertion   *webauthn.SessionData // pending ceremony (first or second key)
 	QRToken     string
+	LivenessRef string // provider session for the face check (B2), set by liveness/begin
 	Approved    bool
 	Denied      bool
 	Delivered   bool

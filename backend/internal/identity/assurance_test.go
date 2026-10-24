@@ -49,7 +49,7 @@ func (g *assuranceRig) member(contact string) string {
 	phone := newSoftAuth(g.h.t, "platform")
 	g.h.register(g.h.signUp(contact), uaIPhone, phone)
 	loginID, _ := g.h.firstFactor(phone, uaIPhone)
-	r := g.h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone)
+	r := g.h.live(loginID)
 	g.h.mustStatus(r, 200)
 	return r.json(g.h.t)["access_token"].(string)
 }

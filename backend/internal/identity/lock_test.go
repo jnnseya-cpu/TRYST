@@ -49,7 +49,7 @@ func TestEmergencyLockNeedsCodeAndOnlyRecoveryLifts(t *testing.T) {
 		t.Fatal("not locked")
 	}
 	loginID, _ := g.h.firstFactor(phone, uaIPhone)
-	if r := g.h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone); r.status != 403 || r.json(t)["code"] != "account_locked" {
+	if r := g.h.live(loginID); r.status != 403 || r.json(t)["code"] != "account_locked" {
 		t.Fatalf("sign-in while locked: %d %s", r.status, r.body)
 	}
 

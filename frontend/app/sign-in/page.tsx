@@ -7,6 +7,7 @@ import { FACTOR_COPY, GENERIC_FAILURE, type Factor } from "@/lib/login";
 import { Shell } from "@/components/Shell";
 import { Action } from "@/components/Action";
 import { api, problemTitle, setToken } from "@/lib/api";
+import { openLiveCheck, whenLiveCheckDone } from "@/lib/liveness";
 
 type AssertionOptions = Parameters<typeof startAuthentication>[0]["optionsJSON"];
 type Session = { access_token: string };
@@ -19,6 +20,8 @@ export default function SignIn() {
   const [passed, setPassed] = useState<Factor[]>([]);
   const [qr, setQr] = useState<{ img: string; link: string } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [live, setLive] = useState<{ url: string; opened: boolean } | null>(null);
+  const finishing = useRef(false);
   const poller = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => () => { if (poller.current) clearInterval(poller.current); }, []);
@@ -54,8 +57,25 @@ export default function SignIn() {
 
   async function liveness() {
     setMsg(null);
+    const watch = whenLiveCheckDone();
+    const o = await openLiveCheck(loginId!);
+    if (!o.ok) {
+      watch.cancel();
+      return setMsg(o.msg);
+    }
+    finishing.current = false;
+    setLive({ url: o.url, opened: o.opened });
+    watch.done.then(finishLiveness);
+  }
+
+  async function finishLiveness() {
+    if (finishing.current) return;
+    finishing.current = true;
     const r = await api<Session>("/v1/auth/login/liveness", { method: "POST", body: { login_id: loginId } });
-    if (r.status !== 200) return failed(r.data);
+    if (r.status !== 200) {
+      setLive(null);
+      return failed(r.data);
+    }
     done(r.data);
   }
 
@@ -124,7 +144,15 @@ export default function SignIn() {
         <section className="card">
           <h2>{FACTOR_COPY.B2.title}</h2>
           <p>{FACTOR_COPY.B2.body}</p>
-          <Action className="button" onClick={liveness}>Start live check</Action>
+          {!live ? (
+            <Action className="button" onClick={liveness}>Start live check</Action>
+          ) : (
+            <>
+              <p className="note" role="status">Finish the check in the tab that opened. This page carries on by itself.</p>
+              {!live.opened && <a className="button" href={live.url} target="_blank" rel="noopener noreferrer">Open the live check</a>}
+              <Action className="button ghost" onClick={finishLiveness}>I&rsquo;ve finished the check</Action>
+            </>
+          )}
         </section>
       )}
 

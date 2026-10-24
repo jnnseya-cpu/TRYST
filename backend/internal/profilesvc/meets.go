@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/meet"
 	"github.com/jnnseya-cpu/tryst/backend/internal/metrics"
@@ -94,6 +95,7 @@ func (s *Service) WaitAlerts() { s.alertWG.Wait() }
 type LogAlerting struct {
 	mu      sync.Mutex
 	Trusted []string
+	Urgent  []bool // per trusted-contact alert: sent with the duress wording
 	Line    []meet.Alert
 	Panics  []meet.Alert
 }
@@ -102,6 +104,7 @@ func (l *LogAlerting) TrustedContact(_ context.Context, to, alias, window string
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.Trusted = append(l.Trusted, to)
+	l.Urgent = append(l.Urgent, duress)
 	log.Printf("ALERT trusted contact (dev sink): alias=%s window=%s duress=%v", alias, window, duress)
 	return nil
 }
@@ -413,6 +416,21 @@ func jsonNum(f float64) string {
 	return string(b)
 }
 
+// ukTime is the clock members and responders read; meets are stored in UTC. The zone data
+// is compiled into the binary (time/tzdata), so the slim runtime image needs none.
+var ukTime = func() *time.Location {
+	l, err := time.LoadLocation("Europe/London")
+	if err != nil {
+		panic(err)
+	}
+	return l
+}()
+
+// meetWindow is the meet's time window on the UK clock, labelled so nobody reads it as UTC.
+func meetWindow(start, end time.Time) string {
+	return start.In(ukTime).Format("15:04") + "–" + end.In(ukTime).Format("15:04") + " UK time"
+}
+
 // tickSession turns due actions into alerts. Caller holds s.mu.
 func (s *Service) tickSession(ctx context.Context, ss *safetySession, now time.Time) {
 	if ss.Ended {
@@ -420,13 +438,16 @@ func (s *Service) tickSession(ctx context.Context, ss *safetySession, now time.T
 	}
 	window := ""
 	if m := s.mt.meets[ss.Meet]; m != nil {
-		window = m.Start.Format("15:04") + "–" + m.End.Format("15:04")
+		window = meetWindow(m.Start, m.End)
 	}
 	for _, act := range ss.sess.Tick(now) {
 		reason := "missed_check_in"
-		duress := false
-		if act == meet.Emergency {
+		duress := ss.sess.Duress()
+		switch {
+		case act == meet.Emergency:
 			reason = "panic"
+		case duress:
+			reason = "duress"
 		}
 		a := meet.Alert{ID: "al_" + randHex(8), Reason: reason, MemberAlias: ss.Alias, MeetWindow: window, Started: now}
 		switch act {

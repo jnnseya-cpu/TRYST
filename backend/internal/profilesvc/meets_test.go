@@ -96,6 +96,11 @@ func TestDuressLooksNormalAndCannotEndTheMeet(t *testing.T) {
 	if len(al.Trusted) != 1 || len(al.Line) != 1 {
 		t.Fatalf("duress must alert at once: trusted=%v line=%v", al.Trusted, al.Line)
 	}
+	// Responders must know it's duress: the safety line gets the reason, the contact the
+	// urgent wording.
+	if al.Line[0].Reason != "duress" || !al.Urgent[0] {
+		t.Fatalf("duress reported as %q, urgent=%v", al.Line[0].Reason, al.Urgent[0])
+	}
 	if c, _ := w.do("ana", "POST", "/v1/meets/"+id+"/checkin", `{"pin":"0000"}`); c != 422 {
 		t.Fatal("wrong PIN accepted")
 	}
@@ -201,5 +206,16 @@ func TestTrustedContactMustBeEmailWithoutSMS(t *testing.T) {
 	}
 	if c, _ := w.do("ana", "POST", "/v1/meets/"+id+"/safety", `{"every_minutes":30,"pin":"2468","duress_pin":"1357","trusted_contact":"friend@example.com","safety_line":true}`); c != 200 {
 		t.Fatalf("email trusted contact: %d", c)
+	}
+}
+
+func TestMeetWindowOnTheUKClock(t *testing.T) {
+	summer := time.Date(2026, 7, 10, 19, 0, 0, 0, time.UTC)  // 20:00 BST
+	winter := time.Date(2026, 12, 10, 20, 0, 0, 0, time.UTC) // 20:00 GMT
+	if got := meetWindow(summer, summer.Add(3*time.Hour)); got != "20:00–23:00 UK time" {
+		t.Fatalf("summer: %q", got)
+	}
+	if got := meetWindow(winter, winter.Add(3*time.Hour)); got != "20:00–23:00 UK time" {
+		t.Fatalf("winter: %q", got)
 	}
 }

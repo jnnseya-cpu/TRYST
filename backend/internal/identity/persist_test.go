@@ -34,7 +34,7 @@ func restartSurvives(t *testing.T, st store.Store) {
 	onb := h.signUp("restart@example.com")
 	h.register(onb, uaIPhone, phone)
 	loginID, _ := h.firstFactor(phone, uaIPhone)
-	r := h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone)
+	r := h.live(loginID)
 	h.mustStatus(r, 200)
 	tok := r.json(t)["access_token"].(string)
 	h.srv.Close()
@@ -47,7 +47,7 @@ func restartSurvives(t *testing.T, st store.Store) {
 		t.Fatalf("security activity lost: %v", tot)
 	}
 	loginID, _ = h2.firstFactor(phone, uaIPhone)
-	r = h2.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone)
+	r = h2.live(loginID)
 	h2.mustStatus(r, 200)
 	// The restored account is sealed: a sign-up code can't add a passkey.
 	r = h2.do("POST", "/v1/auth/start", map[string]string{"contact": "restart@example.com"}, "", "")

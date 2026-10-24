@@ -105,6 +105,22 @@ type Liveness struct {
 	MinConfidence float64
 }
 
+// Start opens the provider's hosted capture for the account's reference. The provider returns
+// its session id (kept by TRYST, never shown to the browser as evidence) and the capture page.
+func (l *Liveness) Start(ctx context.Context, identityID, returnURL string) (string, string, error) {
+	var out struct {
+		SessionID string `json:"session_id"`
+		URL       string `json:"url"`
+	}
+	if err := l.G.Post(ctx, "/liveness/sessions", map[string]string{"reference": identityID, "return_url": returnURL}, &out); err != nil {
+		return "", "", err
+	}
+	if out.SessionID == "" || !strings.HasPrefix(out.URL, "https://") {
+		return "", "", ErrVendor
+	}
+	return out.SessionID, out.URL, nil
+}
+
 func (l *Liveness) Verify(ctx context.Context, identityID, evidence string) (bool, error) {
 	if evidence == "" {
 		return false, nil

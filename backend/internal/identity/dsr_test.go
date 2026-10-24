@@ -25,7 +25,7 @@ func TestExportAndErase(t *testing.T) {
 	onb := h.signUp("erase@example.com")
 	h.register(onb, uaIPhone, phone)
 	loginID, _ := h.firstFactor(phone, uaIPhone)
-	r := h.do("POST", "/v1/auth/login/liveness", map[string]string{"login_id": loginID}, "", uaIPhone)
+	r := h.live(loginID)
 	h.mustStatus(r, 200)
 	tok := r.json(t)["access_token"].(string)
 
