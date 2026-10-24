@@ -532,7 +532,12 @@ func (s *Service) handleUpload(w http.ResponseWriter, r *http.Request) {
 	checks.Provenance = profile.ReadProvenance(raw)
 	d := profile.Moderate(checks, 1, false)
 	if d.Outcome == profile.Reject || d.Outcome == profile.Report {
-		// Never stored. CSAM reporting is handled by the vendor pipeline (03 §7.3).
+		// Never stored. A known child-abuse image match also opens a suspected-minor case
+		// for Trust & Safety (15-minute deadline, interim suspension, mandatory NCA report;
+		// 03 §7.3). The image itself goes nowhere: the vendor's hash pipeline holds the match.
+		if d.Outcome == profile.Report && s.OnSignal != nil {
+			s.OnSignal("", "system:photo_hash", acc.ID, "csam_hash")
+		}
 		fail(w, 422, "photo_refused", d.Reason)
 		return
 	}

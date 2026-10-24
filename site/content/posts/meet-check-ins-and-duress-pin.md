@@ -20,7 +20,7 @@ The usual advice is "tell a friend where you're going". That depends on the frie
 3. **Choose two PINs:** your check-in PIN, and a different **duress PIN**.
 4. **Choose who's told** if you miss a check-in: a trusted contact (by email at launch, for this meet only), our 24/7 safety line, or both.
 
-If you miss a check-in, your trusted contact is alerted first, then the safety line, staffed around the clock by a professional alarm-receiving centre. Entering the **duress PIN gives exactly the same reply as a normal check-in**, so anyone looking over your shoulder sees nothing unusual, but escalation starts at once. When you're done, end the meet with **"home safe"**. Your trusted contact's details are deleted when the meet ends.
+If you miss a check-in, your trusted contact is alerted first, then the safety line, staffed around the clock by a professional alarm-receiving centre. Entering the **duress PIN gives exactly the same reply as a normal check-in**, so anyone looking over your shoulder sees nothing unusual, but escalation starts at once. When you're done, end the meet with **"home safe"**. Your trusted contact's details are deleted when you end the meet with your check-in PIN; until then they're kept encrypted, because the check-ins keep running and someone keeps looking for you.
 
 **Panic** is a separate control, available at any time.
 

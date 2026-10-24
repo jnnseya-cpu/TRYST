@@ -19,7 +19,7 @@ Most messaging on connection apps is stored in readable form on the company's se
 - Each message is **encrypted on your device**, separately for every device that you and the other person use. Your private keys never leave your devices.
 - TRYST's servers store and relay **only ciphertext** they can't decrypt.
 - You choose how long messages are kept: **7, 30 or 90 days**. The shortest period either of you picks applies, and expired messages are deleted.
-- **On-device safety checks** run on your phone, not on our servers: they warn you about common scam patterns, refuse to send child sexual abuse material, and freeze a conversation for review if they detect signs of extortion.
+- **On-device safety checks** run on your phone, not on our servers: they warn you about common scam patterns, refuse to send messages that read as grooming or child exploitation, and freeze a conversation for review if they detect signs of extortion.
 - **Block** closes the conversation for both of you and hides you from each other everywhere. They aren't told why.
 
 ## Why it's different

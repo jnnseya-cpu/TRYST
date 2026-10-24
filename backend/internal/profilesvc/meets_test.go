@@ -219,3 +219,44 @@ func TestMeetWindowOnTheUKClock(t *testing.T) {
 		t.Fatalf("winter: %q", got)
 	}
 }
+
+// A deploy or restart mid-meet must not drop the safety net: the plan is saved, with the
+// trusted contact sealed under the member's key, and its timers carry on.
+func TestCheckInsSurviveARestart(t *testing.T) {
+	w, _, id := confirmedMeet(t)
+	if c, _ := w.do("ana", "POST", "/v1/meets/"+id+"/safety", `{"every_minutes":60,"pin":"2468","duress_pin":"1357","trusted_contact":"friend@example.com"}`); c != 200 {
+		t.Fatalf("start: %d", c)
+	}
+	docs, _ := w.s.st.All(context.Background(), "safety")
+	if len(docs) != 1 {
+		t.Fatalf("plan not saved: %d docs", len(docs))
+	}
+	for _, b := range docs {
+		if strings.Contains(string(b), "friend@example.com") {
+			t.Fatal("trusted contact stored in the clear")
+		}
+	}
+
+	s2, err := NewWithStore(w.s.auth, DevModerator{}, "dev", w.s.st, w.s.vault) // restart
+	if err != nil {
+		t.Fatal(err)
+	}
+	al := &LogAlerting{}
+	s2.Alerts = al
+	s2.now = w.s.now
+	w.now = w.now.Add(3 * time.Hour) // the check-in was missed while the service was down
+	s2.SweepSafety(context.Background())
+	s2.WaitAlerts()
+	if len(al.Trusted) != 1 || al.Trusted[0] != "friend@example.com" {
+		t.Fatalf("resumed plan didn't alert the contact: %v", al.Trusted)
+	}
+
+	// Ending with the real PIN deletes the saved plan.
+	w.s = s2
+	if c, _ := w.do("ana", "POST", "/v1/meets/"+id+"/checkin", `{"pin":"2468","end":true}`); c != 200 {
+		t.Fatalf("end: %d", c)
+	}
+	if docs, _ := s2.st.All(context.Background(), "safety"); len(docs) != 0 {
+		t.Fatal("ended plan still stored")
+	}
+}

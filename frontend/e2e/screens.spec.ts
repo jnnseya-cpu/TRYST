@@ -64,7 +64,7 @@ test("computer: join, link phone, sign in with phone approval", async ({ browser
   const contact = `screens${Date.now()}@example.com`;
 
   await laptop.goto("/join");
-  await laptop.getByLabel(/Email or mobile/).fill(contact);
+  await laptop.getByLabel(/^Email address$/).fill(contact);
   await shot(laptop, "join-contact-desktop");
   await laptop.getByRole("button", { name: "Send code" }).click();
   const code = (await laptop.getByTestId("dev-otp").textContent())!.match(/\d{6}/)![0];
@@ -109,7 +109,7 @@ test("computer: join, link phone, sign in with phone approval", async ({ browser
 test("phone: join and sign in with two biometric checks", async ({ browser }) => {
   const phone = (await device(browser, "phone")).page;
   await phone.goto("/join");
-  await phone.getByLabel(/Email or mobile/).fill(`phone${Date.now()}@example.com`);
+  await phone.getByLabel(/^Email address$/).fill(`phone${Date.now()}@example.com`);
   await shot(phone, "join-contact-phone");
   await phone.getByRole("button", { name: "Send code" }).click();
   const code = (await phone.getByTestId("dev-otp").textContent())!.match(/\d{6}/)![0];
@@ -145,7 +145,7 @@ async function signedIn(browser: Browser, viewport: { width: number; height: num
     options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
   });
   await page.goto("/join");
-  await page.getByLabel(/Email or mobile/).fill(`pf${Date.now()}${viewport.width}@example.com`);
+  await page.getByLabel(/^Email address$/).fill(`pf${Date.now()}${viewport.width}@example.com`);
   await page.getByRole("button", { name: "Send code" }).click();
   const code = (await page.getByTestId("dev-otp").textContent())!.match(/\d{6}/)![0];
   await page.getByLabel(/6-digit code/).fill(code);

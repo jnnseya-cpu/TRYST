@@ -141,9 +141,11 @@ func (s *Service) Erase(ctx context.Context, account string) (dsr.Receipt, error
 			}
 		}
 	}
+	var plans []string
 	for k, ss := range s.mt.sessions {
 		if ss.Member == account || containsStr(meets, ss.Meet) {
 			delete(s.mt.sessions, k) // trusted contacts go with them
+			plans = append(plans, k)
 		}
 	}
 	delete(s.th.devices, account)
@@ -205,6 +207,9 @@ func (s *Service) Erase(ctx context.Context, account string) (dsr.Receipt, error
 	}
 	for _, m := range meets {
 		del("meet", m)
+	}
+	for _, k := range plans {
+		del("safety", k)
 	}
 	for _, id := range intents {
 		del("intent", id)

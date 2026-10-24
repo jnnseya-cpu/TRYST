@@ -18,7 +18,7 @@ Sometimes you don't want a plan for next week. You want to know who's free *toni
 - **Go free for 1 to 6 hours**, within about 5, 10, 25 or 50 km.
 - **Only people who are also free tonight can see you**, and only if you're within both people's chosen distance. If you're not free, you see nobody and nobody sees you.
 - Each person appears with their name, age, area and an **approximate** distance band, never an exact location.
-- Tap **Interested** and it stays private: they only find out if they're interested in you too. You have **10 interests per evening**.
+- Tap **Interested** and it stays private: they only find out if they're interested in you too. You can have **up to 10 interests at a time**.
 - When it's mutual, you're both told, and a private conversation opens.
 - **It switches itself off** when your hours run out, or the moment you tap Stop.
 

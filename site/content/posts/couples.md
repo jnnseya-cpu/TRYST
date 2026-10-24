@@ -16,7 +16,7 @@ Fake couple profiles run by one person are common on other platforms. Even genui
 ## How it works
 
 - **Two verified accounts.** Each partner verifies separately, with their own ID.
-- **Linked from two different devices.** One partner creates an invitation; the other confirms on **their own** device within 24 hours. A link confirmed from the same device is refused.
+- **Linked from two different devices.** One partner creates an invitation; the other confirms on **their own** device within 24 hours. A link confirmed from the inviting device is refused, and each partner must be a separately verified member.
 - **Approve the exact answers.** The partner confirming sees what the other has said they're looking for, and approves that exact version. If it changes in the meantime, they're asked to look again.
 - **Two voices on every introduction.** Both partners see each introduction's brief and decide. With the veto set to **"either"**, one yes is enough unless the other says no; with **"both"**, you both have to say yes. Changing the veto rule needs **both** of you to ask for it.
 - **Either partner can end the link at once**, without a reason. The other is told only that it ended.

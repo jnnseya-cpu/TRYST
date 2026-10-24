@@ -109,6 +109,38 @@ type Session struct {
 
 func Start(p *Plan, salt []byte) *Session { return &Session{plan: p, salt: salt, lastOK: p.Start} }
 
+// State is everything a Session needs to carry on after a restart. It holds PIN hashes,
+// never PINs.
+type State struct {
+	Start, End       time.Time
+	Every, Grace     time.Duration
+	SafetyLine       bool
+	HasTrusted       bool
+	PINHash          []byte
+	DuressHash       []byte
+	Salt             []byte
+	LastOK, DuressAt time.Time
+	AlertedAt        time.Time
+	SafetyAt         time.Time
+	Emergency, Ended bool
+}
+
+// State snapshots the session for saving.
+func (s *Session) State() State {
+	p := s.plan
+	return State{Start: p.Start, End: p.End, Every: p.CheckInEvery, Grace: p.Grace, SafetyLine: p.SafetyLine,
+		HasTrusted: p.HasTrusted, PINHash: p.pinHash, DuressHash: p.duressHash, Salt: s.salt, LastOK: s.lastOK,
+		DuressAt: s.duressAt, AlertedAt: s.alertedAt, SafetyAt: s.safetyAt, Emergency: s.emergency, Ended: s.ended}
+}
+
+// Resume rebuilds a session saved with State; its timers carry on from where they were.
+func Resume(st State) *Session {
+	p := &Plan{Start: st.Start, End: st.End, CheckInEvery: st.Every, Grace: st.Grace, SafetyLine: st.SafetyLine,
+		HasTrusted: st.HasTrusted, pinHash: st.PINHash, duressHash: st.DuressHash}
+	return &Session{plan: p, salt: st.Salt, lastOK: st.LastOK, duressAt: st.DuressAt, alertedAt: st.AlertedAt,
+		safetyAt: st.SafetyAt, emergency: st.Emergency, ended: st.Ended}
+}
+
 // CheckIn records a check-in. The screen always shows "Thanks, checked in", whichever PIN
 // was used: the person with them cannot tell a duress check-in from a normal one.
 func (s *Session) CheckIn(pin string, now time.Time) (screen string) {

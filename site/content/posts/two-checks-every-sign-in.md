@@ -20,7 +20,7 @@ Every sign-in needs **two separate checks**, and the second always comes from so
 - **On your phone:** your passkey (unlocked with your fingerprint, face or screen lock), then a short live face check that it's really you.
 - **On a computer:** your passkey, then approval from your registered phone (you scan a code and confirm), or a second security key if you prefer.
 
-Your email address proves who you are once, when you join. After that it can never sign you in or add a device. Five wrong attempts lock the account for 15 minutes, and you can see every sign-in, by day and by device, from your account.
+Your email address proves who you are once, when you join. After that it can never sign you in or add a device. Five wrong attempts lock the account for 15 minutes, and you can see your sign-ins for the last 90 days, day by day, split by phone and computer, from your account.
 
 ## Why it's different
 

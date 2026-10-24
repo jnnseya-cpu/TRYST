@@ -34,8 +34,8 @@ export default function Lock() {
       ) : (
         <section className="card">
           <p>Use this if your phone has been taken or someone else can get into your account. You need the emergency code you were given when you joined.</p>
-          <label htmlFor="contact">Email or mobile number on the account</label>
-          <input id="contact" className="input" autoComplete="off" value={contact} onChange={(e) => setContact(e.target.value)} />
+          <label htmlFor="contact">Email address on the account</label>
+          <input id="contact" className="input" type="email" inputMode="email" autoCapitalize="none" spellCheck={false} autoComplete="off" value={contact} onChange={(e) => setContact(e.target.value)} />
           <label htmlFor="code">Emergency code</label>
           <input id="code" className="input" autoComplete="off" value={code} onChange={(e) => setCode(e.target.value)} />
           <Action className="button" onClick={lock}>Lock the account</Action>

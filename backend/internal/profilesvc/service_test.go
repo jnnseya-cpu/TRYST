@@ -2,6 +2,7 @@ package profilesvc
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"image"
@@ -14,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
+	"github.com/jnnseya-cpu/tryst/backend/internal/profile"
 )
 
 type fakeAuth struct{ acc identity.Account }
@@ -211,5 +213,28 @@ func TestRejectsTinyAndNonImages(t *testing.T) {
 	}
 	if code, _ := upload(t, s, []byte("not an image at all")); code != 422 {
 		t.Fatalf("garbage: %d", code)
+	}
+}
+
+type hashHitModerator struct{}
+
+func (hashHitModerator) Check(context.Context, string, []byte) (profile.Checks, error) {
+	return profile.Checks{DetectorRan: true, CSAMHashHit: true}, nil
+}
+
+// A known child-abuse image match is refused and never stored, and it opens a case for
+// Trust & Safety rather than disappearing.
+func TestKnownAbuseImageOpensASafetyCase(t *testing.T) {
+	s, err := New(fakeAuth{identity.Account{ID: "acc-h", BirthYM: "1985-01"}}, hashHitModerator{}, "prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	s.OnSignal = func(thread, reporter, subject, kind string) { got = append(got, subject+"/"+kind) }
+	if c, _ := upload(t, s, testJPEG(t, 300, 300)); c != 422 {
+		t.Fatalf("upload: %d", c)
+	}
+	if len(got) != 1 || got[0] != "acc-h/csam_hash" {
+		t.Fatalf("signals: %v", got)
 	}
 }

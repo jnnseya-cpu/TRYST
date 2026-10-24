@@ -384,7 +384,7 @@ func (s *Service) FromSignal(threadID, reporter, subject, kind string) {
 // Signal opens a case from an on-device signal, at most once per signal id (the member
 // platform's outbox may deliver a signal more than once).
 func (s *Service) Signal(ctx context.Context, id, threadID, reporter, subject, kind string) error {
-	cat := map[string]string{"child_safety": "minor", "extortion": "sextortion", "fraud": "romance_fraud"}[kind]
+	cat := map[string]string{"child_safety": "minor", "csam_hash": "minor", "extortion": "sextortion", "fraud": "romance_fraud"}[kind]
 	if cat == "" || subject == "" {
 		return nil
 	}

@@ -17,6 +17,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/meet"
 	"github.com/jnnseya-cpu/tryst/backend/internal/metrics"
+	"github.com/jnnseya-cpu/tryst/backend/internal/store"
 )
 
 type meetRecord struct {
@@ -155,6 +157,69 @@ func (s *Service) loadMeets(ctx context.Context) error {
 		if json.Unmarshal(b, &m) == nil {
 			s.mt.meets[m.ID] = &m
 		}
+	}
+	return s.loadSafety(ctx)
+}
+
+// savedSafety is a running check-in plan as stored, so a restart or deploy never silently
+// drops someone's safety net. The trusted contact is sealed under the member's own key.
+type savedSafety struct {
+	Meet, Member, Alias string
+	SafetyLine          bool
+	Started             time.Time
+	Trusted             []byte `json:",omitempty"`
+	State               meet.State
+}
+
+func safetyKey(ss *safetySession) string { return ss.Meet + "|" + ss.Member }
+
+// saveSafety stores a running plan, or deletes it once it has ended. Caller holds s.mu.
+func (s *Service) saveSafety(ctx context.Context, ss *safetySession) {
+	if ss.Ended {
+		if err := s.st.Delete(ctx, "safety", safetyKey(ss)); err != nil && !errors.Is(err, store.ErrNotFound) {
+			log.Printf("persist safety (end) failed: %v", err)
+		}
+		return
+	}
+	doc := savedSafety{Meet: ss.Meet, Member: ss.Member, Alias: ss.Alias, SafetyLine: ss.SafetyLine, Started: ss.Started, State: ss.sess.State()}
+	if ss.Trusted != "" {
+		sealed, err := s.vault.Seal(ctx, ss.Member, []byte(ss.Trusted), []byte("safety:"+safetyKey(ss)))
+		if err != nil {
+			log.Printf("persist safety failed (seal): %v", err)
+			metrics.Default.Inc("tryst_safety_persist_failures_total")
+			return
+		}
+		doc.Trusted = sealed
+	}
+	b, _ := json.Marshal(doc)
+	if err := s.st.Put(ctx, "safety", safetyKey(ss), b); err != nil {
+		log.Printf("persist safety failed: %v", err)
+		metrics.Default.Inc("tryst_safety_persist_failures_total")
+	}
+}
+
+func (s *Service) loadSafety(ctx context.Context) error {
+	docs, err := s.st.All(ctx, "safety")
+	if err != nil {
+		return err
+	}
+	for k, b := range docs {
+		var d savedSafety
+		if json.Unmarshal(b, &d) != nil {
+			continue
+		}
+		ss := &safetySession{Meet: d.Meet, Member: d.Member, Alias: d.Alias, SafetyLine: d.SafetyLine, Started: d.Started,
+			sess: meet.Resume(d.State), salt: d.State.Salt}
+		if len(d.Trusted) > 0 {
+			pt, err := s.vault.Open(ctx, d.Member, d.Trusted, []byte("safety:"+k))
+			if err != nil {
+				// The member's key is gone (erased) or the record is damaged: nothing to resume.
+				log.Printf("safety plan %s not resumed: %v", k, err)
+				continue
+			}
+			ss.Trusted = string(pt)
+		}
+		s.mt.sessions[k] = ss
 	}
 	return nil
 }
@@ -318,6 +383,7 @@ func (s *Service) handleSafetyStart(w http.ResponseWriter, r *http.Request) {
 	ss := &safetySession{Meet: m.ID, Member: acc.ID, Alias: alias, Trusted: in.Trusted, SafetyLine: in.SafetyLine,
 		sess: meet.Start(plan, salt), salt: salt, Started: start}
 	s.mt.sessions[m.ID+"|"+acc.ID] = ss
+	s.saveSafety(r.Context(), ss)
 	writeJSON(w, 200, s.meetView(acc.ID, m))
 }
 
@@ -357,6 +423,7 @@ func (s *Service) handleCheckIn(w http.ResponseWriter, r *http.Request) {
 	if in.End {
 		if ss.sess.End(in.PIN) {
 			s.endSession(ss)
+			s.saveSafety(r.Context(), ss)
 			writeJSON(w, 200, map[string]any{"message": "Glad you're safe. Check-ins have stopped.", "ended": true})
 			return
 		}
@@ -367,6 +434,7 @@ func (s *Service) handleCheckIn(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.tickSession(r.Context(), ss, now)
+		s.saveSafety(r.Context(), ss)
 		writeJSON(w, 200, map[string]any{"message": "Glad you're safe. Check-ins have stopped.", "ended": true})
 		return
 	}
@@ -376,6 +444,7 @@ func (s *Service) handleCheckIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.tickSession(r.Context(), ss, now)
+	s.saveSafety(r.Context(), ss)
 	writeJSON(w, 200, map[string]any{"message": msg})
 }
 
@@ -406,6 +475,7 @@ func (s *Service) handlePanic(w http.ResponseWriter, r *http.Request) {
 	if ss, ok := s.mt.sessions[in.Meet+"|"+acc.ID]; ok && !ss.Ended {
 		ss.sess.Panic()
 		s.tickSession(r.Context(), ss, s.now())
+		s.saveSafety(r.Context(), ss)
 	}
 	s.dispatch("emergency", func(ctx context.Context) error { return s.Alerts.Emergency(ctx, a) })
 	writeJSON(w, 200, map[string]any{"alert": a.ID, "call": "999", "silent_solution": "If you can't speak, dial 999, then press 55 when asked."})
@@ -440,7 +510,11 @@ func (s *Service) tickSession(ctx context.Context, ss *safetySession, now time.T
 	if m := s.mt.meets[ss.Meet]; m != nil {
 		window = meetWindow(m.Start, m.End)
 	}
-	for _, act := range ss.sess.Tick(now) {
+	acts := ss.sess.Tick(now)
+	if len(acts) > 0 {
+		defer s.saveSafety(ctx, ss) // escalation times are part of the saved plan
+	}
+	for _, act := range acts {
 		reason := "missed_check_in"
 		duress := ss.sess.Duress()
 		switch {

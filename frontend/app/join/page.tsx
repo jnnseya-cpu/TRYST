@@ -84,8 +84,8 @@ export default function Join() {
 
       {step === "contact" && (
         <section className="card">
-          <label htmlFor="contact">Email or mobile number (international format)</label>
-          <input id="contact" className="input" value={contact} onChange={(e) => setContact(e.target.value)} autoComplete="off" />
+          <label htmlFor="contact">Email address</label>
+          <input id="contact" className="input" type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={contact} onChange={(e) => setContact(e.target.value)} autoComplete="off" />
           <Action className="button" onClick={sendCode}>Send code</Action>
         </section>
       )}
@@ -103,7 +103,7 @@ export default function Join() {
         <section className="card" data-testid="emergency-code">
           <h2>Your emergency code</h2>
           <p className="code-link" style={{ fontSize: "1.4rem", letterSpacing: "0.1em" }}>{emergency}</p>
-          <p className="note">Keep it somewhere only you can reach. If someone takes your phone, use it with your email or number at /lock to lock the account from any browser, without signing in. It works once. We show it only now.</p>
+          <p className="note">Keep it somewhere only you can reach. If someone takes your phone, use it with your email address at /lock to lock the account from any browser, without signing in. It works once. We show it only now.</p>
         </section>
       )}
 

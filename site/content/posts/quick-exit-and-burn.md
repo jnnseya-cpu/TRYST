@@ -19,7 +19,7 @@ Closing a tab leaves it in your history and one tap away from reopening. Signing
 
 - Every page has a **Leave** button in the corner, on the app and on this journal.
 - **Press Escape twice** on a keyboard and you leave instantly.
-- The page hides immediately and is **replaced** by a neutral weather page, so pressing Back doesn't bring TRYST back.
+- The page hides immediately and is **replaced** by a neutral weather page, so pressing Back once doesn't bring TRYST back.
 
 **Burn**
 
@@ -33,6 +33,7 @@ Quick exit is **built into every page**, not hidden in settings, and it replaces
 
 ## What it doesn't do
 
+- Quick exit replaces only the page you're on: earlier TRYST pages in the same tab stay in its history. Close the tab, or use a private window, if that matters.
 - Quick exit can't erase your browser history or anything your network provider can see. Use a private window if that matters.
 - Burn wipes this device and ends sessions. It doesn't delete your account; for that, see [download or delete for good](/blog/download-or-delete-for-good/).
 - After Burn, signing back in needs your two checks as normal.

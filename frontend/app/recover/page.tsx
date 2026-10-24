@@ -127,8 +127,8 @@ export default function Recover() {
     body = (
       <section className="card">
         <p>Use this only if you&rsquo;ve lost every device that can sign in. You&rsquo;ll repeat the face check and the ID check with the same ID you verified with. Then there&rsquo;s a 24-hour wait, and we tell your account, so you can stop it if it isn&rsquo;t you.</p>
-        <label htmlFor="contact">Email or mobile number on your account</label>
-        <input id="contact" className="input" value={contact} onChange={(e) => setContact(e.target.value)} autoComplete="off" />
+        <label htmlFor="contact">Email address on your account</label>
+        <input id="contact" className="input" type="email" inputMode="email" autoCapitalize="none" spellCheck={false} value={contact} onChange={(e) => setContact(e.target.value)} autoComplete="off" />
         <Action className="button" onClick={begin}>Start recovery</Action>
       </section>
     );

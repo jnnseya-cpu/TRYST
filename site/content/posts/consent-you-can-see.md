@@ -17,7 +17,7 @@ Most services bury consent inside their Terms: agree to everything or leave. You
 
 - **Separate from the Terms.** Before you appear on introductions or Tonight, we ask specifically for your consent to process what your profile says about your sex life. It's a separate tick, with plain words, not a clause in the Terms.
 - **Biometric consent** is asked before any face check, separately again.
-- **A sealed history.** Every consent you give or withdraw is added to a record that can't be edited: each entry is linked to the one before it, so any change would break the chain. We check those chains continuously, and our on-call team is alerted if one ever fails.
+- **A sealed history.** Every consent you give or withdraw is added to a record that can't be edited: each entry is linked to the one before it, so any change would break the chain. We check every chain each time the service starts and regularly while it runs, and our on-call team is alerted if one ever fails.
 - **See it all.** Your account shows each consent, whether it's given now, and the full history with dates and the wording version you agreed to.
 - **Withdraw in one tap.** Withdraw consent to processing your profile and you leave introductions and Tonight **immediately**. Your account stays.
 

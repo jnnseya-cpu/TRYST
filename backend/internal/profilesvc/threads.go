@@ -29,6 +29,8 @@ import (
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/jnnseya-cpu/tryst/backend/internal/metrics"
 )
 
 const (
@@ -376,7 +378,7 @@ func (s *Service) handleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	device := r.URL.Query().Get("device_id")
 	after, _ := strconv.ParseInt(r.URL.Query().Get("after"), 10, 64)
-	tid := t.ID
+	tid, days := t.ID, t.retention()
 	s.mu.Unlock()
 
 	docs, err := s.st.All(r.Context(), "msg:"+tid)
@@ -399,9 +401,12 @@ func (s *Service) handleMessages(w http.ResponseWriter, r *http.Request) {
 		if json.Unmarshal(b, &m) != nil {
 			continue
 		}
-		if now.After(m.Expires) {
-			_ = s.st.Delete(r.Context(), "msg:"+tid, id) // retention: purge on sight (and by the sweep job)
+		if m.expired(days, now) {
+			_ = s.st.Delete(r.Context(), "msg:"+tid, id) // retention: purge on sight (and by SweepMessages)
 			continue
+		}
+		if shorter := m.At.AddDate(0, 0, days); shorter.Before(m.Expires) {
+			m.Expires = shorter
 		}
 		if m.Seq <= after {
 			continue
@@ -422,6 +427,38 @@ func (s *Service) handleMessages(w http.ResponseWriter, r *http.Request) {
 		msgs = []out{}
 	}
 	writeJSON(w, 200, map[string]any{"messages": msgs})
+}
+
+// expired: past the expiry set when it was sent, or past the thread's retention now (a
+// member who shortens retention shortens it for messages already sent; the shortest applies).
+func (m *message) expired(days int, now time.Time) bool {
+	return now.After(m.Expires) || now.After(m.At.AddDate(0, 0, days))
+}
+
+// SweepMessages deletes every expired message, read or not; call it every hour.
+func (s *Service) SweepMessages(ctx context.Context) {
+	s.mu.Lock()
+	days := map[string]int{}
+	for id, t := range s.th.threads {
+		days[id] = t.retention()
+	}
+	now := s.now()
+	s.mu.Unlock()
+	purged := 0
+	for tid, d := range days {
+		docs, err := s.st.All(ctx, "msg:"+tid)
+		if err != nil {
+			log.Printf("message sweep: %v", err)
+			return
+		}
+		for id, b := range docs {
+			var m message
+			if json.Unmarshal(b, &m) == nil && m.expired(d, now) && s.st.Delete(ctx, "msg:"+tid, id) == nil {
+				purged++
+			}
+		}
+	}
+	metrics.Default.Add("tryst_messages_expired_total", float64(purged))
 }
 
 func (s *Service) handleRetention(w http.ResponseWriter, r *http.Request) {

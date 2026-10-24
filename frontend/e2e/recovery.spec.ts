@@ -21,7 +21,7 @@ test("devices need step-up; recovery needs the same ID and can be cancelled from
   const ctx = await browser.newContext({ userAgent: IPHONE_UA });
   const other = await ctx.newPage();
   await other.goto("/recover");
-  await other.getByLabel(/Email or mobile number on your account/).fill(contact);
+  await other.getByLabel(/Email address on your account/).fill(contact);
   await other.getByRole("button", { name: "Start recovery" }).click();
   await other.getByLabel(/I consent to a face check/).check();
   await other.getByRole("button", { name: "Start face check" }).click();
@@ -34,7 +34,7 @@ test("devices need step-up; recovery needs the same ID and can be cancelled from
   await expect(other.getByTestId("recovery-closed")).toContainText("same document");
 
   await other.getByRole("button", { name: "Start again" }).click();
-  await other.getByLabel(/Email or mobile number on your account/).fill(contact);
+  await other.getByLabel(/Email address on your account/).fill(contact);
   await other.getByRole("button", { name: "Start recovery" }).click();
   await other.getByLabel(/I consent to a face check/).check();
   await other.getByRole("button", { name: "Start face check" }).click();

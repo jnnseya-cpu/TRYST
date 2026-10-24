@@ -190,3 +190,18 @@ func TestThreadsSurviveRestart(t *testing.T) {
 		t.Fatal("block lost on restart")
 	}
 }
+
+// Shortening retention applies to messages already sent, and the hourly sweep deletes
+// expired messages nobody opens.
+func TestShorterRetentionAndTheSweepReachEveryMessage(t *testing.T) {
+	w, tid := mutualPair(t)
+	w.do("ana", "PUT", "/v1/devices/key", `{"device_id":"ana-phone-1","public_jwk":`+jwkA+`}`)
+	w.do("ben", "PUT", "/v1/devices/key", `{"device_id":"ben-phone-1","public_jwk":`+jwkB+`}`)
+	send(w, "ana", tid, "ana-phone-1", "c1", "ben-phone-1") // sent under the 30-day default
+	w.do("ben", "PUT", "/v1/threads/"+tid+"/retention", `{"days":7}`)
+	w.now = w.now.Add(8 * 24 * time.Hour)
+	w.s.SweepMessages(t.Context()) // nobody has opened the conversation
+	if docs, _ := w.s.st.All(t.Context(), "msg:"+tid); len(docs) != 0 {
+		t.Fatalf("expired message kept: %d", len(docs))
+	}
+}

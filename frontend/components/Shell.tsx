@@ -13,7 +13,7 @@ export function Shell({ children, wide = false }: { children: React.ReactNode; w
       </header>
       <main className={wide ? "page page-wide" : "page"}>{children}</main>
       <footer className="footer">
-        <span>Adults only. Opening in London first.</span>
+        <span>Adults only. London, Manchester, Birmingham and Brighton.</span>
         <span>Press Esc twice, or Leave, to exit instantly.</span>
       </footer>
     </div>

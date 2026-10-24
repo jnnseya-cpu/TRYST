@@ -1,6 +1,6 @@
 ---
 title: "The partner shield: never seen by the one person who matters"
-description: Add a partner's email or phone number, scrambled on your device. If they ever join, neither of you sees the other, and nobody is told.
+description: Add a partner's email address, scrambled on your device. If they ever join, neither of you sees the other, and nobody is told.
 date: 2026-10-22
 topic: discretion
 usp: If your partner ever joins, you'll never appear to each other, and their contact details never reach us in readable form.
@@ -15,7 +15,7 @@ For many members, there's one person who must never see them on TRYST. The partn
 
 ## How it works
 
-1. In your account, enter a partner's **email address or phone number**.
+1. In your account, enter a partner's **email address** (TRYST sign-up is by email).
 2. **Your device scrambles it** (a one-way fingerprint) before sending. TRYST never receives the contact itself.
 3. Our servers scramble it again with a secret only TRYST holds, and keep only that result.
 4. Every member's own contact is scrambled the same way when they join. **If the two ever match, neither of you sees the other**: not on introductions, not on Tonight, not anywhere.
@@ -25,7 +25,7 @@ You can shield up to **ten** contacts. Adding one is instant; clearing your shie
 
 ## Why it's different
 
-It protects you **before** the other person joins, it works **both ways**, and it's **silent**. Your address book never leaves your phone, and what we hold can't be turned back into a phone number or email. It's built around a hard truth of discreet connections: the person you most need to avoid may join after you.
+It protects you **before** the other person joins, it works **both ways**, and it's **silent**. Your address book never leaves your phone, and what we hold can't be turned back into an email address. It's built around a hard truth of discreet connections: the person you most need to avoid may join after you.
 
 ## What it doesn't do
 

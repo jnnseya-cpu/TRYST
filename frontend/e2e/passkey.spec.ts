@@ -17,7 +17,7 @@ async function deviceWithPasskeys(browser: Browser, userAgent: string, transport
 
 async function join(page: Page, contact: string) {
   await page.goto("/join");
-  await page.getByLabel(/Email or mobile/).fill(contact);
+  await page.getByLabel(/^Email address$/).fill(contact);
   await page.getByRole("button", { name: "Send code" }).click();
   const dev = await page.getByTestId("dev-otp").textContent();
   const code = dev!.match(/\d{6}/)![0];

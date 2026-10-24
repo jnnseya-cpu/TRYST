@@ -16,7 +16,7 @@ async function signedInPhone(browser: Browser): Promise<Page> {
     options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
   });
   await page.goto("/join");
-  await page.getByLabel(/Email or mobile/).fill(`p${Date.now()}@example.com`);
+  await page.getByLabel(/^Email address$/).fill(`p${Date.now()}@example.com`);
   await page.getByRole("button", { name: "Send code" }).click();
   const code = (await page.getByTestId("dev-otp").textContent())!.match(/\d{6}/)![0];
   await page.getByLabel(/6-digit code/).fill(code);

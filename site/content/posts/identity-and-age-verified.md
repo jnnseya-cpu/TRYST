@@ -21,7 +21,7 @@ Verification has three steps, done once:
 2. **Conduct declaration.** You declare that you have no unspent convictions for sexual or violent offences, and that you aren't subject to a Sexual Harm Prevention Order, a restraining order or a non-molestation order. A declaration you knew to be false is grounds for permanent removal.
 3. **ID check.** Your passport or driving licence, checked by the provider.
 
-From the ID check, TRYST receives only: that you're over 18, your birth month and year (so your profile can show your age), and a one-way code made from your document number. We then **check your age ourselves** as well. If you're under 18, the account is refused and signed out everywhere.
+From the ID check, TRYST receives only: that you're over 18, your birth month and year (so your profile can show your age), and your document number, which we turn into a one-way code the moment it arrives and then discard. We then **check your age ourselves** as well. If you're under 18, the account is refused and signed out everywhere.
 
 Until all three are done, you can build your profile, but nobody can see you and you can't see anyone.
 

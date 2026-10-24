@@ -19,8 +19,11 @@ set -a
 . /run/tryst/api.env
 . /run/tryst/safety.env
 set +a
+# Keep at most one key-database dump: this week's replaces last week's before it is made, so
+# none is ever older than the weekly timer's 7 days.
+find /var/backups/tryst-keys -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
 out="$(BACKUP_DIR=/var/backups/tryst KEYS_BACKUP_DIR=/var/backups/tryst-keys BACKUP_KEY_FILE="$work/key" \
   /opt/tryst/scripts/backup.sh)"
 rsync -a -e "ssh -i $work/ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes" "$out" "$target/"
-find /var/backups/tryst /var/backups/tryst-keys -mindepth 1 -maxdepth 1 -mtime +7 -exec rm -rf {} +
+find /var/backups/tryst -mindepth 1 -maxdepth 1 -mtime +7 -exec rm -rf {} +
 echo "off-site copy done: $(basename "$out")"

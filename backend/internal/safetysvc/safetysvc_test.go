@@ -561,3 +561,16 @@ func TestQueueStats(t *testing.T) {
 		t.Fatalf("minor overdue: %d %d %d", o, od, u)
 	}
 }
+
+func TestKnownAbuseImageSignalIsASuspectedMinorCase(t *testing.T) {
+	g := newRig(t, store.NewMemory())
+	g.svc.FromSignal("", "system:photo_hash", "bob", "csam_hash")
+	g.svc.Flush(context.Background())
+	if g.dir.get("bob") != "suspend" {
+		t.Fatal("hash match didn't suspend the uploader pending review")
+	}
+	_, q := g.do("GET", "/ops/v1/cases", "", tokMod1, nil)
+	if l := q["cases"].([]any); len(l) != 1 || l[0].(map[string]any)["category"] != "minor" {
+		t.Fatalf("queue: %v", l)
+	}
+}

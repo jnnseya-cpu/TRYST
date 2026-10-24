@@ -25,7 +25,7 @@ Your **Discretion Policy** holds three choices, applied everywhere you can be se
 
 Two more controls sit alongside it: [hidden areas](/blog/hidden-areas/) and the [partner shield](/blog/partner-shield/).
 
-**Tightening is instant.** Going incognito, shortening your distance or raising the verification floor takes effect immediately. **Loosening needs proof it's you.** Any change that would show you to more people needs [both sign-in checks again](/blog/step-up-and-your-devices/). Every version of your policy is kept, so you can see what changed and when.
+**Tightening is instant.** Going incognito, shortening your distance or raising the verification floor takes effect immediately. **Loosening needs proof it's you.** Any change that would show you to more people needs [both sign-in checks again](/blog/step-up-and-your-devices/). Your last 50 versions are kept, so you can see what changed and when.
 
 ## Why it's different
 

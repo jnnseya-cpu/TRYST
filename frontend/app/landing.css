@@ -104,7 +104,7 @@
 .lp-devices .device-screen h4 { font-size: 20px; }
 
 /* Membership */
-.lp-tiers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-top: 3rem; border-top: 1px solid var(--hairline); }
+.lp-tiers { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; margin-top: 3rem; border-top: 1px solid var(--hairline); }
 .lp-tier { padding: 2.2rem 1.6rem 1rem 0; border-right: 1px solid var(--hairline-soft); padding-left: 1.6rem; }
 .lp-tier:first-child { padding-left: 0; }
 .lp-tier:last-child { border-right: 0; }

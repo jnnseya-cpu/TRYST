@@ -406,6 +406,11 @@ func serve(a *app) {
 			prof.SweepSafety(context.Background())
 		}
 	}()
+	go func() {
+		for range time.Tick(time.Hour) {
+			prof.SweepMessages(context.Background())
+		}
+	}()
 	root := routes(a)
 
 	m := metrics.Default

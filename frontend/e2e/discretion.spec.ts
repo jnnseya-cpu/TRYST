@@ -72,7 +72,7 @@ test("emergency lock: the code from sign-up locks the account from any browser, 
   const ctx = await browser.newContext();
   const other = await ctx.newPage();
   await other.goto("/lock");
-  await other.getByLabel(/Email or mobile number on the account/).fill(contact);
+  await other.getByLabel(/Email address on the account/).fill(contact);
   await other.getByLabel("Emergency code").fill(code.toLowerCase());
   await other.getByRole("button", { name: "Lock the account" }).click();
   await expect(other.getByTestId("lock-done")).toBeVisible();
