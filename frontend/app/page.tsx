@@ -278,7 +278,7 @@ export default async function Home() {
       <section className="lp-section lp-final">
         <div className="lp-wrap lp-narrow">
           <h2>Your evening,<br /><em>on your terms.</em></h2>
-          <p className="lede" style={{ margin: "0 auto 2.4rem" }}>Join now in London, Manchester, Birmingham and Brighton. Matching opens city by city, London first.</p>
+          <p className="lede" style={{ margin: "0 auto 2.4rem" }}>Open to verified adults in London, Manchester, Birmingham and Brighton.</p>
           <div className="lp-ctas">
             <Link className="button" href="/join">Become a member</Link>
           </div>

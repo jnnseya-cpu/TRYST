@@ -62,7 +62,7 @@ You need: a Google Cloud billing account, two empty projects (staging and produc
 * Adding or removing safety staff: edit the roster file, run `setup.sh prod`.
 * A new vendor credential or rotated key: put it in `prod.secrets.env`, run `setup.sh prod`;
   the next deploy picks it up.
-* Rotating the internal secrets: `SECRETS_BACKEND=gcp ENV=prod scripts/provision-safety-secrets.sh --rotate`,
+* Rotating the internal secrets: `ENV=prod scripts/provision-safety-secrets.sh --rotate`,
   deploy, then `--finish-rotation`, deploy.
 * Restores: [restore.md](restore.md). Run the restore drill on staging monthly.
 * Growing: raise `MACHINE_TYPE` or `DB_TIER_MAIN` in the conf and run `setup.sh`.

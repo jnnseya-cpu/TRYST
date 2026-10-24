@@ -96,7 +96,7 @@ dsn_secret DATABASE_URL_LEDGER ledger tryst_ledger ledger_svc
 
 say "Internal secrets and staff roster"
 if [ -n "${ROSTER_FILE:-}" ] && [ -f "$ROSTER_FILE" ]; then
-  CLOUDSDK_CORE_PROJECT="$PROJECT_ID" SECRETS_BACKEND=gcp ENV="$env_name" scripts/provision-safety-secrets.sh --roster "$ROSTER_FILE"
+  CLOUDSDK_CORE_PROJECT="$PROJECT_ID" ENV="$env_name" scripts/provision-safety-secrets.sh --roster "$ROSTER_FILE"
 elif ! has STAFF_ROSTER; then
   echo "WARNING: no roster yet (set ROSTER_FILE): the safety service won't start without one"
 fi

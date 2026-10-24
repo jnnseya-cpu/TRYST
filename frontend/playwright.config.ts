@@ -7,7 +7,7 @@ import { defineConfig } from "@playwright/test";
 const chromium = process.env.CHROMIUM_PATH; // e.g. /opt/pw-browsers/chromium-1194/chrome-linux/chrome
 
 // E2E_BASE_URL=http://localhost:3000 runs against an already-running stack (for example
-// deploy/docker-compose.yml) instead of starting the services.
+// deploy/gcp/compose.yml) instead of starting the services.
 const external = process.env.E2E_BASE_URL;
 
 export default defineConfig({
@@ -35,7 +35,7 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
-      command: "OPS_CONSOLE=1 npm run build && OPS_CONSOLE=1 npm run start -- -p 3000",
+      command: "OPS_CONSOLE=1 npm run build && TRYST_ENV=dev OPS_CONSOLE=1 npm run start -- -p 3000",
       url: "http://localhost:3000",
       timeout: 300_000,
       reuseExistingServer: false,

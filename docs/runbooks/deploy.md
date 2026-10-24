@@ -1,10 +1,11 @@
 # Deploying TRYST
 
-Internal engineering runbook (D-57). Recommended hosting: Google Cloud, London, one VM
-plus Cloud SQL ([go-live.md](go-live.md), `deploy/gcp`). The AWS alternative:
-`deploy/terraform` (London).
+Internal engineering runbook (D-57). Hosting: Google Cloud, London, one VM per environment
+plus Cloud SQL, set up with `deploy/gcp/setup.sh` ([go-live.md](go-live.md)). This is the only
+supported target (D-66).
 Images: `backend/Dockerfile` (API, distroless, non-root) and `frontend/Dockerfile` (Next.js
-standalone, non-root). Local stack: `deploy/docker-compose.yml`.
+standalone, non-root). They run on the VM from `deploy/gcp/compose.yml`. Local development:
+[backend/README.md](../../backend/README.md) and [frontend/README.md](../../frontend/README.md).
 
 ## What production refuses to run without
 
@@ -24,8 +25,8 @@ are present (see the header of `backend/cmd/identity-svc/main.go`):
 | `ANCHOR_PEPPER` (hex, ≥ 32 bytes) | One-way document codes: one account per ID, bans, recovery (D-61, D-62) |
 
 Non-secret settings (`RP_ID`, `RP_ORIGINS`, `PUBLIC_URL`, `SALE_ITEMS`, `ASSURANCE_CERTS`, the
-vendor URLs and `STRIPE_PRICE_<KEY>`) go in the Terraform variable `api_config`; it refuses
-anything named like a secret. `ASSURANCE_CERTS` without a current certificate for web
+vendor URLs and `STRIPE_PRICE_<KEY>`) come from `deploy/gcp/<env>.conf`; `setup.sh` stores
+them in Secret Manager as `API_CONFIG` and secrets as their own entries. `ASSURANCE_CERTS` without a current certificate for web
 capture keeps every check refused (G-NG-4). Staging: [staging.md](staging.md).
 
 The safety service (`--entrypoint /safety-svc`, same image) refuses to start without
@@ -45,37 +46,7 @@ Recommended (only Google Cloud, D-66): **Identity-Aware Proxy** on the console's
 service, set up as in [go-live.md](go-live.md) §2, with `STAFF_ACCESS_PROVIDER=iap` and
 `STAFF_ACCESS_AUDIENCE` in the safety service's settings. Security keys are enforced by the
 safety team's Google 2-Step Verification policy (IAP tokens don't report how someone signed
-in, so `STAFF_ACCESS_REQUIRE_AMR` stays unset). Then skip to step 3.
-
-Alternative, if the AWS route is used: a Cloudflare Access application (Cloudflare Zero
-Trust dashboard):
-
-1. Access → Applications → Add an application → **Self-hosted**. Application domain: the
-   console host (`ops_host`, e.g. `ops.<your-domain>`). Session duration: 1 hour.
-2. Identity provider: your company sign-in (Microsoft Entra ID, Okta or Google
-   Workspace). Turn off every other login method, including one-time PIN.
-3. Policy "T&S staff", action **Allow**:
-   * Include: the identity provider group for the Trust & Safety team (not "everyone at
-     the company").
-   * Require: **Authentication method** = hardware key (`hwk`). This needs your identity
-     provider to report how the person signed in. If it doesn't, enforce
-     phishing-resistant security keys for that group inside the identity provider instead.
-4. Note the application's **Audience (AUD) tag** (application overview) and your **team
-   domain** (`<team>.cloudflareaccess.com`).
-5. Point the console host's DNS at Cloudflare (proxied) so all traffic passes Access.
-   Even if someone reached the load balancer directly, the safety service still refuses
-   them: it verifies the Access token itself.
-
-**2. Terraform**
-
-```hcl
-staff_access = {
-  issuer      = "https://<team>.cloudflareaccess.com"
-  audience    = "<AUD tag>"
-  jwks_url    = "https://<team>.cloudflareaccess.com/cdn-cgi/access/certs"
-  require_amr = ""   # set to "hwk" in step 5 once check-token shows it arrives
-}
-```
+in, so `STAFF_ACCESS_REQUIRE_AMR` stays unset). Then go to step 3.
 
 **3. Roster and internal secrets**
 
@@ -83,58 +54,53 @@ Write the roster in a file outside the repository, one person per line (`email r
 `moderator` and/or `lead`; at least three people and one lead, because a permanent removal
 needs two different moderators and an appeal needs a third who wasn't involved). Then:
 
-```sh
-ENV=prod scripts/provision-safety-secrets.sh --roster /secure/roster.txt
-```
-
-It generates the two internal secrets (one per direction), stores everything in Secrets
-Manager under `tryst-prod/`, never prints a value, and never overwrites a secret that's
-already set. Delete the roster file afterwards. To change who has access, edit the list and
-run it again with `--roster`; removing someone takes effect on the next safety-service
-deploy, even if Access still lets them in.
+Set `ROSTER_FILE=/secure/roster.txt` in `prod.conf` and run `deploy/gcp/setup.sh prod`. It
+calls `scripts/provision-safety-secrets.sh`, which generates the two internal secrets (one
+per direction), stores everything in Secret Manager as `tryst-prod-<NAME>`, never prints a
+value, and never overwrites a secret that's already set. Keep the roster file off shared
+drives. To change who has access, edit the list and run `setup.sh prod` again; removing
+someone takes effect on the next deploy, even if IAP still lets them in.
 
 **4. Deploy, then check**
 
-Deploy both services, then run inside each task (ECS Exec):
+Deploy, then on the VM (`gcloud compute ssh tryst-prod --zone europe-west2-a --tunnel-through-iap`):
 
 ```sh
-/safety-svc admin preflight     # roster size, proxy keys, hardware key, secrets, database, link to the API
-/identity-svc admin preflight   # secrets distinct, link to the safety service
+cd /opt/tryst/deploy/gcp
+sudo docker compose --env-file /etc/tryst/images.env exec safety /safety-svc admin preflight   # roster, IAP keys, secrets, database, link to the API
+sudo docker compose --env-file /etc/tryst/images.env exec api /identity-svc admin preflight    # secrets distinct, link to the safety service
 ```
 
 Both must exit 0. Preflight prints no secrets and no emails.
 
 **5. Confirm a real sign-in**
 
-Sign in to the console host with a security key. Copy the `CF_Authorization` cookie value
-and run `/safety-svc admin check-token` with the value on stdin. It shows the email, the
-roles TRYST would give and the sign-in methods in the token. If `hwk` is listed, set
-`require_amr = "hwk"` and redeploy: from then on TRYST itself refuses staff tokens that
-don't show a hardware key. Run preflight again.
+Sign in to the console host with a team member's Google account. A person outside the
+safety group must get Google's "You don't have access" page.
 
 **Rotating the internal secrets** (yearly, or at once if one may have leaked):
-`--rotate`, redeploy both services (each accepts old and new), `--finish-rotation`,
-redeploy both again.
+`ENV=prod scripts/provision-safety-secrets.sh --rotate`, deploy (each
+service accepts old and new), `--finish-rotation`, deploy again.
 
 ## First deployment
 
-1. `terraform apply` with `api_image`, `web_image` (pinned by digest) and `certificate_arn`.
-2. Put every secret in Secrets Manager (`tryst-prod/<NAME>`); values never go in Terraform.
-3. Create the databases on the three instances: identity, profile, safety, commerce on
-   `main`; keys on `keys`; ledger on `ledger`.
-4. Stripe: create Prices, set `STRIPE_PRICE_<KEY>`, point the webhook at
-   `/v1/billing/stripe/webhook`, enable renewal reminder emails at least 7 days ahead, and
-   set a neutral statement descriptor.
-5. Run the restore drill once against the empty stack (below) before taking traffic.
+1. `deploy/gcp/setup.sh prod` ([go-live.md](go-live.md) §2): network, the three Cloud SQL
+   instances and their databases, the VM, the load balancer, IAP and every secret.
+2. Stripe (optional at launch): create Prices, set `STRIPE_PRICE_<KEY>`, point the webhook
+   at `/v1/billing/stripe/webhook`, enable renewal reminder emails at least 7 days ahead,
+   and set a neutral statement descriptor.
+3. Run the restore drill once against the empty stack before taking traffic
+   ([restore.md](restore.md)).
 
 ## Every release
 
-CI builds both images and runs Go (including the restore drill against PostgreSQL), web
-unit, and browser tests. Deploy by changing the image digests; ECS rolls back
-automatically if the new tasks fail their health checks. The API drains for up to 25 s on
-stop so in-flight safety alerts finish.
+CI builds the images and runs Go (including the restore drill against PostgreSQL), web unit
+and browser tests. A merge to `main` deploys by image digest (`.github/workflows/deploy.yml`):
+the VM stops the old API and safety service, then starts the new ones, and the pipeline
+fails if the site doesn't answer within 5 minutes. Roll back by re-running an earlier
+successful deploy. The API drains for up to 25 s on stop so in-flight safety alerts finish.
 
 ## Metrics
 
-Each API task serves `/metrics` on port 9090, reachable only from the monitoring security
-group. Alert rules: `deploy/monitoring/alerts.yml`; what to do: `oncall.md`.
+The API serves `/metrics` on port 9090 inside the VM; Prometheus on the VM scrapes it and
+listens on `127.0.0.1:9091` only (reach it through an IAP tunnel). Alert rules: `deploy/monitoring/alerts.yml`; what to do: `oncall.md`.

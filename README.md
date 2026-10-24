@@ -31,12 +31,12 @@ Three parts, each built, tested and deployed on its own. They meet only through 
 
 | Path | What | Deploys as | CI |
 |---|---|---|---|
-| [`frontend/`](frontend/README.md) | Next.js web app (member site; the staff console is the same code built with `OPS_CONSOLE=1`). Talks to the backend only over HTTP (`/v1/*` proxied to `IDENTITY_URL` / `SAFETY_URL`) | Vercel or a container (`frontend/Dockerfile`) | `frontend.yml` |
-| [`backend/`](backend/README.md) | Go services: `identity-svc` (the member API) and `safety-svc` (Trust & Safety), one image, two entrypoints; PostgreSQL | Containers (`backend/Dockerfile`) | `backend.yml` |
+| [`frontend/`](frontend/README.md) | Next.js web app (member site; the staff console is the same code built with `OPS_CONSOLE=1`). Talks to the backend only over HTTP (`/v1/*` proxied to `IDENTITY_URL` / `SAFETY_URL`) | Container on the Google Cloud VM (`frontend/Dockerfile`); not Vercel (D-66) | `frontend.yml` |
+| [`backend/`](backend/README.md) | Go services: `identity-svc` (the member API) and `safety-svc` (Trust & Safety), one image, two entrypoints; PostgreSQL | Containers on the Google Cloud VM (`backend/Dockerfile`) | `backend.yml` |
 | [`shared/`](shared/README.md) | The contract between them: OpenAPI and Protobuf contracts, controlled vocabularies, test vectors both sides must pass, brand assets | Nothing to deploy | `shared.yml` |
 | [`site/`](site/README.md) | The public website and journal: one post per feature, selling each honestly, with editorial rules enforced by tests. Static, no cookies, no member data, indexable | Vercel | `site.yml` |
-| `agents/`, `crypto-core/`, `mobile/` | Python agents, Rust media crypto, native app requirements | — | `backend.yml` |
-| `deploy/` | Docker Compose, Terraform, monitoring | — | `integration.yml` |
+| `agents/`, `crypto-core/`, `mobile/` | Later phases, **not deployed at launch**: Python agent services (P2), Rust media crypto for the native apps, native app requirements | — | `backend.yml` |
+| `deploy/` | Google Cloud set-up (`gcp/`: Terraform, `setup.sh`, the VM's Compose file and units), the Hostinger uptime check, Prometheus rules | — | `integration.yml`, `deploy.yml` |
 
 `integration.yml` runs the browser end-to-end tests against both parts together and scans the images. Run everything locally with `make check`; go-live: [docs/runbooks/go-live.md](docs/runbooks/go-live.md).
 

@@ -19,6 +19,8 @@ services:
   web:
     image: ${WEB_IMAGE:?set WEB_IMAGE}
     restart: unless-stopped
+    environment:
+      TRYST_ENV: ${TRYST_ENV:-prod}            # "dev" shows the stand-in check and checkout pages
     ports: ["3000:3000"]                     # load balancer only (firewall)
     networks: [edge, app]
     depends_on: { api: { condition: service_healthy } }

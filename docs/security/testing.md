@@ -43,6 +43,6 @@ first run on 11 October 2026, and what is still needed before launch.
   ([../runbooks/staging.md](../runbooks/staging.md)).
 * A review of the cryptography (message envelopes, crypto-erasure, deletion proofs) by a
   specialist.
-* Cloud configuration review of the deployed AWS account (the Terraform is validated, not
-  deployed).
+* Cloud configuration review of the deployed Google Cloud projects (the Terraform in
+  `deploy/gcp/terraform` is validated in CI, not yet applied).
 * A bug-bounty or vulnerability disclosure programme with a `security.txt`.
