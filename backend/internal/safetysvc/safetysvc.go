@@ -35,6 +35,7 @@ import (
 	"github.com/jnnseya-cpu/tryst/backend/internal/problem"
 	"github.com/jnnseya-cpu/tryst/backend/internal/staffauth"
 	"github.com/jnnseya-cpu/tryst/backend/internal/store"
+	"github.com/jnnseya-cpu/tryst/backend/internal/vendorkeys"
 )
 
 // MemberAuth is satisfied by *identity.Server.
@@ -172,6 +173,8 @@ type Service struct {
 	mux     *http.ServeMux
 	// Notices delivers a masked notice to a member (the notification service). May be nil.
 	Notices func(ctx context.Context, account, kind, link string) error
+	// Settings keeps the vendor keys leads enter in the console. Nil: not managed here.
+	Settings vendorkeys.Store
 	// Outboxes (D-59): standing changes for the member platform and member notices are
 	// written here with the change that caused them and delivered with retries.
 	standingBox *outbox.Box
@@ -227,6 +230,9 @@ func New(members MemberAuth, staff StaffAuth, dir Directory, st store.Store) (*S
 	m.HandleFunc("GET /ops/v1/audit/verify", s.handleAuditVerify)
 	m.HandleFunc("GET /ops/v1/stats", s.handleStats)
 	m.HandleFunc("POST /ops/v1/cases/{id}/external-report", s.handleExternalReport)
+	m.HandleFunc("GET /ops/v1/settings/vendor-keys", s.handleVendorKeys)
+	m.HandleFunc("PUT /ops/v1/settings/vendor-keys/{name}", s.handleVendorKeySet)
+	m.HandleFunc("POST /ops/v1/settings/vendor-keys/apply", s.handleVendorKeysApply)
 	return s, nil
 }
 

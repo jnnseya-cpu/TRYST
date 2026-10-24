@@ -19,10 +19,11 @@ cp -f "$images" "$images.previous" 2>/dev/null || true
 mv "$images.new" "$images"
 grep -q '^LB_IP=' "$images" || { echo "LB_IP is required on the first deploy"; exit 2; }
 # Units and timers ship with the code; secrets are fetched fresh into memory each deploy.
-cp "$here/tryst.service" "$here/tryst-offsite-backup.service" "$here/tryst-offsite-backup.timer" /etc/systemd/system/
+cp "$here/tryst.service" "$here/tryst-offsite-backup.service" "$here/tryst-offsite-backup.timer" \
+  "$here/tryst-settings.service" "$here/tryst-settings.timer" /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable -q tryst tryst-offsite-backup.timer
-systemctl start tryst-offsite-backup.timer
+systemctl enable -q tryst tryst-offsite-backup.timer tryst-settings.timer
+systemctl start tryst-offsite-backup.timer tryst-settings.timer
 # shellcheck disable=SC1091
 . /etc/tryst/env
 ENV="$ENV" "$here/fetch-secrets.sh"

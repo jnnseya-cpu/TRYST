@@ -60,7 +60,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -654,27 +653,9 @@ func saleItems() map[string]bool {
 // certificate, and (until the native apps exist) an injection-attack one too, since web
 // capture needs it (internal/assurance; D-44, D-49).
 func assuranceRoute() func() error {
-	var recs []struct {
-		Name  string `json:"name"`
-		Certs []struct {
-			Scheme     string    `json:"scheme"`
-			Lab        string    `json:"lab"`
-			Evidence   string    `json:"evidence"`
-			ValidUntil time.Time `json:"valid_until"`
-		} `json:"certs"`
-	}
-	if v := os.Getenv("ASSURANCE_CERTS"); v != "" {
-		if err := json.Unmarshal([]byte(v), &recs); err != nil {
-			log.Fatal("ASSURANCE_CERTS: ", err)
-		}
-	}
-	var providers []assurance.Provider
-	for _, r := range recs {
-		p := assurance.Provider{Name: r.Name, Up: true}
-		for _, c := range r.Certs {
-			p.Certs = append(p.Certs, assurance.Cert{Scheme: assurance.Scheme(c.Scheme), Lab: c.Lab, Evidence: c.Evidence, ValidUntil: c.ValidUntil})
-		}
-		providers = append(providers, p)
+	providers, err := assurance.ParseRecords(os.Getenv("ASSURANCE_CERTS"))
+	if err != nil {
+		log.Fatal("ASSURANCE_CERTS: ", err)
 	}
 	if _, err := assurance.Choose(providers, assurance.Web, time.Now()); err != nil {
 		log.Printf("WARNING: no certified identity provider on record (ASSURANCE_CERTS): verification is refused until one is")

@@ -55,7 +55,10 @@ export default function Console() {
           <p className="eyebrow">Trust &amp; Safety</p>
           <h1>Case queue</h1>
         </div>
-        {staffToken() && <button type="button" className="ms-block" onClick={() => { setStaffToken(null); setRows(null); load(); }}>Sign out</button>}
+        <div className="op-row">
+          <a className="ms-block" href="/ops/settings">Vendor keys</a>
+          {staffToken() && <button type="button" className="ms-block" onClick={() => { setStaffToken(null); setRows(null); load(); }}>Sign out</button>}
+        </div>
       </div>
       <p className="note">Most urgent first. Reporters are never shown. Every action is logged.</p>
       {rows.length === 0 ? (

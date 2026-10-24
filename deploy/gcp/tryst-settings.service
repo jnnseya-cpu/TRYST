@@ -1,0 +1,8 @@
+[Unit]
+Description=Apply vendor keys saved in the TRYST staff console
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/tryst/env
+ExecStart=/opt/tryst/deploy/gcp/apply-settings.sh

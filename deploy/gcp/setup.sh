@@ -101,7 +101,7 @@ elif ! has STAFF_ROSTER; then
   echo "WARNING: no roster yet (set ROSTER_FILE): the safety service won't start without one"
 fi
 
-say "Vendor credentials ($secrets_file)"
+say "Vendor keys ($secrets_file; or enter them later in the staff console → Vendor keys)"
 declare -A vendor=()
 if [ -f "$secrets_file" ]; then
   while IFS='=' read -r k v; do
@@ -109,8 +109,16 @@ if [ -f "$secrets_file" ]; then
     vendor[$k]="$v"
   done <"$secrets_file"
 fi
-for k in SMTP_PASSWORD ASSURANCE_SECRET ASSURANCE_API_KEY ASSURANCE_CALLBACK_SECRET LIVENESS_SECRET LIVENESS_API_KEY \
-  ARC_SECRET ARC_API_KEY STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET PHOTODNA_KEY SIGHTENGINE_SECRET OFFSITE_TARGET; do
+# The mailbox comes from the conf; everything else from the secrets file. Each is its own
+# secret, the same ones the console's "Vendor keys" page writes. A value here replaces one
+# entered in the console, so once you use the console, leave these out of the file.
+[ -n "${SMTP_HOST:-}" ] && { vendor[SMTP_HOST]="$SMTP_HOST"; vendor[SMTP_PORT]="${SMTP_PORT:-465}"; vendor[SMTP_USER]="$SMTP_USER"; }
+[ -n "${OTP_EMAIL_FROM:-}" ] && vendor[OTP_EMAIL_FROM]="$OTP_EMAIL_FROM"
+for k in SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD OTP_EMAIL_FROM \
+  ASSURANCE_URL ASSURANCE_PROVIDER ASSURANCE_CERTS ASSURANCE_API_KEY ASSURANCE_SECRET ASSURANCE_CALLBACK_SECRET \
+  LIVENESS_URL LIVENESS_API_KEY LIVENESS_SECRET ARC_URL ARC_API_KEY ARC_SECRET \
+  STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_PRICE_TRYST_PLUS STRIPE_PRICE_TRYST_PLUS_ANNUAL \
+  SIGHTENGINE_USER SIGHTENGINE_SECRET PHOTODNA_KEY OFFSITE_TARGET; do
   if [ -n "${vendor[$k]:-}" ]; then printf '%s' "${vendor[$k]}" >"$tmp/v"; put "$k" "$tmp/v"; fi
 done
 if [ -n "${vendor[OFFSITE_SSH_KEY_FILE]:-}" ]; then put OFFSITE_SSH_KEY "${vendor[OFFSITE_SSH_KEY_FILE]}"; fi
@@ -119,12 +127,6 @@ say "Settings"
 {
   echo "RP_ID=$DOMAIN"; echo "RP_ORIGINS=https://$DOMAIN"; echo "PUBLIC_URL=https://$DOMAIN"
   echo "SALE_ITEMS=${SALE_ITEMS:-tryst_plus,tryst_plus_annual}"; echo "VAPID_SUBJECT=mailto:$ALERT_EMAIL"
-  [ -n "${SMTP_HOST:-}" ] && { echo "SMTP_HOST=$SMTP_HOST"; echo "SMTP_PORT=${SMTP_PORT:-465}"; echo "SMTP_USER=$SMTP_USER"; }
-  [ -n "${OTP_EMAIL_FROM:-}" ] && echo "OTP_EMAIL_FROM=$OTP_EMAIL_FROM"
-  for k in ASSURANCE_URL ASSURANCE_PROVIDER ASSURANCE_CERTS LIVENESS_URL ARC_URL SIGHTENGINE_USER \
-    STRIPE_PRICE_TRYST_PLUS STRIPE_PRICE_TRYST_PLUS_ANNUAL; do
-    [ -n "${vendor[$k]:-}" ] && echo "$k=${vendor[$k]}"
-  done
   true
 } >"$tmp/api"
 put API_CONFIG "$tmp/api"

@@ -8,7 +8,8 @@ and counsel ([legal-review-pack.md](legal-review-pack.md)).
 
 For each vendor: ☐ contract ☐ DPA with UK/EU data location and sub-processor list ☐
 security evidence ☐ sandbox credentials into staging ☐ staging test passed ☐ production
-credentials into Secret Manager (via `setup.sh`) ☐ entry in the records of processing.
+credentials entered in the staff console → Vendor keys (a safety lead), then Apply ☐ entry
+in the records of processing.
 
 ## Launch-critical (the service won't start or can't verify anyone without these)
 

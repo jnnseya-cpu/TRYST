@@ -61,9 +61,10 @@ chmod +x /etc/cron.weekly/tryst-docker-prune
 # (deploy/gcp is synced to /opt/tryst/deploy/gcp by the deploy workflow).
 if [ -f /opt/tryst/deploy/gcp/tryst.service ]; then
   cp /opt/tryst/deploy/gcp/tryst.service /opt/tryst/deploy/gcp/tryst-offsite-backup.service \
-     /opt/tryst/deploy/gcp/tryst-offsite-backup.timer /etc/systemd/system/
+     /opt/tryst/deploy/gcp/tryst-offsite-backup.timer /opt/tryst/deploy/gcp/tryst-settings.service \
+     /opt/tryst/deploy/gcp/tryst-settings.timer /etc/systemd/system/
   systemctl daemon-reload
-  systemctl enable --now tryst-offsite-backup.timer
+  systemctl enable --now tryst-offsite-backup.timer tryst-settings.timer
   systemctl enable tryst
   if grep -q '^API_IMAGE=' /etc/tryst/images.env; then systemctl start tryst; fi
 fi

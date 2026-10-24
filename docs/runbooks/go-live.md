@@ -29,7 +29,8 @@ You need: a Google Cloud billing account, two empty projects (staging and produc
    ```
    `prod.conf`: project, domains, the safety team's Google group, the alert email, the
    repository, the Hostinger mailbox (`SMTP_USER`) and the staff roster file.
-   `prod.secrets.env`: the mailbox password and each vendor's credentials as you get them.
+   `prod.secrets.env` is optional: vendor keys are easier to enter in the staff console
+   (step 4).
 2. **Build each environment**: `deploy/gcp/setup.sh staging`, then `deploy/gcp/setup.sh prod`.
    It shows the Terraform plan and asks before applying, then creates every key and
    database password straight into Secret Manager (never on disk, never in Terraform).
@@ -39,7 +40,13 @@ You need: a Google Cloud billing account, two empty projects (staging and produc
    * in Google Admin, set the safety group's 2-Step Verification to **security keys
      only**, put `STAFF_ACCESS_KEYS_CONFIRMED=google-2sv-security-keys-only` in the conf,
      and run `setup.sh` once more.
-4. **Hostinger VPS**: install `deploy/hostinger/uptime-check.sh` (instructions at the top
+4. **Vendor keys**: sign in to the console (`console.<domain>`) as a safety lead →
+   **Vendor keys**. The page lists what each vendor needs (mailbox, identity provider,
+   safety line; Stripe and photo checks if you use them), where to find each value, and
+   checks it before saving. Keys go straight to Secret Manager and are never shown again;
+   every change is in the audit log. Press **Apply** when done: TRYST restarts within two
+   minutes with the new keys (about 30 seconds offline).
+5. **Hostinger VPS**: install `deploy/hostinger/uptime-check.sh` (instructions at the top
    of the file), and create a `backup` user with an SSH key whose private half goes in
    `OFFSITE_SSH_KEY_FILE` / `OFFSITE_TARGET` in `prod.secrets.env` (run `setup.sh prod`
    again to load it).
@@ -60,8 +67,7 @@ You need: a Google Cloud billing account, two empty projects (staging and produc
 ## 4. The few things that stay manual
 
 * Adding or removing safety staff: edit the roster file, run `setup.sh prod`.
-* A new vendor credential or rotated key: put it in `prod.secrets.env`, run `setup.sh prod`;
-  the next deploy picks it up.
+* A new vendor credential or rotated key: console → Vendor keys → paste → Save → Apply.
 * Rotating the internal secrets: `ENV=prod scripts/provision-safety-secrets.sh --rotate`,
   deploy, then `--finish-rotation`, deploy.
 * Restores: [restore.md](restore.md). Run the restore drill on staging monthly.

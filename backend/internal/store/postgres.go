@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -28,7 +29,12 @@ CREATE TABLE IF NOT EXISTS blobs (
 // Postgres is the production Store.
 type Postgres struct {
 	pool *pgxpool.Pool
-	lock *pgx.Conn // single-instance lock connection, outside the pool (Exclusive)
+	// The single-instance lock's own connection, outside the pool (Exclusive). lockMu
+	// serialises it between the watchdog and Close: a pgx connection isn't safe for
+	// concurrent use.
+	lockMu sync.Mutex
+	lock   *pgx.Conn
+	closed bool
 }
 
 // OpenPostgres connects and applies the schema.
@@ -49,9 +55,12 @@ func OpenPostgres(ctx context.Context, dsn string) (*Postgres, error) {
 }
 
 func (p *Postgres) Close() {
-	if p.lock != nil {
+	p.lockMu.Lock()
+	if p.lock != nil && !p.closed {
 		_ = p.lock.Close(context.Background()) // releases the single-instance lock
 	}
+	p.closed = true
+	p.lockMu.Unlock()
 	p.pool.Close()
 }
 
@@ -148,15 +157,22 @@ func (p *Postgres) Exclusive(ctx context.Context, name string, lost func(error))
 		case <-time.After(2 * time.Second):
 		}
 	}
+	p.lockMu.Lock()
 	p.lock = conn
+	p.lockMu.Unlock()
 	go func() { // #nosec G118 -- holds the lock for the life of the process, not of a request
-		for range time.Tick(10 * time.Second) {
-			if conn.IsClosed() {
+		t := time.NewTicker(10 * time.Second)
+		defer t.Stop()
+		for range t.C {
+			p.lockMu.Lock()
+			if p.closed {
+				p.lockMu.Unlock()
 				return // Close was called: the service is stopping
 			}
 			c, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			err := conn.Ping(c)
 			cancel()
+			p.lockMu.Unlock()
 			if err != nil {
 				lost(err)
 				return

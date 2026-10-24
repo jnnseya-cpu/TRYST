@@ -18,6 +18,9 @@
 //	STAFF_TRUSTED_PROXIES  alternative: header-asserting proxy addresses
 //	STAFF_ROSTER           email:role[,role];... (required in prod)
 //	STAFF_DEV_TOKENS       dev only: id:role:token,...
+//	SETTINGS_STORE         gcp: leads manage vendor keys in the console, kept in Google Secret
+//	                       Manager as SETTINGS_PREFIX<NAME> (e.g. tryst-prod-); unset: not
+//	                       managed here (dev uses an in-memory store)
 package main
 
 import (
@@ -38,6 +41,7 @@ import (
 	"github.com/jnnseya-cpu/tryst/backend/internal/store"
 	"github.com/jnnseya-cpu/tryst/backend/internal/svcauth"
 	"github.com/jnnseya-cpu/tryst/backend/internal/svcenv"
+	"github.com/jnnseya-cpu/tryst/backend/internal/vendorkeys"
 )
 
 type app struct {
@@ -95,6 +99,16 @@ func build() *app {
 		log.Fatal(err)
 	}
 	svc.Notices = safetysvc.RemoteNotices(toPlatform)
+	switch {
+	case mode == "dev":
+		svc.Settings = &vendorkeys.Memory{} // a dev copy never touches real keys
+	case svcenv.Env("SETTINGS_STORE", "") == "gcp":
+		prefix := svcenv.Env("SETTINGS_PREFIX", "")
+		if prefix == "" {
+			log.Fatal("SETTINGS_PREFIX is required with SETTINGS_STORE=gcp (e.g. tryst-prod-)")
+		}
+		svc.Settings = &vendorkeys.SecretManager{Prefix: prefix}
+	}
 	return &app{mode: mode, safety: svc, st: st, staff: staff, toPlatform: toPlatform}
 }
 

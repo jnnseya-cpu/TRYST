@@ -43,9 +43,18 @@ func TestRestoreDrill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close(ctx)
+	t.Cleanup(func() { conn.Close(ctx) })
 	run := fmt.Sprintf("d%x", os.Getpid())
 	dbs := []string{"identity", "profile", "keys", "safety", "commerce", "ledger"}
+	// Cleanups run last-registered first: the services' connections (and the single-instance
+	// lock they hold) close before their databases are dropped, or the service would see its
+	// lock vanish and stop.
+	t.Cleanup(func() {
+		for _, d := range dbs {
+			_, _ = conn.Exec(ctx, "drop database if exists live_"+run+"_"+d+" with (force)")
+			_, _ = conn.Exec(ctx, "drop database if exists drill_"+run+"_"+d+" with (force)")
+		}
+	})
 	for _, d := range dbs {
 		name := "live_" + run + "_" + d
 		_, _ = conn.Exec(ctx, "drop database if exists "+name)
@@ -142,11 +151,6 @@ func TestRestoreDrill(t *testing.T) {
 	}
 	if ex, _ := restored.notifier.Export(ctx, "acc-kept"); ex == nil {
 		t.Fatal("kept member's notices lost")
-	}
-
-	for _, d := range dbs {
-		_, _ = conn.Exec(ctx, "drop database if exists live_"+run+"_"+d+" with (force)")
-		_, _ = conn.Exec(ctx, "drop database if exists "+prefix+"_"+d+" with (force)")
 	}
 }
 

@@ -186,6 +186,75 @@ paths:
       responses:
         '200': { description: Counts, content: { application/json: { schema: { type: object } } } }
         '401': { $ref: '#/components/responses/Problem' }
+  /settings/vendor-keys:
+    get:
+      tags: [settings]
+      operationId: vendorKeys
+      summary: "Leads only: every vendor setting, grouped by vendor, with whether it is set and when it changed. Never a value."
+      responses:
+        '200':
+          description: Groups and settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  launch_ready: { type: boolean, description: Every required group is complete }
+                  groups:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key: { type: string }
+                        label: { type: string }
+                        required: { type: boolean }
+                        ready: { type: boolean }
+                        missing: { type: integer }
+                        settings:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              name: { type: string }
+                              label: { type: string }
+                              secret: { type: boolean }
+                              required: { type: boolean }
+                              help: { type: string }
+                              set: { type: boolean }
+                              updated: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /settings/vendor-keys/{name}:
+    put:
+      tags: [settings]
+      operationId: setVendorKey
+      summary: "Leads only: store a new value (write-only; checked first; audited by name, never by value)."
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string, pattern: '^[A-Z][A-Z0-9_]{2,40}$' } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: { type: string, maxLength: 8192 }
+      responses:
+        '200': { description: Stored, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /settings/vendor-keys/apply:
+    post:
+      tags: [settings]
+      operationId: applyVendorKeys
+      summary: "Leads only: restart the services with the stored values (within about two minutes; about 30 seconds offline)."
+      responses:
+        '202': { description: Applying, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     staffAccess:

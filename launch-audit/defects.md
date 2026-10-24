@@ -27,6 +27,8 @@ web unit tests, 24 browser tests, 211 site tests).
 | D18 | P3 | Truth | Eight smaller over-claims (quick exit and Back, consent checks, policy versions, sign-in history, ID number handling, Tonight cap, couple device, partner shield phones) | Copy ahead of code | Copy corrected | Site tests | 83ee2b6 | Fixed |
 | D19 | P1 | Security (supply chain) | Next.js 16.3.8 had critical advisories (GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr) | Dependency age | 16.4.2 in app and site; `npm audit` 0 | Builds and tests | 8ff2274 | Fixed |
 | D20 | P2 | Security | GO-2026-6809 (crypto/x509) reachable via the SMTP TLS dial | Toolchain go1.26.9 | go1.26.10 | govulncheck in CI | 8ff2274 | Fixed |
+| D21 | P2 | Reliability | Data race: on shutdown `Postgres.Close` closed the single-instance lock connection while its watchdog goroutine was using it | pgx connections aren't safe for concurrent use; no synchronisation | Mutex around the lock connection; watchdog stops when closed | `go test -race` (restore drill) | cycle 2 | Fixed |
+| D22 | P3 | Tests | The restore drill dropped its databases before closing the service's connections, so the service saw its lock vanish and stopped (timing-dependent) | Teardown order | Drops run in a cleanup after the connections close | Restore drill 3/3 | cycle 2 | Fixed |
 
 ## Known, not fixed (non-blocking, recorded)
 

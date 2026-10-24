@@ -60,6 +60,8 @@ services:
       INTERNAL_ADDR: ":8092"
       METRICS_ADDR: ":9092"
       PLATFORM_INTERNAL_URL: http://api:8091
+      SETTINGS_STORE: gcp                      # leads manage vendor keys in the console
+      SETTINGS_PREFIX: tryst-${ENV:-prod}-
     stop_grace_period: 30s
     read_only: true
     healthcheck: { test: ["CMD", "/safety-svc", "healthcheck"], interval: 10s, retries: 30, start_period: 30s }

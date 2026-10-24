@@ -16,8 +16,11 @@
 package assurance
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -35,6 +38,45 @@ type Cert struct {
 	Lab        string
 	Evidence   string // report reference held by T&S
 	ValidUntil time.Time
+}
+
+// ParseRecords reads ASSURANCE_CERTS: a JSON list of providers and their certificates, e.g.
+// [{"name":"yoti","certs":[{"scheme":"pad_iso30107_3_level2","lab":"iBeta","evidence":"ref",
+// "valid_until":"2027-06-30T00:00:00Z"}]}]. Empty means none on record. The staff console
+// checks a new value with this before storing it, so it can never stop the service starting.
+func ParseRecords(v string) ([]Provider, error) {
+	if strings.TrimSpace(v) == "" {
+		return nil, nil
+	}
+	var recs []struct {
+		Name  string `json:"name"`
+		Certs []struct {
+			Scheme     string    `json:"scheme"`
+			Lab        string    `json:"lab"`
+			Evidence   string    `json:"evidence"`
+			ValidUntil time.Time `json:"valid_until"`
+		} `json:"certs"`
+	}
+	dec := json.NewDecoder(strings.NewReader(v))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&recs); err != nil {
+		return nil, err
+	}
+	var out []Provider
+	for _, r := range recs {
+		if r.Name == "" {
+			return nil, errors.New("a provider has no name")
+		}
+		p := Provider{Name: r.Name, Up: true}
+		for _, c := range r.Certs {
+			if c.Scheme == "" || c.ValidUntil.IsZero() {
+				return nil, fmt.Errorf("%s: each certificate needs a scheme and a valid_until date", r.Name)
+			}
+			p.Certs = append(p.Certs, Cert{Scheme: Scheme(c.Scheme), Lab: c.Lab, Evidence: c.Evidence, ValidUntil: c.ValidUntil})
+		}
+		out = append(out, p)
+	}
+	return out, nil
 }
 
 // Provider is an age-assurance / identity provider.
