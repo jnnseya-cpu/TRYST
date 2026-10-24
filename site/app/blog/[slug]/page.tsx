@@ -34,7 +34,7 @@ export default async function PostPage({ params }: Props) {
     datePublished: p.date,
     articleSection: TOPICS[p.topic].name,
     mainEntityOfPage: `${SITE_URL}/blog/${p.slug}/`,
-    publisher: { "@type": "Organization", name: SITE_NAME, logo: { "@type": "ImageObject", url: `${SITE_URL}/brand/tryst-logo.png` } },
+    publisher: { "@type": "Organization", name: SITE_NAME, logo: { "@type": "ImageObject", url: `${SITE_URL}/brand/tryst-logo-512.png` } },
   };
   return (
     <article className="post">

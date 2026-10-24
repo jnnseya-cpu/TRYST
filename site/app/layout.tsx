@@ -9,6 +9,7 @@ import { TOPICS } from "@/lib/posts";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
+  icons: { icon: "/brand/tryst-logo-192.png", apple: "/brand/tryst-logo-180.png" },
   title: { default: `${SITE_NAME}: ${TAGLINE}`, template: `%s · ${SITE_NAME}` },
   description: "How TRYST works, feature by feature: discreet introductions for verified adults, with the privacy and safety tools behind them explained plainly.",
   referrer: "no-referrer",
@@ -25,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <QuickExit />
         <header className="site-head">
           <a href="/" className="brand" aria-label="TRYST home">
-            <img src="/brand/tryst-logo.png" alt="" width={44} height={44} />
+            <img src="/brand/tryst-logo-96.png" alt="" width={44} height={44} />
             <span>TRYST</span>
           </a>
           <nav aria-label="Topics">

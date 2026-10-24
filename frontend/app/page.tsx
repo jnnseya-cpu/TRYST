@@ -95,7 +95,7 @@ export default async function Home() {
       {/* I. Hero */}
       <section className="lp-section lp-hero">
         <div>
-          <img className="logo reveal" src="/brand/tryst-logo.png" alt="TRYST" width={1254} height={1254} />
+          <img className="logo reveal" src="/brand/tryst-logo-512.webp" alt="TRYST" width={512} height={512} fetchPriority="high" />
           <p className="eyebrow reveal d1">For attached adults, open relationships and couples</p>
           <h1 className="reveal d2">Private chemistry.<br /><em>Intelligent discretion.</em></h1>
           <p className="lede reveal d3">

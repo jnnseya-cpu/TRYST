@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   description: "Private chemistry. Intelligent discretion.",
   robots: { index: false, follow: false, nocache: true }, // app origin is never indexed (FR-076)
   manifest: "/manifest.webmanifest",
+  icons: { icon: "/brand/tryst-logo-192.png", apple: "/brand/tryst-logo-180.png" },
   referrer: "no-referrer",
 };
 
