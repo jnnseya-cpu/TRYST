@@ -1,10 +1,21 @@
-# 09 — TRYST Operating System (internal engineering) v1.3
+# 09 — TRYST Operating System (internal engineering) v1.4
 
-Part of the [TRYST v1.3 baseline](00_README.md). Written in response to the founder's *Master AI Operating System Architect* brief (4 Oct 2026), applied to TRYST. Decisions [D-25](06_Decisions_and_Changes.md#2-decision-log)–[D-32](06_Decisions_and_Changes.md#2-decision-log); requirements FR-080–FR-088.
+Part of the [TRYST v1.3 baseline](00_README.md). Written in response to the founder's *Master AI Operating System Architect* brief (4 Oct 2026), applied to TRYST, and revised in v1.4 for the re-issued brief (25 Oct 2026). Decisions [D-25](06_Decisions_and_Changes.md#2-decision-log)–[D-32](06_Decisions_and_Changes.md#2-decision-log); requirements FR-080–FR-088.
 
 **How to read this document.** The brief asks for an autonomous, self-improving AI infrastructure OS with a full agent workforce, a BitriPay payment door, a connector ecosystem and a commercial engine. **This document keeps every item in the brief.** Each item is either built as asked, adapted so it fits TRYST's product principles ([01 §4](01_Product.md#4-operating-stance-and-principles)), or recorded with a stated reason it does not apply to a members-only discreet platform. The full register is in [§0](#0-brief-coverage-register). Nothing in the brief has been dropped silently.
 
 **The one rule that shapes everything here:** *the AI runs the machine; people make the decisions that cannot be undone.* Agents observe, predict, recommend, draft and carry out reversible or pre-approved actions on their own. A permanent action against a member, money movement, a production code change and any contact made on a member's behalf always need a named human. This is enforced in code by the AI Governance gate (`backend/internal/aigov`, tested), not by policy text ([§5.4](#54-ai-governance-gate-implemented)).
+
+### What changed in v1.4 (25 Oct 2026)
+
+The re-issued brief asks for the same seventeen sections. v1.3 already answers every item, so v1.4 keeps all of it and fixes what has drifted or was missing:
+
+1. **Launch reality** ([§0.1](#01-launch-reality-25-oct-2026)): every component now says whether it runs at launch, is built but not deployed, or is specified for a later phase. v1.3 called the governance gate and the BitriPay adapter "Built"; both are tested code that no running service uses yet ([D-69](06_Decisions_and_Changes.md#2-decision-log)).
+2. **One infrastructure provider** ([D-66](06_Decisions_and_Changes.md#2-decision-log)): the architecture is re-based from AWS to Google Cloud (London, `europe-west2`), with Hostinger for mail, DNS and the outside backup copy, and Vercel for the public site. Each AWS or Cloudflare service in v1.3 has its Google Cloud equivalent ([§9.11](#911-google-cloud-service-map)).
+3. **Learning methods** ([§5.8](#58-learning-methods)): where neural networks, gradient-boosted models, LLMs, small on-device models, reinforcement learning (contextual bandits) and decision intelligence are used, what proves each, and the limit on each.
+4. **API key management in the admin centre** is built: a Vendor keys page for safety leads ([§14](#14-admin-super-control-centre), [D-70](06_Decisions_and_Changes.md#2-decision-log)).
+5. **Three more reference companies** the new brief names (Bloomberg, NVIDIA, SpaceX) are mapped to the patterns TRYST takes from them ([§9.1](#91-proven-patterns-used-and-where-they-come-from)).
+6. **Claims discipline**: "military-grade" security and "without human intervention" are restated as the controls and limits that actually apply (§0).
 
 ---
 
@@ -37,6 +48,35 @@ Status: **Built** = in the codebase and tested. **Spec** = fully specified here 
 | PRD, TRD, system, infra, AI, agent, security, DB, API, event, DevOps, monitoring, DR, BC, data governance, compliance, scalability, commercial architecture | Spec | §9–§13; index in §17 |
 | Complete ERD, API specs, user journeys, agent workflows, DB schemas, security controls, deployment, testing, production-readiness review | Spec | §10 (ERD + DDL), §11 (API + webhooks), §3.2 journeys, §5.5 workflows, §13 controls, §9.9 deployment, §9.10 testing, §15.6 PRR |
 | 17 required sections | Spec | §1–§17 below |
+| *Re-issued brief, 25 Oct 2026* | | |
+| Neural networks, ML, RL, LLMs, SLMs, predictive and decision intelligence | Spec · partly Running | §5.8: each method, where it is used, what proves it and its limit. At launch the ranking, safety and fraud logic is deterministic and explainable; learned models replace a rule only through the gate in [D-47](06_Decisions_and_Changes.md#2-decision-log) |
+| "Military-grade" cybersecurity | **Adapted** | Claims discipline (01 §15.1): no unverifiable grade. Controls are stated as what they are and mapped to NCSC CAF, ISO/IEC 27001 and OWASP ASVS L2 (§13) |
+| Bloomberg, NVIDIA, SpaceX, Tesla patterns | Spec | §9.1 |
+| API key management in the admin centre | **Built** | Vendor keys page for safety leads: write-only, checked, audited, applied on request (§14, [D-70](06_Decisions_and_Changes.md#2-decision-log)) |
+| Cloud: AWS, Azure, GCP | **Adapted** | Google Cloud only, by founder decision ([D-66](06_Decisions_and_Changes.md#2-decision-log)); AWS and Azure stay as patterns, not providers (§9.11) |
+
+### 0.1 Launch reality (25 Oct 2026)
+
+What this document describes is a phased build. This table says, for each part, what is true today. **Running** = deployed with the launch build and used. **Built** = tested code in the repository that no running service uses yet. **Spec** = specified here, not yet code. Source: the truth audit in `launch-audit/` (126 member-facing claims traced to running code).
+
+| Part | Status | Notes |
+|---|---|---|
+| Member platform: accounts, two-factor sign-in, step-up, recovery, emergency lock | Running | `identity-svc`; phone face check through the provider's hosted session ([D1 fix](../../launch-audit/defects.md)) |
+| Verification (V1, V2), one person one account, consent ledger | Running | Needs the identity provider's live keys to work in production |
+| Profiles, photos, discretion, introductions, intents, Tonight, couples, the handshake brief | Running | Introductions use a deterministic weighted score with reason codes (`profilesvc/intro.go`): the "Broker P1 baseline" |
+| End-to-end encrypted messages, meets, check-ins, duress, Panic | Running | Check-in plans survive restarts; the safety line needs the alarm-receiving centre |
+| Trust & Safety service and console, hash-chained audit, NCA reporting record | Running | `safety-svc` |
+| Vendor keys page (admin API key management) | Running | [D-70](06_Decisions_and_Changes.md#2-decision-log) |
+| Payments: TRYST+ through Stripe | Running when keys are set | Otherwise launch is free-only |
+| Data rights: export, erasure with signed proof | Running | Erasure re-applied after any restore |
+| On-device message-safety checks (Guardian baseline) | Running (web) | Deterministic rules with labelled vectors (`frontend/lib/guardian.ts`) |
+| AI governance gate, workforce registry | Built | `backend/internal/aigov`, tested; wired when the first agent ships |
+| BitriPay adapter | Built | Sandbox-tested; live use gated by market ([D-26](06_Decisions_and_Changes.md#2-decision-log)) |
+| City-by-city matching gate and waitlist | Built | `backend/internal/launch`; not wired; founder decision pending |
+| Python agent services (Mirror, Broker learning, Envoy negotiation) | Built (scaffold) | `agents/`; not deployed |
+| Rust media crypto core | Built | For the native apps (P3) |
+| LLM runtime, event streaming, warehouse, vector database, workflow engine, Kubernetes | Spec | At launch: one VM per environment, Cloud SQL, a PostgreSQL outbox for events, no LLM anywhere |
+| Native apps, partner API, ACU metering, licensing | Spec | P3–P4 |
 
 ---
 
@@ -319,7 +359,7 @@ Code: `backend/internal/aigov` (Go, standard library only). Tests: `aigov_test.g
 | Member-data scopes only for self-hosted member-plane agents; `act_as_member` rejected | `Register` | `TestManifestRules`, `TestOpsAgentsHoldNoMemberScopes` |
 | Hash-chained, append-only audit log; any edit or deletion detected | `Entry.digest`, `VerifyChain` | `TestAuditChain` |
 
-**Production wiring (P1):** the gate runs as a sidecar library in each agent and as a central `agent-registry` service. The audit chain is written to an append-only table (§10, `ops.agent_decision`) and anchored hourly to an object-lock (WORM) bucket, so even a database administrator cannot rewrite history unnoticed. Pattern: Certificate Transparency and AWS QLDB-style ledgers.
+**Production wiring (P1):** the gate runs as a sidecar library in each agent and as a central `agent-registry` service. The audit chain is written to an append-only table (§10, `ops.agent_decision`) and anchored hourly to a retention-locked (WORM) Cloud Storage bucket (Bucket Lock), so even a database administrator cannot rewrite history unnoticed. Pattern: Certificate Transparency and AWS QLDB-style ledgers.
 
 ### 5.5 Core agents (the brief's fifteen)
 
@@ -424,7 +464,7 @@ Specified in 03 §3.2. Purpose: organic growth through earned search visibility.
 | Triggers | Operator request; scheduled packs |
 | Workflow | Map question to metric definitions → generate SQL → run with row-count floor (k ≥ 20) → add DP noise to member-derived counts → render |
 | Escalation | A question that needs member-level data → refused, with the route to a DPO-approved analysis |
-| APIs | ClickHouse (read-only), semantic layer |
+| APIs | BigQuery (read-only marts), semantic layer |
 | Value | Self-serve analytics without exposing members |
 
 #### Operations Agent
@@ -482,7 +522,7 @@ Purpose: help admins run the Super Control Centre (§14). It summarises alerts, 
 | **System Health** | Uptime, latency, errors, saturation (golden signals); SLO burn rates (multi-window, multi-burn-rate) | Open incident, page on-call, attach traces | — | Google SRE workbook |
 | **Bug Detection** | Error-tracking clusters, regression detection on deploy, flaky-test detection, crash-free rate | File issue with repro and suspected commit (git bisect in CI) | — | Meta SapFix/Sapienz-style triage; Sentry clustering |
 | **Auto-Repair** | Runs pre-approved runbooks: rollback the last release, restart a crash-looping pod, scale out, drain a bad node, rotate a leaked key | L3 runbooks (budget 50/day) | **Deploying a code patch** (production_change). It may *open* a fix PR, which follows normal review and CI ([D-28](06_Decisions_and_Changes.md#2-decision-log)) | Kubernetes self-healing; Argo Rollouts; Netflix Spinnaker automated canary analysis |
-| **Infrastructure Optimisation** | Compute, storage, bandwidth, cloud spend; GPU utilisation of the vLLM pool | Proposals only | Applying rightsizing | AWS Compute Optimizer; FinOps Foundation |
+| **Infrastructure Optimisation** | Compute, storage, bandwidth, cloud spend; GPU utilisation of the vLLM pool | Proposals only | Applying rightsizing | Google Cloud Recommender (rightsizing, idle resources); FinOps Foundation |
 | **Release Management** | Canary analysis, progressive delivery (1% → 10% → 50% → 100%), feature flags, freeze windows | Halt a canary; roll back | Promoting a release | Google, Facebook progressive rollouts |
 | **AI Governance** | The gate (§5.4), model and prompt registry, eval results, drift monitors, red-team results | Deny; kill an agent on policy breach (e.g. a guardrail violation rate above threshold) | Resuming a killed agent; changing a manifest | NIST AI RMF; ISO/IEC 42001; EU AI Act logging duties |
 
@@ -500,6 +540,25 @@ Purpose: help admins run the Super Control Centre (§14). It summarises alerts, 
 | Tool use | Tools are gRPC methods listed in the manifest; arguments validated against Protobuf schemas | OpenAI and Anthropic tool-use with schema validation |
 | Prompt and model registry | Versioned prompts and policies (`policies/<agent>.yaml`); a change is a production_change | MLflow-style registry |
 | Injection defence | Untrusted text (profiles, tickets, web pages) is never placed in an instruction position; outputs are schema-validated; the injection red-team suite runs per release (03 §9) | OWASP LLM Top 10 |
+
+### 5.8 Learning methods
+
+The brief names neural networks, machine learning, reinforcement learning, LLMs, SLMs, predictive and decision intelligence. Each is used where it is proven to beat a rule, and nowhere else. **A learned model replaces a deterministic rule only after it beats the rule on a held-out set and passes the release gate** ([D-47](06_Decisions_and_Changes.md#2-decision-log)); until then the rule runs. No model is trained on message content (end-to-end encrypted, never on the server) or on special-category data beyond what the member consented to for matching.
+
+| Method | Proven at | Where TRYST uses it | Phase | Limit |
+|---|---|---|---|---|
+| Deterministic scoring with reason codes | Stripe Radar rules, FICO scorecards | Introductions (Stage 0 gates + weighted score), fraud rules, triage deadlines | **Running** | The baseline every model must beat |
+| Gradient-boosted trees | Stripe Radar, Airbnb trust and fraud, Uber ETA | Payment fraud and card-testing risk; fake-account risk (admission L1) | P2 | Features are behavioural and payment signals, never profile content or identity-check images; scores add friction, never remove a safety step |
+| Neural networks: two-tower retrieval and learned ranking | YouTube (2016), Pinterest PinSage, Airbnb search | Candidate retrieval and ranking for daily introductions | P2 | Runs after Stage 0 gates (blocks, shields, hidden areas, consent): a model can reorder, never surface a gated person |
+| Contextual bandits (reinforcement learning) | Microsoft Personalizer, Yahoo news (LinUCB), LinkedIn feed | Exploration on the slate so new members get fair exposure; learns from outcomes (a reply, a confirmed meet, aftercare), not clicks | P2 | Off-policy evaluation before any online change; exposure caps and fairness constraints are hard; never used on safety, moderation or pricing |
+| Full reinforcement learning (policy optimisation over long horizons) | DeepMind data-centre cooling, robotics | **Not used.** No proven, auditable application in a two-sided consent product; recorded so it isn't added later by default | — | Revisit only with a published, comparable deployment |
+| Large language models (self-hosted, open-weight) | Anthropic, OpenAI, Google (hosted); Meta Llama, Mistral (open-weight) | Phrasing the handshake brief from structured fields; support reply drafts from the public help centre; public-site drafts (Herald, outside the member plane) | P2 | Self-hosted in our Google Cloud project in `europe-west2` (Vertex AI model garden or vLLM on GKE); hosted third-party APIs only for public, non-member text; outputs schema-checked; never speaks as a member |
+| Small language models on device | Apple on-device models, Google Gemini Nano, Microsoft Phi | Message-safety classifier (Guardian) distilled from the labelled vectors, running in the app; the server never sees message text | P3 (native) | Must match or beat the rule set on every child-safety vector before it replaces a rule |
+| Predictive intelligence (forecasting) | Uber marketplace forecasting, Airbnb demand | Liquidity per city and segment, capacity, support load, churn by cohort | P2 | Aggregates only; no churn label shown against a member |
+| Decision intelligence | Palantir operations, ServiceNow workflows | Case triage, processor failover, incident runbooks: recommendations with reasons, executed only inside the gate's autonomy levels | P1–P2 | The four always-human classes (§5.2) |
+| Knowledge graph and vector search | Palantir ontology, Google Knowledge Graph | Operations memory (services, runbooks, incidents); the block and exclusion graph in Stage 0 | P2 | Member graph used for gates and abuse detection only |
+
+**Model operations** (all phases): a model registry with version, training data window, eval scores and owner; shadow mode before promotion; canary at 5%; automatic rollback on metric breach; drift monitors; every model change is a `production_change` needing a named person (§5.2).
 
 ---
 
@@ -618,12 +677,12 @@ Two wire details are not in the supplied documentation and are marked **ASSUMED*
 | Payments | Subscriptions, Keys, deposit, refunds | `commerce` via `PaymentProvider` | Sends amount, currency, neutral descriptor, opaque billing ref; receives payment events | **Stripe** (conditional, D-22) · high-risk acquirer (backup MID) · **BitriPay** (gated, D-26) · Adyen · Checkout.com · PayPal | Adyen and Checkout.com are evaluated as the high-risk backup in P0; PayPal is unlikely to accept the category (verify) |
 | Banking-as-a-Service | Not needed for members (TRYST holds no stored value) | Treasury (ops) | Company accounts only | Business bank with API (e.g. Modulr, ClearBank partners) | Operator-only |
 | Open banking | Optional pay-by-bank in UK/EU, lower fees, no card data | `commerce` | Payment initiation; no account data retained | TrueLayer · Yapily · Stripe (pay by bank) | P3 evaluation; descriptor rules apply |
-| KYC / age assurance | Highly effective age assurance (OSA); V2 | identity-svc | Sends selfie/document to provider; receives pass/fail + token | Two providers: **Yoti** · **Persona** · **Veriff** · **Sumsub** · Onfido | No document image retained by TRYST (A §8.1) |
+| KYC / age assurance | Highly effective age assurance (OSA); V2 | identity-svc | Sends selfie/document to provider; receives pass/fail + token | Two providers: **Yoti** (recommended: UK, ACCS-certified age estimation, used by dating apps) · **Veriff** (second; self-serve) · Persona · Sumsub · Onfido. Keys entered in the console → Vendor keys | No document image retained by TRYST (A §8.1) |
 | KYB | Licensees and commission partners | Partner onboarding | Business registration data | Sumsub KYB · Persona · Companies House API | B2B only |
 | AML screening | Sanctions and PEP screening of **businesses** (licensees, partners). Member AML duties sit with the regulated PSP | Partner onboarding | Business and director names | ComplyAdvantage · Sumsub | D-32 |
-| Fraud prevention | Card testing, ATO, bots | Payment, identity, edge | Device signals, payment risk | Stripe Radar · Ethoca/Verifi alerts · Cloudflare Bot Management · Fingerprint (device, hashed) | Device IDs hashed; no cross-site tracking |
-| Identity verification (liveness B2) | Login factor B2 (02 §3.3) | identity-svc | Liveness session; match result | iProov · FaceTec · Persona | PAD Level 2 (NFR-17); D-18 |
-| Email | Statutory notices (renewal, cooling-off), sign-in alerts | Notification engine | Billing email (member-chosen), neutral subject lines | Postmark · Amazon SES · SendGrid · Brevo | No tracking pixels; neutral sender |
+| Fraud prevention | Card testing, ATO, bots | Payment, identity, edge | Device signals, payment risk | Stripe Radar · Ethoca/Verifi alerts · Cloud Armor (bot rules, rate limits) · reCAPTCHA Enterprise on sign-up (P2) | Device IDs hashed; no cross-site tracking |
+| Identity verification (liveness B2) | Login factor B2 (02 §3.3) | identity-svc | Hosted liveness session opened by the server; match result checked against that session (built) | The same provider as age assurance: **Yoti** (recommended) · **Veriff** (second) · iProov · FaceTec | PAD Level 2 (NFR-17); D-18 |
+| Email | Statutory notices (renewal, cooling-off), sign-in alerts | Notification engine | Billing email (member-chosen), neutral subject lines | **Hostinger mailbox over SMTP** (launch, D-67) · Postmark · SendGrid · Brevo (if volume outgrows the mailbox) | No tracking pixels; neutral sender |
 | SMS | **Sign-up OTP only**; never a login factor (D-16) | identity-svc | Phone number, code | Twilio Verify · MessageBird | Neutral sender ID |
 | WhatsApp | — | — | — | — | **Declined for members** (D-29): exposes the contact on a shared device and to a third party. Operator alerts may use Slack/PagerDuty instead |
 | Push notifications | Masked alerts | Notification engine | Opaque payload; content fetched in app | APNs · FCM | No names or content (04 §5) |
@@ -632,11 +691,11 @@ Two wire details are not in the supplied documentation and are marked **ASSUMED*
 | Accounting | Revenue recognition, VAT returns | Finance (ops) | Aggregated revenue journals; no member data | Xero · NetSuite | Aggregates only |
 | Tax | VAT/OSS calculation | `commerce` | Country + amount | Stripe Tax · Avalara | — |
 | CRM | **B2B pipeline only** (licensees, partners, press) | Sales copilot | Business contacts | HubSpot · Salesforce | **No member data, ever** (D-29) |
-| Analytics | Product and marketing-site analytics | Warehouse; marketing site | Cookieless aggregate; pseudonymous product events | Self-hosted: ClickHouse + Plausible/Umami | No third-party tracking scripts (NFR-20) |
+| Analytics | Product and marketing-site analytics | Warehouse; marketing site | Cookieless aggregate; pseudonymous product events | Self-hosted, cookieless: BigQuery marts (P2) for product analytics; the public site has none (no cookies, no trackers) | No third-party tracking scripts (NFR-20) |
 | AI model providers | Generic copy (Herald, help centre); coding copilots | `llm-gateway` | Redacted prompts | Anthropic · OpenAI · Google Gemini / Vertex AI · Cohere · Mistral; **self-hosted** open-weight (vLLM) for member data | Zero-retention terms required for hosted providers |
-| Cloud | Compute, storage, KMS/HSM | All | — | **AWS eu-west-2** (primary) · Azure / GCP for DR evaluation | UK/EU residency |
-| Cloud storage | Encrypted media, backups, WORM audit anchors | media-svc, ops | Ciphertext only | S3 (object lock) · Cloudflare R2 (egress-free CDN origin for marketing assets) | Client-side encryption for member media |
-| Authentication | Members: passkeys (built, go-webauthn). Staff: SSO | identity-svc; ops | — | Members: in-house WebAuthn. Staff: Okta / Google Workspace SSO + hardware keys | No third-party IdP for members |
+| Cloud | Compute, databases, keys, secrets, load balancing | All | — | **Google Cloud, `europe-west2` London** (D-66); DR region `europe-west1`. Hostinger: mail, DNS, outside uptime check and encrypted backup copy. Vercel: the public site. Firebase: Cloud Messaging for the native apps (P3) | UK/EU residency; one provider per job |
+| Cloud storage | Encrypted media, backups, WORM audit anchors | media-svc, ops | Ciphertext only | Cloud Storage (Bucket Lock for WORM anchors); Cloud SQL backups; Hostinger VPS for the weekly encrypted outside copy | Client-side encryption for member media |
+| Authentication | Members: passkeys (built, go-webauthn). Staff: SSO | identity-svc; ops | — | Members: in-house WebAuthn (built). Staff: Google Identity-Aware Proxy with the safety team's Google group on security-key 2-Step Verification (built, D-66) | No third-party IdP for members |
 | Productivity | Staff collaboration | Ops | No member data | Google Workspace · Microsoft 365 | DLP rules block member identifiers |
 | Document generation | Statements of reasons, DSR exports, invoices, transparency report | Compliance, Payment | Generated server-side | In-house (HTML → PDF with headless Chromium, as the spec PDF) | Not sent to third parties |
 | E-signature | Partner, licensee and vendor contracts | Partner onboarding | Business signatories | DocuSign · Dropbox Sign | B2B only |
@@ -644,8 +703,8 @@ Two wire details are not in the supplied documentation and are marked **ASSUMED*
 | Data enrichment | — | — | — | — | **Declined for members** (D-29): enrichment would link a pseudonymous member to a real identity, breaking FR-002. B2B lead enrichment allowed in the CRM |
 | Currency exchange | Display prices in EUR, SEK, DKK in P4 | `commerce` | Rates only | Processor-native pricing (Stripe multi-currency) · ECB reference rates | Prices set per market, not converted live |
 | Subscription billing | Plans, renewals, notices | `commerce` | Via the payment adapters | Stripe Billing · BitriPay `/plans` and `/subscriptions` (gated) | DMCC/CCR notices (03 §10) |
-| Observability | Metrics, logs, traces | All services | No member content; pseudonymous IDs | Self-hosted Grafana stack (Prometheus, Loki, Tempo) + OpenTelemetry | Logs scrubbed at source |
-| Security | WAF, DDoS, secrets, scanning | Edge, CI | — | Cloudflare · AWS Shield · HashiCorp Vault / AWS Secrets Manager · Snyk / GitHub Advanced Security | — |
+| Observability | Metrics, logs, traces | All services | No member content; pseudonymous IDs | Launch: Google Cloud Monitoring and Logging (uptime checks, alert policies) + Prometheus on the VM. P2: OpenTelemetry to Cloud Trace | Logs scrubbed at source |
+| Security | WAF, DDoS, secrets, scanning | Edge, CI | — | Cloud Armor (WAF, Adaptive Protection) · Secret Manager (keys entered via Vendor keys) · gosec, staticcheck, govulncheck, npm audit, Trivy, gitleaks in CI (built) | — |
 | Incident and on-call | Paging | System Health | Incident metadata | PagerDuty · Opsgenie | — |
 
 ---
@@ -659,7 +718,7 @@ Two wire details are not in the supplied documentation and are marked **ASSUMED*
 | Idempotency keys on every mutating request | Stripe | Edge API (02 §5), all payment adapters |
 | Signed webhooks with timestamp tolerance and replay | Stripe, GitHub | Inbound processor webhooks; outbound partner webhooks (§11.4) |
 | Zero trust / BeyondCorp: identity- and device-aware access, no trusted network | Google | Staff access; service-to-service mTLS (SPIFFE) |
-| Event streaming with a schema registry | LinkedIn (Kafka), Uber | Redpanda + Protobuf registry (03 §2.1) |
+| Event streaming with a schema registry | LinkedIn (Kafka), Uber, Spotify (Pub/Sub) | PostgreSQL outbox at launch; Pub/Sub with Protobuf schemas (P2) |
 | Durable workflows with compensation | Uber (Cadence → Temporal), Netflix (Conductor) | §5.7 workflow catalogue |
 | Progressive delivery with automated canary analysis | Netflix (Kayenta), Google | Release Manager (§5.6) |
 | SLOs and error budgets; multi-window burn-rate alerts | Google SRE | System Health |
@@ -669,27 +728,30 @@ Two wire details are not in the supplied documentation and are marked **ASSUMED*
 | Risk engine with explainable reason codes | Stripe Radar, Goldman Sachs Aladdin risk factors | Fraud, Risk |
 | Cell-based architecture to cap blast radius | AWS, Slack | §9.8 (P4) |
 | Lakehouse with governed semantic layer | Databricks, Snowflake | §9.6 |
-| Edge WAF, bot management, DDoS absorption | Cloudflare | §13 |
+| Edge WAF, bot management, DDoS absorption | Cloudflare, Google (Cloud Armor, used) | §13 |
 | Endpoint and identity threat detection | CrowdStrike | SOC and Threat Hunter design |
 | Workflow-centric operations consoles | ServiceNow | Operator command centres (§4) |
 | Agent tool use with schema validation and human approval | OpenAI, Anthropic, Microsoft | §5 |
+| Low-latency event processing with a single ordered log per entity, and terminal-grade entitlements on every data view | Bloomberg (B-PIPE, entitlement system) | Ordered per-thread message log; every console view checked against role and case entitlement |
+| GPU inference serving with batching and quantised models; fleet utilisation as a cost signal | NVIDIA (Triton, TensorRT-LLM) | Self-hosted LLM serving (§5.8, P2); Infra Optimiser's GPU signal |
+| Hardware-in-the-loop testing, fault injection and flight rules (pre-agreed responses to each failure) | SpaceX, NASA flight rules; Tesla over-the-air staged rollouts | Runbooks as flight rules (§5.6); chaos game days (§9.10); staged releases with automatic halt |
 
 ### 9.2 Layered architecture
 
 ```
  Clients ─ iOS / Android (native, Rust crypto core) · Web PWA (Next.js) · Marketing site · Ops console · Partner portal
     │  TLS 1.3, passkeys, DPoP-bound tokens
- Edge ─ Cloudflare (WAF, DDoS, bot) → edge-gateway (Go): authN, jurisdiction, tier, consent, rate limit, idempotency
+ Edge ─ Google Cloud Load Balancing + Cloud Armor (WAF, DDoS, rate limits) → API: authN, jurisdiction, tier, consent, rate limit, idempotency
     │  gRPC + mTLS (SPIFFE)
  Domain ─ identity-svc · core-svc (profile, couple, intent, discretion, discovery, reveal, threads/MLS, meet, consent, deletion, commerce)
           media-svc · safety-svc · jobs · webhook-engine · notification-engine · partner-api (P4)
-    │  typed Protobuf events (Redpanda + schema registry)
+    │  typed Protobuf events (PostgreSQL outbox at launch; Pub/Sub with schemas from P2)
  Agents ─ member plane: Cartographer, Mirror, Broker, Envoy, Curtain, Guardian, Aftercare, Onboarding, Risk, Fraud, Support, Payment, Compliance, Chief of Staff
           ops plane: Herald*, System Health, Bug Detection, Auto-Repair, Release Manager, Infra Optimiser, SOC, Threat Hunter, Vulnerability, analysts
           every action → aigov gate → audit chain        (*Herald: separate cloud account)
  AI runtime ─ llm-gateway (vLLM pool, self-hosted, UK) · hosted LLM proxy (redacted, generic copy only) · model + prompt registry · eval harness
- Data ─ IDENTITY-DB · PROFILE-DB · SAFETY-DB · BAN-DB (isolated PostgreSQL clusters) · Qdrant · Feast · ClickHouse · S3 (ciphertext, object lock) · KMS/HSM
- Platform ─ Kubernetes (EKS) · Argo CD · Terraform · Vault · OpenTelemetry → Grafana stack · PagerDuty · Temporal
+ Data ─ Cloud SQL (main, keys, ledger) · pgvector → Vertex AI Vector Search at scale · BigQuery · Cloud Storage (ciphertext, Bucket Lock) · Cloud KMS / Cloud HSM
+ Platform ─ launch: one VM per environment (Compose, stop-then-start deploys) · P2+: GKE Autopilot · Terraform · Secret Manager · Cloud Monitoring · Pub/Sub · Cloud Workflows or Temporal
 ```
 
 ### 9.3 Component specification
@@ -699,17 +761,17 @@ Two wire details are not in the supplied documentation and are marked **ASSUMED*
 | Frontend | Native Swift / Kotlin with a shared Rust crypto core (E-07); Next.js 16 PWA (built: join, enrol, sign-in, approve, account); ops console and partner portal as separate Next.js apps on separate origins with their own CSP |
 | Backend | Go services (03 §2.2); modular monolith `core-svc` with split triggers (§9.8) |
 | Database | PostgreSQL 16 clusters isolated per domain; pgvector; migrations generated from 02 §4 (`scripts/gen_migrations.py`, drift-checked in CI) |
-| Authentication | Members: account-holder-only passkeys + second factor (built). Staff: SSO + FIDO2 hardware key + device posture. Services: SPIFFE mTLS. Partners: scoped API keys + mTLS for webhooks |
+| Authentication | Members: account-holder-only passkeys + second factor (built). Staff: Google Identity-Aware Proxy + security-key 2-Step Verification (built). Services: signed internal calls, one secret per direction (built); SPIFFE mTLS on GKE (P2+). Partners: scoped API keys + mTLS for webhooks (P4) |
 | Role-based access control | RBAC for staff roles, plus ABAC (03 §6.5) on case, purpose and data class; just-in-time elevation with a second approver; all access logged |
 | AI orchestration layer | Agent services + Temporal workflows + `aigov` gate (§5) |
 | Agent memory layer | Structured member vectors only; operational knowledge graph and runbook vector index (§5.7) |
-| Vector database | Qdrant for candidate retrieval (filtered ANN after Stage 0 gates); a separate Qdrant collection in the ops plane for runbook and spec retrieval |
-| Event-driven workflows | Redpanda topics `member.*`, `agent.*`, `payment.*`, `safety.*`, `ops.*`; Protobuf schemas with compatibility checks; outbox pattern from PostgreSQL to avoid dual writes |
+| Vector database | pgvector in Cloud SQL for candidate retrieval (filtered ANN after Stage 0 gates), Vertex AI Vector Search at scale; a separate ops-plane index for runbook and spec retrieval |
+| Event-driven workflows | Topics (Pub/Sub from P2; the PostgreSQL outbox carries signals, standing changes and notices at launch) `member.*`, `agent.*`, `payment.*`, `safety.*`, `ops.*`; Protobuf schemas with compatibility checks; outbox pattern from PostgreSQL to avoid dual writes |
 | API gateway | `edge-gateway` (built skeleton): middleware order in 02 §5; per-key and per-subject rate limits (token bucket in Redis) |
 | Webhook engine | Inbound: verify signature → dedupe → enqueue → process idempotently. Outbound (partners, P4): signed `TRYST-Signature` (§11.4), exponential back-off for 72 h, delivery log, replay, endpoint auto-disable after 5 days of failure |
 | Payment gateway layer | `PaymentProvider` with Stripe, acquirer and BitriPay adapters; the Payment agent's failover (§5.5) |
 | Notification engine | Channel router (push, email, in-app); Curtain-controlled masking; quiet hours; statutory notices bypass quiet hours but stay neutral |
-| Audit log | Two chains: agent decisions (`aigov`) and admin actions; both anchored hourly to S3 object lock |
+| Audit log | Two chains: agent decisions (`aigov`) and admin actions; both anchored hourly to a Bucket-Locked Cloud Storage bucket |
 | Admin control layer | Super Control Centre (§14) over the ops API; break-glass with two-person approval |
 | Security layer | §13 |
 | Observability | OpenTelemetry traces, metrics and logs; member IDs replaced by rotating pseudonyms; content never logged |
@@ -744,12 +806,12 @@ Two wire details are not in the supplied documentation and are marked **ASSUMED*
 
 | Component (brief) | TRYST implementation | Privacy rule |
 |---|---|---|
-| Data lake | S3 (eu-west-2), Iceberg tables, partitioned by day; raw events land here pseudonymised | Raw behavioural events purged at 180 d |
-| Data warehouse | ClickHouse marts (dbt-modelled); semantic layer of metric definitions (QCAM, mutual rate, etc.) | Aggregate marts only for analysts; k ≥ 20 row floor |
-| Vector database | Qdrant (member plane) and a separate ops-plane collection | Member vectors never leave the member plane |
+| Data lake | Cloud Storage (`europe-west2`) with Apache Iceberg tables through BigLake, partitioned by day; raw events land here pseudonymised (P2) | Raw behavioural events purged at 180 d |
+| Data warehouse | BigQuery marts (dbt-modelled); semantic layer of metric definitions (QCAM, mutual rate, etc.) (P2) | Aggregate marts only for analysts; k ≥ 20 row floor |
+| Vector database | pgvector in Cloud SQL first (member plane), a separate ops-plane index; Vertex AI Vector Search once retrieval p95 needs it | Member vectors never leave the member plane |
 | Knowledge graph | Ops: services, runbooks, incidents, decisions (Neo4j or PostgreSQL + Apache AGE). Member plane: the block and exclusion graph used by Broker Stage 0 | The member graph is used for gates and abuse detection only |
-| Event streaming platform | Redpanda + schema registry | §9.4 |
-| Real-time analytics engine | ClickHouse materialised views over Redpanda for ops dashboards (queue depth, authorisation rate, SLOs) | No member-level real-time views outside T&S |
+| Event streaming platform | Launch: PostgreSQL outbox (built). P2: Pub/Sub with schema validation (Protobuf) | §9.4 |
+| Real-time analytics engine | Cloud Monitoring metrics (launch); BigQuery continuous queries over Pub/Sub (P2) for ops dashboards (queue depth, authorisation rate, SLOs) | No member-level real-time views outside T&S |
 | Predictive intelligence engine | Liquidity forecasting (city × segment × mode), churn propensity (aggregate cohorts), capacity forecasting | Forecasts on aggregates; churn scores never shown to support staff as a label on a member |
 | Behavioural intelligence engine | Mirror (03 §4): RevealedPreferenceVector, divergence, α weighting with the 15% stated-preference floor | Message content never used; personalisation can be switched off (FR-024) |
 | Recommendation engine | Broker: Stage 0 gates → retrieval → M3/M4 ranking → fairness constraints (S4 caps, Gini) | Hard limits inviolable (P2) |
@@ -761,8 +823,8 @@ Two wire details are not in the supplied documentation and are marked **ASSUMED*
 
 | Tier | Systems | RPO | RTO | Mechanism |
 |---|---|---|---|---|
-| T0 | identity-svc, edge, IDENTITY-DB, BAN-DB, KMS/HSM | 1 min | 30 min | Multi-AZ synchronous replicas; cross-region (eu-west-1) async replica; HSM cluster across AZs; quarterly restore drill |
-| T1 | core-svc, PROFILE-DB, threads, payments | 5 min | 1 h | As above; Redpanda tiered storage |
+| T0 | identity-svc, edge, IDENTITY-DB, BAN-DB, Cloud KMS | 1 min | 30 min | Launch: Cloud SQL point-in-time recovery (7 days) and daily backups (30 days, keys 7), restore drill passing locally; P2: regional high availability and a cross-region replica in `europe-west1`; quarterly Cloud SQL restore drill |
+| T1 | core-svc, PROFILE-DB, threads, payments | 5 min | 1 h | As above; Pub/Sub retention for replay (P2) |
 | T2 | Agents, analytics | 24 h | 8 h | Rebuild from IaC and the lake |
 
 Erasure must survive restore: deletion jobs are replayed against any restored backup before it serves traffic (crypto-shredded keys stay destroyed, 03 §6.3). **Business continuity:** backup MID live from day one; two age-assurance providers; staff runbooks for a full agent kill (the platform keeps running with agents at L0, falling back to the deterministic P1 baseline ranker, 03 §5.2).
@@ -775,26 +837,53 @@ Erasure must survive restore: deletion jobs are replayed against any restored ba
 | PROFILE-DB write p95 > 20 ms or > 2 TB | Partition by region cell, then shard by `profile_id` hash |
 | > 500k verified members or a second region (P4) | **Cell-based architecture**: a cell = full stack for a market group (UK+IE, EU-North, EU-South); global services limited to identity routing and ban anchors |
 | vLLM pool GPU utilisation > 70% p95 | Infra Optimiser proposes scale-out; a person applies it |
-| Qdrant p95 retrieval > 40 ms | Add replicas; tighten Stage 0 pre-filters |
+| Vector retrieval p95 > 40 ms | Move from pgvector to Vertex AI Vector Search; tighten Stage 0 pre-filters |
 
 ### 9.9 Deployment strategy
 
-Trunk-based development; every merge runs CI (spec check, contracts lint, Go, Python, Rust, web, Playwright e2e, as in `.github/workflows/` (one pipeline each for shared, backend and frontend, plus integration)). Images are signed (Sigstore cosign) with SLSA provenance; Argo CD syncs from Git; progressive delivery 1% → 10% → 50% → 100% with automated canary analysis; feature flags for every user-visible change; freeze windows around launches. Agents ship with their eval suites as a release gate (03 §9). Infrastructure is Terraform with policy checks (OPA) in CI.
+**Today:** a merge to `main` that passes CI is built once, deployed to staging (if configured) and then to production after one approval (`.github/workflows/deploy.yml`, keyless Workload Identity Federation, images by digest in Artifact Registry); the VM stops the old services and starts the new ones; rollback = re-run an earlier deploy. **From P2:** trunk-based development; every merge runs CI (spec check, contracts lint, Go, Python, Rust, web, Playwright e2e, as in `.github/workflows/` (one pipeline each for shared, backend and frontend, plus integration)). Images are signed (Sigstore cosign) with SLSA provenance; Argo CD syncs from Git; progressive delivery 1% → 10% → 50% → 100% with automated canary analysis; feature flags for every user-visible change; freeze windows around launches. Agents ship with their eval suites as a release gate (03 §9). Infrastructure is Terraform with policy checks (OPA) in CI.
 
 ### 9.10 Testing strategy
 
 | Layer | What | Where today |
 |---|---|---|
-| Unit | Each package | Go (`go test ./...`, including `aigov` and `payments`), Python (pytest + Hypothesis), Rust (`cargo test`), web (Vitest) |
+| Unit | Each package | Go (`go test -race ./...` with PostgreSQL in CI), Python (pytest + Hypothesis), Rust (`cargo test`), web (Vitest, 123 tests) |
 | Property | Hard-limit inviolability, ranking invariants | `agents/tests` (Hypothesis) |
 | Contract | OpenAPI lint; Protobuf compatibility; processor adapters against recorded sandbox behaviour | Redocly in CI; `bitripay_test.go` |
-| End to end | Passkey sign-up and two-factor sign-in with virtual authenticators | Playwright (`frontend/e2e/passkey.spec.ts`) |
+| End to end | 25 journeys against the real Go services: passkey sign-up and two-factor sign-in, hosted face check, verification, introductions, couples, messages, meets with duress and Panic, safety and appeals, billing, data rights, vendor keys; accessibility (axe, WCAG 2.2 AA rules) at 360 px on slow 3G | Playwright (`frontend/e2e/`), in CI |
+| Restore | Backup, deletion after backup, restore, re-applied erasure | `TestRestoreDrill` with PostgreSQL, in CI |
+| Adversarial API | Every route with malformed, oversized and forged input; unauthenticated callers refused on every console route | Route tests driven by the OpenAPI contracts (CI); fuzz run recorded in `launch-audit/evidence-ledger.md` |
 | Agent evals | 400-case golden set per agent; injection red team; workflow-level replay | 03 §9 (P1) |
 | Governance | Always-human classes, kill switch, audit-chain tamper detection; mutation-checked | `aigov_test.go` |
 | Privacy | Privacy Auditor probes: access, retention, model leakage | `jobs` (P1) |
 | Load | k6 profiles per journey at 3× forecast peak | P1 |
 | Chaos | AZ loss, connector outage (age assurance, payments), agent kill-all | Game days quarterly from P2 |
-| Security | SAST, DAST, dependency and container scanning; quarterly pen test; annual red team; bug bounty (NFR-19) | CI + vendors |
+| Security | SAST (gosec, staticcheck), govulncheck, npm audit, container scan (Trivy), secret scan of full history (gitleaks); pen test before members (launch blocker H7); annual red team; bug bounty (NFR-19) | CI (running) + vendors (pending) |
+
+### 9.11 Google Cloud service map
+
+One provider per job ([D-66](06_Decisions_and_Changes.md#2-decision-log)). Where v1.3 named an AWS or Cloudflare service, this is what TRYST uses instead. The pattern each came from stays credited in §9.1.
+
+| Job | v1.3 | Now | Phase |
+|---|---|---|---|
+| Compute | EKS | One VM per environment, Docker Compose, stop-then-start deploys (single-instance services) | **Running** (launch) |
+| Compute at scale | EKS | GKE Autopilot, one namespace per service, Workload Identity | P2+ |
+| Databases | RDS / Aurora | Cloud SQL for PostgreSQL 16 (main, keys, ledger), private IP, PITR | **Running** |
+| Object storage, WORM | S3 + Object Lock | Cloud Storage + Bucket Lock | P1 (anchors) |
+| Keys | KMS, CloudHSM | Cloud KMS, Cloud HSM for the contact and anchor peppers | P2 |
+| Secrets | Secrets Manager, Vault | Secret Manager; vendor keys entered in the console (D-70) | **Running** |
+| Edge, WAF, DDoS | Cloudflare, AWS Shield | External Application Load Balancer + Cloud Armor (+ Adaptive Protection) | **Running** |
+| Staff access | Cloudflare Access, Okta | Identity-Aware Proxy + Google group with security-key 2SV | **Running** |
+| Events | Redpanda | PostgreSQL outbox → Pub/Sub with schemas | Running → P2 |
+| Warehouse, lake | ClickHouse, S3 + Iceberg | BigQuery, BigLake Iceberg on Cloud Storage | P2 |
+| Vector search | Qdrant | pgvector → Vertex AI Vector Search | P2 |
+| Model serving | vLLM on EKS GPUs | Vertex AI (open-weight models in our project) or vLLM on GKE GPUs, `europe-west2` | P2 |
+| Monitoring | Grafana stack, PagerDuty | Cloud Monitoring and Logging, uptime checks, alert policies to email; Prometheus on the VM | **Running** |
+| Mail | SES, Postmark | Hostinger mailbox over SMTP | **Running** |
+| Public website | — | Vercel (static) | **Running** |
+| Push (native apps) | APNs, FCM | Firebase Cloud Messaging (and APNs through it) | P3 |
+| Outside uptime check and backup copy | — | Hostinger VPS | **Running** |
+| Confidential compute | Nitro Enclaves | Confidential VMs / Confidential Space | P2 evaluation |
 
 ---
 
@@ -927,7 +1016,7 @@ CREATE TABLE partner.acu_balance (
 );
 ```
 
-**Permissions.** Roles `member_plane_rw` (02 §4 schemas only), `ops_rw` (ops), `partner_rw` (partner), `analyst_ro` (aggregate marts in ClickHouse, not PostgreSQL), `auditor_ro` (ops.agent_decision, ops.admin_action). No role spans member and partner schemas. **Audit requirements:** append-only tables have UPDATE/DELETE revoked; hourly hash anchoring to S3 object lock; every `access_grant` and break-glass event is itself an `admin_action`.
+**Permissions.** Roles `member_plane_rw` (02 §4 schemas only), `ops_rw` (ops), `partner_rw` (partner), `analyst_ro` (aggregate marts in BigQuery, not PostgreSQL), `auditor_ro` (ops.agent_decision, ops.admin_action). No role spans member and partner schemas. **Audit requirements:** append-only tables have UPDATE/DELETE revoked; hourly hash anchoring to S3 object lock; every `access_grant` and break-glass event is itself an `admin_action`.
 
 ---
 
@@ -1094,7 +1183,7 @@ The OS changes 01 §10.3 in three ways (to be measured in beta, not assumed):
 
 | Threat | Control |
 |---|---|
-| DDoS | Cloudflare and AWS Shield; per-route rate limits; autoscaling with caps |
+| DDoS | Cloud Armor with Adaptive Protection at the load balancer; per-route rate limits for sign-in, recovery and emergency lock (built); single-instance services sized with headroom |
 | SQL injection | Parameterised queries only (Go `database/sql` placeholders, pglast-validated migrations); least-privilege DB roles; SAST rule |
 | XSS | React escaping; strict CSP with no inline scripts on app origins (`frontend/next.config.ts`); no third-party scripts; Trusted Types in P1 |
 | CSRF | No cookie-authenticated mutating endpoints without SameSite=Strict and Origin checks; tokens are DPoP-bound bearer (not ambient) |
@@ -1110,9 +1199,9 @@ The OS changes 01 §10.3 in three ways (to be measured in beta, not assumed):
 
 | Brief element | Control |
 |---|---|
-| Encryption at rest | AES-256 via KMS for every store; per-member keys for profile data; crypto-shredding for erasure (03 §6.3) |
+| Encryption at rest | Google-managed AES-256 for every store; customer-managed Cloud KMS keys (P2); per-member keys for photos today, extended to other record types (R5 in `launch-audit/defects.md`); crypto-shredding for erasure (03 §6.3) |
 | Encryption in transit | TLS 1.3 at the edge; mTLS inside |
-| Encryption in use | E2EE threads (MLS); client-side media encryption (Rust core, built); on-device Guardian; Nitro Enclaves evaluated for the PSI server (P2) |
+| Encryption in use | E2EE threads (MLS); client-side media encryption (Rust core, built); on-device Guardian; Confidential VMs / Confidential Space evaluated for the PSI server (P2) |
 | Tokenisation | Card data tokenised by processors (TRYST is SAQ-A scope); contact handles stored as HMAC with an HSM pepper |
 
 ### 13.4 Compliance
@@ -1131,6 +1220,7 @@ The OS changes 01 §10.3 in three ways (to be measured in beta, not assumed):
 | Webhook signing | HMAC with timestamp tolerance in and out; dedupe |
 | Transaction monitoring | Payment and Fraud agents; chargeback thresholds |
 | Admin action tracking | `ops.admin_action`, two-person break-glass |
+| Security assurance (in place of "military-grade") | Controls mapped to the NCSC Cyber Assessment Framework, ISO/IEC 27001 Annex A and OWASP ASVS Level 2; Cyber Essentials Plus before members (P1), ISO 27001 at P4. Evidence, not adjectives: `launch-audit/evidence-ledger.md` |
 
 ### 13.5 AI risk register (additions to 01 §13.3)
 
@@ -1147,7 +1237,7 @@ The OS changes 01 §10.3 in three ways (to be measured in beta, not assumed):
 
 ## 14. Admin Super Control Centre
 
-Internal origin, staff SSO + hardware key, redacted by default, every view and action logged (FR-086).
+Internal origin (`console.<domain>`), behind Google Identity-Aware Proxy with security-key 2-Step Verification, redacted by default, every view and action logged (FR-086). **Running at launch:** the case queue, case detail with reason-gated photo reveal, decisions with two-person permanent removal, independent appeals, NCA/police/IWF report records, audit-chain verification, transparency counts, and Vendor keys. The other areas below are specified for P1–P4.
 
 | Area | Visibility | Actions (and who may take them) |
 |---|---|---|
@@ -1155,6 +1245,8 @@ Internal origin, staff SSO + hardware key, redacted by default, every view and a
 | Businesses | Licensees and partners with KYB status, contracts, usage | Suspend keys (admin); terminate (two admins) |
 | Transactions | Ledger explorer, payment events by processor | Refund (payments ops); failover (payments ops) |
 | APIs | Traffic, errors, latency by route and key; deprecations | Throttle a key (admin); revoke (admin) |
+| **Vendor keys** (built, D-70) | Every vendor setting by vendor (mailbox, identity provider, safety line, Stripe, photo checks): set or not set, last changed, where each value comes from; launch readiness | Paste and save a key (safety lead only; checked first; write-only, never shown again; audited by name); Apply (restarts the services within two minutes) |
+| Partner API keys (P4) | Keys per partner and environment (sandbox, live), scopes, last use | Create (shown once; Argon2id-hashed), rotate, revoke (admin); leaked-key alerts |
 | Payments | Authorisation rate, chargebacks, disputes, settlement by processor | Approve dispute responses; switch primary processor (two admins) |
 | Agents | Registry, levels, budgets, decision stream, pending approvals, eval scores | Approve pending decisions (named approvers); kill (any on-call); resume (two people) |
 | Automations | Workflow runs, failures, compensations | Retry, cancel (ops) |
@@ -1274,4 +1366,5 @@ This document is the developer-ready OS specification for TRYST. The brief's req
 | Complete agent workflows | §5.5, §5.6, §5.7 |
 | Complete testing strategy | §9.10 |
 | Production readiness review | §15.6 |
-| Code that implements this document today | `backend/internal/aigov` (governance gate, workforce registry, audit chain), `backend/internal/payments/bitripay.go` (BitriPay adapter), plus the v1.2 identity, payments and agent code |
+| Code that implements this document today | Running: `backend/cmd/identity-svc` and `backend/cmd/safety-svc` (member platform, safety service, console), `backend/internal/vendorkeys` (Vendor keys), `frontend/`, `deploy/gcp/`. Built, not yet deployed: `backend/internal/aigov` (governance gate, workforce registry, audit chain), `backend/internal/payments/bitripay.go` (BitriPay adapter), `backend/internal/launch`, `agents/`, `crypto-core/`. Status by part: §0.1 |
+| Launch evidence | `launch-audit/` (evidence ledger, defects, truth audit, Human Action List) |
