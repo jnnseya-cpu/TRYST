@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
+	"github.com/jnnseya-cpu/tryst/backend/internal/comms"
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
 	"github.com/jnnseya-cpu/tryst/backend/internal/notify"
+	"github.com/jnnseya-cpu/tryst/backend/internal/outbound"
 	"github.com/jnnseya-cpu/tryst/backend/internal/profilesvc"
 )
 
@@ -16,8 +20,29 @@ import (
 // what moderation needs: who a bearer token belongs to, who is on the other side of a
 // thread, a pseudonym and city, the main photo (for a moderator who recorded why), and a
 // way to apply standing and send masked notices.
-func internalAPI(srv *identity.Server, prof *profilesvc.Service, notifier *notify.Service) http.Handler {
+func internalAPI(srv *identity.Server, prof *profilesvc.Service, notifier *notify.Service, mailer outbound.Mailer) http.Handler {
 	m := http.NewServeMux()
+	// Communications page (staff console): the delivery log, and test sends to staff.
+	m.HandleFunc("GET /internal/v1/comms", func(w http.ResponseWriter, _ *http.Request) {
+		provider := ""
+		if mailer != nil {
+			provider = mailer.Provider()
+		}
+		writeInternal(w, map[string]any{"log": comms.Default.Snapshot(100), "email_provider": provider})
+	})
+	m.HandleFunc("POST /internal/v1/comms/test", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Event string `json:"event"`
+			To    string `json:"to"`
+		}
+		_ = json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&in)
+		ev, ok := comms.Lookup(in.Event)
+		if !ok {
+			w.WriteHeader(404)
+			return
+		}
+		writeInternal(w, map[string]any{"results": commsTest(r.Context(), ev, in.To, mailer)})
+	})
 	m.HandleFunc("GET /internal/v1/ping", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })
 	m.HandleFunc("POST /internal/v1/authenticate", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
@@ -88,4 +113,25 @@ func writeInternal(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// commsTest sends one catalogue event to a staff member as a test. Email goes for real when
+// a mailbox is configured and the staff identity is an email address (subject marked
+// "[Test]"); every other channel, and email without a mailbox, is recorded in sandbox: a
+// test never reaches a member, a trusted contact or the alarm-receiving centre.
+func commsTest(ctx context.Context, ev comms.Event, to string, mailer outbound.Mailer) []map[string]string {
+	var out []map[string]string
+	for _, ch := range ev.Channels {
+		status, provider := comms.Sandbox, "sandbox"
+		if ch == comms.Email && mailer != nil && strings.Contains(to, "@") {
+			provider = mailer.Provider()
+			status = comms.Sent
+			if err := mailer.Send(ctx, to, "[Test] "+ev.Subject, ev.Text); err != nil {
+				status = comms.Failed
+			}
+		}
+		comms.Default.Record(ev.Key, ch, status, provider, "staff", to, true)
+		out = append(out, map[string]string{"channel": ch, "status": status, "provider": provider})
+	}
+	return out
 }

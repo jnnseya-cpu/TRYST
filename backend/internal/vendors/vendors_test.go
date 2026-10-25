@@ -3,6 +3,7 @@ package vendors
 import (
 	"context"
 	"encoding/json"
+	"github.com/jnnseya-cpu/tryst/backend/internal/comms"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -256,5 +257,13 @@ func TestLivenessStartOpensAHostedCapture(t *testing.T) {
 		if _, _, err := l.Start(context.Background(), "acc-1", "https://app.example/liveness-done"); err == nil {
 			t.Fatalf("accepted %s", ans)
 		}
+	}
+}
+
+func TestCatalogueTrustedContactWordingMatchesSender(t *testing.T) {
+	missed, _ := comms.Lookup("safety.checkin_missed")
+	duress, _ := comms.Lookup("safety.duress")
+	if missed.Text != TrustedContactText("Sam", "20:00–23:00 UK time", false) || duress.Text != TrustedContactText("Sam", "", true) {
+		t.Fatal("catalogue wording differs from what the trusted contact receives")
 	}
 }

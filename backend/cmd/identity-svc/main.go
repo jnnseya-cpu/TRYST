@@ -72,6 +72,7 @@ import (
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/assurance"
 	"github.com/jnnseya-cpu/tryst/backend/internal/commercesvc"
+	"github.com/jnnseya-cpu/tryst/backend/internal/comms"
 	"github.com/jnnseya-cpu/tryst/backend/internal/consent"
 	"github.com/jnnseya-cpu/tryst/backend/internal/dsr"
 	"github.com/jnnseya-cpu/tryst/backend/internal/gate"
@@ -94,8 +95,9 @@ type logSender struct{}
 
 // Send logs that a code was issued without logging the code or the contact (dev only; the
 // code is returned in X-Dev-OTP in dev).
-func (logSender) Send(string, string) error {
+func (logSender) Send(contact, _ string) error {
 	log.Printf("otp issued (dev sender)")
+	comms.Default.Record("account.signup_code", comms.Email, comms.Sandbox, "dev log", "contact", contact, false)
 	return nil
 }
 
@@ -156,6 +158,7 @@ type app struct {
 	consents   *consent.Ledger
 	stores     map[string]store.Store // by database name, for readiness and admin
 	vault      *store.Vault
+	mailer     outbound.Mailer // nil when no mailbox is configured (dev)
 }
 
 func main() {
@@ -372,7 +375,11 @@ func build() *app {
 	ledger := openStore(ctx, mode, "DATABASE_URL_LEDGER")
 	rights.Ledger = ledger
 	rights.StepUp = srv.StepUpOK
-	return &app{mode: mode, srv: srv, prof: prof, commerce: commerce, notifier: notifier, rights: rights, vault: vault, consents: consents,
+	var mailer outbound.Mailer
+	if out != nil {
+		mailer = out.Email
+	}
+	return &app{mailer: mailer, mode: mode, srv: srv, prof: prof, commerce: commerce, notifier: notifier, rights: rights, vault: vault, consents: consents,
 		signals: signals, signalKick: signalKick, toSafety: toSafety,
 		stores: map[string]store.Store{"identity": idStore, "profile": profStore, "keys": keyStore, "commerce": commerceStore, "ledger": ledger}}
 }
@@ -394,7 +401,7 @@ func serve(a *app) {
 	}()
 	// Internal API for the safety service (private listener, signed calls only).
 	internal := svcenv.Verifier(mode, "safety", "INTERNAL_SECRET_PLATFORM")
-	svcenv.ServeInternal(svcenv.Env("INTERNAL_ADDR", "127.0.0.1:8091"), internal.Wrap(internalAPI(a.srv, prof, notifier)))
+	svcenv.ServeInternal(svcenv.Env("INTERNAL_ADDR", "127.0.0.1:8091"), internal.Wrap(internalAPI(a.srv, prof, notifier, a.mailer)))
 	go func() {
 		for range time.Tick(time.Minute) {
 			rights.Sweep(context.Background())

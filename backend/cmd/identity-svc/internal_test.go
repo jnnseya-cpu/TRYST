@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/jnnseya-cpu/tryst/backend/internal/comms"
 	"net/http/httptest"
 	"testing"
 
@@ -53,7 +54,7 @@ func TestPlatformInternalAPI(t *testing.T) {
 	devEnv(t)
 	startFakeSafety(t)
 	a := build()
-	srv := httptest.NewServer((&svcauth.Verifier{Secrets: map[string][]byte{"safety": svcenv.InternalSecret("dev", "INTERNAL_SECRET_PLATFORM")}}).Wrap(internalAPI(a.srv, a.prof, a.notifier)))
+	srv := httptest.NewServer((&svcauth.Verifier{Secrets: map[string][]byte{"safety": svcenv.InternalSecret("dev", "INTERNAL_SECRET_PLATFORM")}}).Wrap(internalAPI(a.srv, a.prof, a.notifier, a.mailer)))
 	defer srv.Close()
 	c := &svcauth.Client{BaseURL: srv.URL, Caller: "safety", Secret: svcenv.InternalSecret("dev", "INTERNAL_SECRET_PLATFORM")}
 	ctx := context.Background()
@@ -97,5 +98,19 @@ func TestPlatformPreflight(t *testing.T) {
 	a.toSafety.BaseURL = url + "/nowhere"
 	if _, ok := preflightPlatform(context.Background(), a); ok {
 		t.Fatal("unreachable safety service passed")
+	}
+}
+
+// A test send never reaches a member: without a mailbox every channel is sandbox.
+func TestCommsTestIsSandboxedWithoutAMailbox(t *testing.T) {
+	ev, _ := comms.Lookup("message.new")
+	res := commsTest(context.Background(), ev, "lead@corp.example", nil)
+	if len(res) != 2 {
+		t.Fatalf("results: %v", res)
+	}
+	for _, r := range res {
+		if r["status"] != comms.Sandbox {
+			t.Fatalf("not sandbox: %v", r)
+		}
 	}
 }

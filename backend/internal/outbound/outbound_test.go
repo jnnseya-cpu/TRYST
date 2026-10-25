@@ -3,6 +3,7 @@ package outbound
 import (
 	"encoding/json"
 	"errors"
+	"github.com/jnnseya-cpu/tryst/backend/internal/comms"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -67,5 +68,12 @@ func TestPostmarkAndTwilio(t *testing.T) {
 	}
 	if err := (Sender{}).Send("+44", "1"); !errors.Is(err, ErrNoChannel) {
 		t.Fatalf("no channel: %v", err)
+	}
+}
+
+func TestCatalogueEmailWordingMatchesSender(t *testing.T) {
+	ev, _ := comms.Lookup("account.signup_code")
+	if ev.Text != CodeText("482913") || ev.Subject != "Your verification code" {
+		t.Fatalf("catalogue and sender differ:\n%q\n%q", ev.Text, CodeText("482913"))
 	}
 }

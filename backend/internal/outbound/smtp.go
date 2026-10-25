@@ -18,6 +18,7 @@ import (
 
 // Mailer sends one plain-text email.
 type Mailer interface {
+	Provider() string // short name for the delivery log, e.g. "hostinger smtp"
 	Send(ctx context.Context, to, subject, text string) error
 }
 
@@ -33,6 +34,9 @@ type SMTP struct {
 }
 
 func header(v string) string { return strings.NewReplacer("\r", "", "\n", "").Replace(v) }
+
+// Provider names the mailer in the delivery log ("smtp.hostinger.com", never an address).
+func (s *SMTP) Provider() string { return "smtp " + s.Host }
 
 // Send delivers the message. The contact is never logged.
 func (s *SMTP) Send(ctx context.Context, to, subject, text string) error {

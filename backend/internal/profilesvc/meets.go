@@ -26,6 +26,7 @@ import (
 	"time"
 	_ "time/tzdata"
 
+	"github.com/jnnseya-cpu/tryst/backend/internal/comms"
 	"github.com/jnnseya-cpu/tryst/backend/internal/meet"
 	"github.com/jnnseya-cpu/tryst/backend/internal/metrics"
 	"github.com/jnnseya-cpu/tryst/backend/internal/store"
@@ -65,9 +66,17 @@ type Alerting interface {
 
 // dispatch delivers an alert outside the service lock (the alarm-receiving centre may be
 // slow), retrying once; failures are counted for the on-call alert rule (deploy/monitoring).
-func (s *Service) dispatch(channel string, send func(ctx context.Context) error) {
+func (s *Service) dispatch(channel, event, member string, send func(ctx context.Context) error) {
+	commsChannel, provider := comms.Email, "email"
+	if channel != "trusted_contact" {
+		commsChannel, provider = comms.SafetyLine, "arc"
+	}
+	if _, dev := s.Alerts.(*LogAlerting); dev {
+		provider = "dev log"
+	}
 	if s.Alerts == nil {
 		metrics.Default.Inc("tryst_safety_alert_failures_total", "channel", channel, "cause", "not_configured")
+		comms.Default.Record(event, commsChannel, comms.Failed, "not configured", "member", member, false)
 		return
 	}
 	s.alertWG.Add(1)
@@ -79,6 +88,11 @@ func (s *Service) dispatch(channel string, send func(ctx context.Context) error)
 			cancel()
 			if err == nil {
 				metrics.Default.Inc("tryst_safety_alerts_total", "channel", channel)
+				status := comms.Sent
+				if provider == "dev log" {
+					status = comms.Sandbox
+				}
+				comms.Default.Record(event, commsChannel, status, provider, "member", member, false)
 				return
 			}
 			log.Printf("safety alert (%s) failed: %v", channel, err)
@@ -87,6 +101,7 @@ func (s *Service) dispatch(channel string, send func(ctx context.Context) error)
 			}
 		}
 		metrics.Default.Inc("tryst_safety_alert_failures_total", "channel", channel, "cause", "delivery")
+		comms.Default.Record(event, commsChannel, comms.Failed, provider, "member", member, false)
 	}()
 }
 
@@ -477,7 +492,7 @@ func (s *Service) handlePanic(w http.ResponseWriter, r *http.Request) {
 		s.tickSession(r.Context(), ss, s.now())
 		s.saveSafety(r.Context(), ss)
 	}
-	s.dispatch("emergency", func(ctx context.Context) error { return s.Alerts.Emergency(ctx, a) })
+	s.dispatch("emergency", "safety.panic", acc.ID, func(ctx context.Context) error { return s.Alerts.Emergency(ctx, a) })
 	writeJSON(w, 200, map[string]any{"alert": a.ID, "call": "999", "silent_solution": "If you can't speak, dial 999, then press 55 when asked."})
 }
 
@@ -527,14 +542,18 @@ func (s *Service) tickSession(ctx context.Context, ss *safetySession, now time.T
 		switch act {
 		case meet.AlertTrusted:
 			if to, alias := ss.Trusted, ss.Alias; to != "" {
-				s.dispatch("trusted_contact", func(ctx context.Context) error {
+				event := "safety.checkin_missed"
+				if duress {
+					event = "safety.duress"
+				}
+				s.dispatch("trusted_contact", event, ss.Member, func(ctx context.Context) error {
 					return s.Alerts.TrustedContact(ctx, to, alias, window, duress)
 				})
 			}
 		case meet.AlertSafetyLine:
-			s.dispatch("safety_line", func(ctx context.Context) error { return s.Alerts.SafetyLine(ctx, a) })
+			s.dispatch("safety_line", "safety.line_alert", ss.Member, func(ctx context.Context) error { return s.Alerts.SafetyLine(ctx, a) })
 		case meet.Emergency:
-			s.dispatch("emergency", func(ctx context.Context) error { return s.Alerts.Emergency(ctx, a) })
+			s.dispatch("emergency", "safety.panic", ss.Member, func(ctx context.Context) error { return s.Alerts.Emergency(ctx, a) })
 		}
 	}
 }

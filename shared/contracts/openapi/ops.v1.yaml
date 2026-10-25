@@ -186,6 +186,33 @@ paths:
       responses:
         '200': { description: Counts, content: { application/json: { schema: { type: object } } } }
         '401': { $ref: '#/components/responses/Problem' }
+  /comms:
+    get:
+      tags: [comms]
+      operationId: comms
+      summary: "Staff: the communication catalogue (every message TRYST sends, its channels and exact wording), channel coverage, what is never sent and why, and the recent delivery log. The log holds no address, name or content."
+      responses:
+        '200': { description: Catalogue and log, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /comms/test:
+    post:
+      tags: [comms]
+      operationId: commsTest
+      summary: "Leads only: send one catalogue event to yourself. Email goes for real to the lead's staff address when a mailbox is set ('[Test]' subject); every other channel is recorded in sandbox. Never reaches a member, contact or the alarm centre."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event]
+              properties:
+                event: { type: string, maxLength: 64 }
+      responses:
+        '200': { description: Result per channel, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /settings/vendor-keys:
     get:
       tags: [settings]

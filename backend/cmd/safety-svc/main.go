@@ -99,6 +99,7 @@ func build() *app {
 		log.Fatal(err)
 	}
 	svc.Notices = safetysvc.RemoteNotices(toPlatform)
+	svc.Comms = safetysvc.RemoteComms{C: toPlatform}
 	switch {
 	case mode == "dev":
 		svc.Settings = &vendorkeys.Memory{} // a dev copy never touches real keys

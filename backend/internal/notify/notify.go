@@ -23,31 +23,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jnnseya-cpu/tryst/backend/internal/comms"
 	"github.com/jnnseya-cpu/tryst/backend/internal/dsr"
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
 	"github.com/jnnseya-cpu/tryst/backend/internal/problem"
 	"github.com/jnnseya-cpu/tryst/backend/internal/store"
 )
 
-// Kinds and their in-app text. In-app text is seen only inside the signed-in app.
-var texts = map[string]string{
-	"match":         "You have a new match.",
-	"message":       "You have a new message.",
-	"meet_proposed": "A meet was proposed.",
-	"meet_update":   "A meet was confirmed or changed.",
-	"safety":        "There's an update from our safety team. See your account.",
-	"appeal":        "Your appeal has been decided. See your account.",
-	"renewal":       "Your plan renews soon. You can cancel any time in Plans and Keys.",
-	"plan_ended":    "Your plan has ended.",
-	"new_device":    "A new device signed in to your account. If this wasn't you, use Burn.",
-	"payment":       "Payment received.",
-	"intent":        "Someone would like to meet you.",
-	"intro":         "You have a new introduction.",
-	"couple":        "There's an update about your couple link.",
-	// Account recovery (FR-061): the member can cancel from any signed-in device.
-	"recovery_started": "Someone started recovering your account. If this wasn't you, cancel it in your account.",
-	"recovery_hold":    "Your account will be recovered in 24 hours. If this wasn't you, cancel it in your account now.",
-}
+// In-app wording comes from the communication catalogue (internal/comms), so the console's
+// Communications page shows exactly what members read.
 
 const (
 	maxNotices    = 100
@@ -166,10 +150,11 @@ func (s *Service) save(ctx context.Context, account string) {
 // Unknown kinds are ignored. Safe to call from any service, holding any lock: delivery is
 // asynchronous.
 func (s *Service) Notify(account, kind, link string) {
-	text, ok := texts[kind]
+	ev, ok := comms.ByKind(kind)
 	if !ok || account == "" {
 		return
 	}
+	text := ev.Text
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
 	s.mu.Lock()
@@ -186,8 +171,13 @@ func (s *Service) Notify(account, kind, link string) {
 			bx.LastPush = now
 		}
 	}
+	pushOn := bx.Settings.Push && s.push != nil
 	s.save(context.Background(), account)
 	s.mu.Unlock()
+	comms.Default.Record(ev.Key, comms.InApp, comms.Sent, "inbox", "member", account, false)
+	if pushOn && len(targets) == 0 {
+		comms.Default.Record(ev.Key, comms.Push, comms.Suppressed, "coalesced", "member", account, false)
+	}
 	if len(targets) == 0 {
 		return
 	}
@@ -197,11 +187,17 @@ func (s *Service) Notify(account, kind, link string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 		for _, ep := range targets {
-			if err := s.push.Send(ctx, ep); err == ErrGone {
+			err := s.push.Send(ctx, ep)
+			switch {
+			case err == ErrGone:
 				s.dropEndpoint(account, ep)
-			} else if err != nil {
+				comms.Default.Record(ev.Key, comms.Push, comms.Failed, "web push (endpoint gone)", "member", account, false)
+			case err != nil:
 				log.Printf("push failed: %v", err) // no endpoint or account logged
 				metrics.Default.Inc("tryst_push_failures_total")
+				comms.Default.Record(ev.Key, comms.Push, comms.Failed, "web push", "member", account, false)
+			default:
+				comms.Default.Record(ev.Key, comms.Push, comms.Sent, "web push", "member", account, false)
 			}
 		}
 	}()

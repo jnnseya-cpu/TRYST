@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/jnnseya-cpu/tryst/backend/internal/comms"
 	"io"
 	"net/http"
 	"net/url"
@@ -60,12 +61,25 @@ func (s Sender) Send(contact, code string) error {
 		if s.Email == nil {
 			return ErrNoChannel
 		}
-		return s.Email.Send(ctx, contact, "Your verification code", CodeText(code))
+		err := s.Email.Send(ctx, contact, "Your verification code", CodeText(code))
+		record("account.signup_code", comms.Email, s.Email.Provider(), contact, err)
+		return err
 	}
 	if s.SMS == nil {
 		return ErrNoChannel
 	}
-	return s.SMS.Send(ctx, contact, CodeText(code))
+	err := s.SMS.Send(ctx, contact, CodeText(code))
+	record("account.signup_code", comms.SMS, "twilio", contact, err)
+	return err
+}
+
+// record notes a delivery in the communication log: never the address or the text.
+func record(event, channel, provider, to string, err error) {
+	status := comms.Sent
+	if err != nil {
+		status = comms.Failed
+	}
+	comms.Default.Record(event, channel, status, provider, "contact", to, false)
 }
 
 func client(c *http.Client) *http.Client {
@@ -76,6 +90,9 @@ func client(c *http.Client) *http.Client {
 }
 
 // Send sends one plain-text email with tracking off (no open pixels, no rewritten links).
+// Provider names the mailer in the delivery log.
+func (p *Postmark) Provider() string { return "postmark" }
+
 func (p *Postmark) Send(ctx context.Context, to, subject, text string) error {
 	base := p.BaseURL
 	if base == "" {

@@ -13,3 +13,16 @@
 .op-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
 .vk-row { border-top: 1px solid var(--hairline); padding: 0.9rem 0; }
 .vk-row .input { flex: 1 1 18rem; min-width: 0; }
+.cm-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.8rem; margin: 1.2rem 0; }
+.cm-tile { border: 1px solid var(--hairline); padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.2rem; }
+.cm-tile span { font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-muted); }
+.cm-tile b { font-size: 1.8rem; color: var(--tryst-champagne); font-weight: 500; }
+.cm-tile small { color: var(--ink-muted); }
+.cm-bar { display: grid; grid-template-columns: 7rem 1fr auto; gap: 0.8rem; align-items: center; padding: 0.35rem 0; }
+.cm-bar-track { height: 0.5rem; background: var(--night-raised); display: block; }
+.cm-bar-fill { display: block; height: 100%; background: var(--tryst-gold); }
+.cm-preview { display: grid; gap: 0.8rem; margin: 1rem 0; }
+.cm-mail, .cm-notice { border: 1px solid var(--hairline); padding: 0.8rem 1rem; background: var(--night-raised); }
+.cm-chip { font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid var(--hairline); padding: 0.05rem 0.4rem; margin-left: 0.3rem; }
+.cm-req, .cm-critical { color: var(--tryst-gold); }
+@media (max-width: 40rem) { .cm-bar { grid-template-columns: 5.5rem 1fr; } .cm-bar .note { grid-column: 1 / -1; } }
