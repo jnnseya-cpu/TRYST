@@ -5,6 +5,7 @@ check: spec contracts backend agents crypto frontend
 
 spec:
 	python3 scripts/check_spec.py
+	python3 scripts/baseline.py
 	python3 scripts/gen_migrations.py --check
 
 contracts:

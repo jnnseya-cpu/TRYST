@@ -40,6 +40,15 @@ Three parts, each built, tested and deployed on its own. They meet only through 
 
 `integration.yml` runs the browser end-to-end tests against both parts together and scans the images. Run everything locally with `make check`; go-live: [docs/runbooks/go-live.md](docs/runbooks/go-live.md).
 
+## Baseline lock (D-72)
+
+Everything built so far is locked in [`baseline/manifest.json`](baseline/manifest.json): decisions, requirements, API operations, routes, tests, pages, journal posts, messages, vendor keys, prices, CI and deployment files. CI (`baseline.yml`) fails on any push that removes, changes or adds a locked item without recording it.
+
+    python3 scripts/baseline.py                         # check
+    python3 scripts/baseline.py --update --reason "…"   # accept a change on purpose
+
+Each update is appended, with its reason, to [`baseline/CHANGES.md`](baseline/CHANGES.md).
+
 ## Sources and history
 
 - `docs/source/` — founder source documents (consolidated Spec + ToS, 4 Oct 2026; Developer Specification, 17 Sep 2026)

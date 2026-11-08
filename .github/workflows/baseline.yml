@@ -1,0 +1,28 @@
+name: baseline (nothing built changes or disappears unrecorded)
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    name: Baseline lock
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pyyaml
+      - name: Every locked item is present and unchanged
+        run: python3 scripts/baseline.py
+      - name: Every baseline change is written to the change log
+        run: |
+          if git rev-parse --verify -q HEAD~1 >/dev/null; then
+            if ! git diff --quiet HEAD~1 -- baseline/manifest.json && git diff --quiet HEAD~1 -- baseline/CHANGES.md; then
+              echo "baseline/manifest.json changed without an entry in baseline/CHANGES.md: use scripts/baseline.py --update --reason"; exit 1
+            fi
+          fi
+        shell: bash
