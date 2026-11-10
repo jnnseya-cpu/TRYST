@@ -1,10 +1,11 @@
-# Three instances (D-50, D-57): main (identity, profile, safety, commerce); keys (member data
+# Three instances (D-50, D-57): main (identity, profile, safety, commerce, growth: D-73,
+# its own database and user, no access to the others); keys (member data
 # keys, 7-day backups so a deletion reaches backups within a week); ledger (erasure ledger,
 # kept apart so restores can re-apply deletions). Users and passwords are made by setup.sh
 # straight into Secret Manager, never in Terraform state.
 locals {
   sql = {
-    main   = { tier = var.db_tier_main, ha = var.db_high_availability, backups = 30, logs = 7, dbs = ["tryst_identity", "tryst_profile", "tryst_safety", "tryst_commerce"] }
+    main   = { tier = var.db_tier_main, ha = var.db_high_availability, backups = 30, logs = 7, dbs = ["tryst_identity", "tryst_profile", "tryst_safety", "tryst_commerce", "tryst_growth"] }
     keys   = { tier = var.db_tier_small, ha = false, backups = 7, logs = 7, dbs = ["tryst_keys"] }
     ledger = { tier = var.db_tier_small, ha = false, backups = 30, logs = 7, dbs = ["tryst_ledger"] }
   }

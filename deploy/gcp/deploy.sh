@@ -3,7 +3,7 @@
 #
 #   LB_IP=<load balancer address> deploy/gcp/deploy.sh <api@sha256:...> <web@sha256:...> <ops@sha256:...>
 #
-# api and safety keep their working state in memory and must never run twice: the old
+# api, safety and growth keep their working state in memory and must never run twice: the old
 # container is stopped before the new one starts (a database lock also enforces it, and
 # the new one waits for it). The web containers are stateless and restart in place.
 set -euo pipefail
@@ -29,7 +29,7 @@ systemctl start tryst-offsite-backup.timer tryst-settings.timer
 ENV="$ENV" "$here/fetch-secrets.sh"
 dc() { docker compose -f "$here/compose.yml" --env-file "$images" "$@"; }
 dc pull api web ops
-for svc in safety api; do      # one copy only: stop, then start
+for svc in safety growth api; do  # one copy only: stop, then start
   dc stop "$svc"
   dc up -d --no-deps "$svc"
 done

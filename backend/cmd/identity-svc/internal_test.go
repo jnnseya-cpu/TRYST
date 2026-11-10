@@ -114,3 +114,38 @@ func TestCommsTestIsSandboxedWithoutAMailbox(t *testing.T) {
 		}
 	}
 }
+
+// TestGrowthCallerReachesOnlyAggregates: the growth service signs with its own secret and
+// gets weekly counts by city above the cohort floor; every other internal path (members,
+// photos, tokens, notices) is closed to it, and its secret opens nothing for anyone else.
+func TestGrowthCallerReachesOnlyAggregates(t *testing.T) {
+	devEnv(t)
+	startFakeSafety(t)
+	a := build()
+	v := svcenv.Verifiers("dev", map[string]string{"safety": "INTERNAL_SECRET_PLATFORM", "growth": "INTERNAL_SECRET_GROWTH"})
+	srv := httptest.NewServer(v.Wrap(byCaller(internalAPI(a.srv, a.prof, a.notifier, a.mailer), growthAPI(a.activity))))
+	defer srv.Close()
+	ctx := context.Background()
+	growth := &svcauth.Client{BaseURL: srv.URL, Caller: "growth", Secret: svcenv.InternalSecret("dev", "INTERNAL_SECRET_GROWTH")}
+	var out struct {
+		Items     []map[string]any `json:"items"`
+		MinCohort int              `json:"min_cohort"`
+	}
+	if err := growth.Do(ctx, "GET", "/internal/v1/growth/aggregates", nil, &out); err != nil || out.MinCohort != 50 {
+		t.Fatalf("aggregates: %v %+v", err, out)
+	}
+	for _, path := range []string{"/internal/v1/members/acc-a/summary", "/internal/v1/members/acc-a/main-photo",
+		"/internal/v1/threads/th_1/counterpart", "/internal/v1/comms", "/internal/v1/ping"} {
+		if err := growth.Do(ctx, "GET", path, nil, nil); !svcauth.IsStatus(err, 404) {
+			t.Errorf("growth reached %s: %v", path, err)
+		}
+	}
+	if err := growth.Do(ctx, "POST", "/internal/v1/authenticate", map[string]string{"token": "x"}, nil); !svcauth.IsStatus(err, 404) && !svcauth.IsStatus(err, 405) {
+		t.Errorf("growth reached authenticate: %v", err)
+	}
+	// The growth secret can't pass as the safety service.
+	spoof := &svcauth.Client{BaseURL: srv.URL, Caller: "safety", Secret: svcenv.InternalSecret("dev", "INTERNAL_SECRET_GROWTH")}
+	if err := spoof.Do(ctx, "GET", "/internal/v1/ping", nil, nil); !svcauth.IsStatus(err, 401) {
+		t.Errorf("growth secret passed as safety: %v", err)
+	}
+}

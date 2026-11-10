@@ -16,6 +16,8 @@ const csp = [
 // Same-origin API: /v1/* is proxied to identity-svc, so the CSP can stay connect-src 'self'.
 const IDENTITY_URL = process.env.IDENTITY_URL ?? "http://localhost:8081";
 const SAFETY_URL = process.env.SAFETY_URL ?? "http://localhost:8082";
+// Growth intelligence (D-73): staff console only; members never reach it.
+const GROWTH_URL = process.env.GROWTH_URL ?? "http://localhost:8083";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
@@ -33,6 +35,7 @@ const nextConfig: NextConfig = {
       ...(process.env.OPS_CONSOLE === "1"
         ? [
             { source: "/ops/v1/vouchers", destination: `${IDENTITY_URL}/ops/v1/vouchers` },
+            { source: "/ops/v1/growth/:path*", destination: `${GROWTH_URL}/ops/v1/growth/:path*` },
             { source: "/ops/v1/:path*", destination: `${SAFETY_URL}/ops/v1/:path*` },
           ]
         : []),

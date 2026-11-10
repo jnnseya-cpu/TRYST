@@ -1,5 +1,6 @@
-# One address, TLS by a Google-managed certificate, Cloud Armor in front of both sites, and
-# Identity-Aware Proxy on the staff console only.
+# One address, TLS by a Google-managed certificate, Cloud Armor in front of every host, and
+# Identity-Aware Proxy on the staff console only. The guide pages (growth-svc's public
+# listener, D-73) get a host only when guides_domain is set; otherwise nothing routes to them.
 resource "google_compute_global_address" "lb" {
   name = local.name
 }
@@ -16,14 +17,18 @@ resource "google_compute_instance_group" "app" {
     name = "console"
     port = 3001
   }
+  named_port {
+    name = "guides"
+    port = 3002
+  }
 }
 
 resource "google_compute_health_check" "hc" {
-  for_each = { web = 3000, console = 3001 }
+  for_each = { web = { port = 3000, path = "/" }, console = { port = 3001, path = "/" }, guides = { port = 3002, path = "/healthz" } }
   name     = "${local.name}-${each.key}"
   http_health_check {
-    port         = each.value
-    request_path = "/"
+    port         = each.value.port
+    request_path = each.value.path
   }
 }
 
@@ -68,7 +73,7 @@ resource "google_compute_security_policy" "armor" {
 }
 
 resource "google_compute_backend_service" "b" {
-  for_each              = { web = false, console = true } # IAP on the console only
+  for_each              = { web = false, console = true, guides = false } # IAP on the console only
   name                  = "${local.name}-${each.key}"
   protocol              = "HTTP"
   port_name             = each.key
@@ -105,11 +110,25 @@ resource "google_compute_url_map" "https" {
     name            = "console"
     default_service = google_compute_backend_service.b["console"].id
   }
+  dynamic "host_rule" {
+    for_each = var.guides_domain == "" ? [] : [1]
+    content {
+      hosts        = [var.guides_domain]
+      path_matcher = "guides"
+    }
+  }
+  dynamic "path_matcher" {
+    for_each = var.guides_domain == "" ? [] : [1]
+    content {
+      name            = "guides"
+      default_service = google_compute_backend_service.b["guides"].id
+    }
+  }
 }
 
 resource "google_compute_managed_ssl_certificate" "cert" {
   name = local.name
-  managed { domains = [var.domain, var.console_domain] }
+  managed { domains = compact([var.domain, var.console_domain, var.guides_domain]) }
   lifecycle { create_before_destroy = true }
 }
 

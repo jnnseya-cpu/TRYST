@@ -91,10 +91,12 @@ dsn_secret DATABASE_URL_IDENTITY main tryst_identity identity_svc
 dsn_secret DATABASE_URL_PROFILE main tryst_profile profile_svc
 dsn_secret DATABASE_URL_SAFETY main tryst_safety safety_svc
 dsn_secret DATABASE_URL_COMMERCE main tryst_commerce commerce_svc
+dsn_secret DATABASE_URL_GROWTH main tryst_growth growth_svc # D-73: growth's own database only
 dsn_secret DATABASE_URL_KEYS keys tryst_keys keys_svc
 dsn_secret DATABASE_URL_LEDGER ledger tryst_ledger ledger_svc
 
 say "Internal secrets and staff roster"
+gen INTERNAL_SECRET_GROWTH hex32 # growth-svc -> member platform, aggregates path only (D-73)
 if [ -n "${ROSTER_FILE:-}" ] && [ -f "$ROSTER_FILE" ]; then
   CLOUDSDK_CORE_PROJECT="$PROJECT_ID" ENV="$env_name" scripts/provision-safety-secrets.sh --roster "$ROSTER_FILE"
 elif ! has STAFF_ROSTER; then
@@ -136,6 +138,10 @@ put API_CONFIG "$tmp/api"
   true
 } >"$tmp/safety"
 put SAFETY_CONFIG "$tmp/safety"
+{
+  echo "SITE_URL=https://${GUIDES_DOMAIN:-www.$DOMAIN}"; echo "APP_URL=https://$DOMAIN"
+} >"$tmp/growth"
+put GROWTH_CONFIG "$tmp/growth"
 
 say "Done. Once, by hand:"
 cat <<MSG

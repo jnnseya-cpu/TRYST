@@ -451,7 +451,7 @@ Each entry gives purpose, inputs, outputs, permissions, triggers, workflow, esca
 
 #### Marketing Agent (Herald)
 
-Specified in 03 §3.2. Purpose: organic growth through earned search visibility. Inputs: public web, Search Console, aggregate cookieless analytics. Outputs: drafts and refresh proposals. Permissions: L2 for internal-link repair; `publish_page` is irreversible → editor. Escalation: claims-discipline flags → editor. Value: low-CAC channel (D-21).
+Specified in 03 §3.2; the running part is growth intelligence ([10](10_Growth_Intelligence.md), D-73): aggregate demand signals, Growth Briefs, editor-approved guide pages, invisible to members. Purpose: organic growth through earned search visibility. Inputs: public web, Search Console, aggregate cookieless analytics. Outputs: drafts and refresh proposals. Permissions: L2 for internal-link repair; `publish_page` is irreversible → editor. Escalation: claims-discipline flags → editor. Value: low-CAC channel (D-21).
 
 #### Data Intelligence Agent
 

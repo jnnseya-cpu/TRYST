@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Writes /run/tryst/api.env and /run/tryst/safety.env from Google Secret Manager at boot.
+# Writes /run/tryst/api.env, safety.env and growth.env from Google Secret Manager at boot.
 # /run is tmpfs: secrets never touch the VM's disk. The VM's service account needs
 # roles/secretmanager.secretAccessor on these secrets only.
 #
@@ -17,6 +17,7 @@ api=(API_CONFIG DATA_KEK DSR_SIGNING_KEY CONTACT_PEPPER ANCHOR_PEPPER VAPID_PRIV
   TWILIO_AUTH_TOKEN DATABASE_URL_IDENTITY DATABASE_URL_PROFILE DATABASE_URL_KEYS
   DATABASE_URL_COMMERCE DATABASE_URL_LEDGER INTERNAL_SECRET_SAFETY INTERNAL_SECRET_PLATFORM
   INTERNAL_SECRET_SAFETY_PREVIOUS INTERNAL_SECRET_PLATFORM_PREVIOUS
+  INTERNAL_SECRET_GROWTH INTERNAL_SECRET_GROWTH_PREVIOUS
   # Vendor settings (backend/internal/vendorkeys; the staff console's "Vendor keys" page)
   SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD OTP_EMAIL_FROM
   ASSURANCE_URL ASSURANCE_PROVIDER ASSURANCE_CERTS ASSURANCE_API_KEY ASSURANCE_SECRET ASSURANCE_CALLBACK_SECRET
@@ -25,6 +26,9 @@ api=(API_CONFIG DATA_KEK DSR_SIGNING_KEY CONTACT_PEPPER ANCHOR_PEPPER VAPID_PRIV
   SIGHTENGINE_USER SIGHTENGINE_SECRET PHOTODNA_KEY )
 safety=(DATABASE_URL_SAFETY DATABASE_URL_LEDGER INTERNAL_SECRET_SAFETY INTERNAL_SECRET_PLATFORM
   INTERNAL_SECRET_SAFETY_PREVIOUS INTERNAL_SECRET_PLATFORM_PREVIOUS STAFF_ROSTER SAFETY_CONFIG)
+# Growth intelligence (D-73): its own database and internal secret, the console's staff
+# sign-in (SAFETY_CONFIG) and roster; no credential to any member database.
+growth=(DATABASE_URL_GROWTH INTERNAL_SECRET_GROWTH INTERNAL_SECRET_GROWTH_PREVIOUS STAFF_ROSTER SAFETY_CONFIG GROWTH_CONFIG)
 
 write() { # file, names...
   local out="$1"; shift
@@ -35,7 +39,7 @@ write() { # file, names...
       continue # optional secrets (an API key a vendor doesn't issue, a *_PREVIOUS outside a rotation)
     fi
     case "$n" in
-      API_CONFIG|SAFETY_CONFIG) printf '%s\n' "$v" >>"$tmp" ;; # KEY=value lines of non-secret settings
+      API_CONFIG|SAFETY_CONFIG|GROWTH_CONFIG) printf '%s\n' "$v" >>"$tmp" ;; # KEY=value lines of non-secret settings
       *) printf '%s=%s\n' "$n" "$(printf '%s' "$v" | tr -d '\n')" >>"$tmp" ;;
     esac
   done
@@ -43,4 +47,5 @@ write() { # file, names...
 }
 write api.env "${api[@]}"
 write safety.env "${safety[@]}"
+write growth.env "${growth[@]}"
 echo "secrets written to $dir (tmpfs)"

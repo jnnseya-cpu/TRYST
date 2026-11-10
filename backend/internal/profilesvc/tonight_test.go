@@ -280,3 +280,25 @@ func TestDiscoveryNeedsArticle9Consent(t *testing.T) {
 		t.Fatalf("ben still on: %v", out)
 	}
 }
+
+type cityCounts map[string]int
+
+func (c cityCounts) Inc(metric, city, member string) { c[metric+"|"+city]++ }
+
+// TestTonightCountsTheCityOnly: starting Tonight adds one to the member's city for growth
+// counts (D-73); refreshing an active session doesn't count again, and nothing about the
+// member is passed on.
+func TestTonightCountsTheCityOnly(t *testing.T) {
+	w := newWorld(t, "dev", "ana")
+	counts := cityCounts{}
+	w.s.Activity = counts
+	w.ready("ana", "Islington")
+	for range 2 {
+		if c, out := w.do("ana", "PUT", "/v1/tonight", `{"hours":2,"radius_km":10}`); c != 200 {
+			t.Fatalf("start: %d %v", c, out)
+		}
+	}
+	if len(counts) != 1 || counts["tonight_start|London"] != 1 {
+		t.Fatalf("counts: %v", counts)
+	}
+}

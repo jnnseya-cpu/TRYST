@@ -25,6 +25,8 @@ tags:
     description: Served by the member platform for the safety service
   - name: safety
     description: Served by the safety service for the member platform
+  - name: growth
+    description: Served by the member platform for the growth service (one path only)
 paths:
   /internal/v1/authenticate:
     post:
@@ -138,6 +140,14 @@ paths:
         '200': { description: Receipt, content: { application/json: { schema: { type: object, properties: { part: { type: string }, erased: { type: integer }, retained: { type: array, items: { type: string } } } } } } }
         '401': { description: Unsigned call }
         '503': { description: Retry }
+  /internal/v1/growth/aggregates:
+    get:
+      tags: [growth]
+      operationId: growthAggregates
+      summary: "Caller growth only (its one permitted path, D-73): complete weeks of activity counts by city at or above the cohort floor (k = 50). A smaller count is withheld, never sent as zero. No member, account or event is ever included."
+      responses:
+        '200': { description: Counts, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object } }, min_cohort: { type: integer } } } } } }
+        '401': { description: Unsigned call }
 components:
   securitySchemes:
     svcSignature:

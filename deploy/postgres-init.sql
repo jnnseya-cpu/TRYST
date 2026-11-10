@@ -6,3 +6,4 @@ CREATE DATABASE tryst_keys;
 CREATE DATABASE tryst_safety;
 CREATE DATABASE tryst_commerce;
 CREATE DATABASE tryst_ledger;
+CREATE DATABASE tryst_growth; -- growth intelligence (D-73)

@@ -247,6 +247,7 @@ func (s *Service) handleTonightStart(w http.ResponseWriter, r *http.Request) {
 	if e == nil {
 		e = &tonightEntry{interests: map[string]bool{}}
 		s.tn.entries[acc.ID] = e
+		s.countActivity("tonight_start", acc.ID, p)
 	}
 	e.until, e.radiusKm = s.now().Add(time.Duration(in.Hours)*time.Hour), min(in.RadiusKm, p.policy().MaxDistanceKm)
 	writeJSON(w, 200, s.tonightView(acc.ID, p))

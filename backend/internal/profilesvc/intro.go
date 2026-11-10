@@ -632,6 +632,7 @@ func (s *Service) sendIntent(ctx context.Context, from, to, via string) (*Intent
 	}
 	s.in.intents[in.ID] = in
 	s.put(ctx, "intent", in.ID, in)
+	s.countActivity("intent_sent", from, s.data[from])
 	return in, nil
 }
 

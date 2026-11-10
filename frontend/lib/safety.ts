@@ -62,7 +62,7 @@ export function setStaffToken(t: string | null) {
 }
 
 /** Console request. In production the staff sign-in proxy adds identity; dev uses a token. */
-export async function ops<T = Record<string, unknown>>(path: string, opts: { method?: string; body?: unknown } = {}) {
+export async function ops<T = Record<string, unknown>>(path: string, opts: { method?: string; body?: unknown; headers?: Record<string, string> } = {}) {
   const t = staffToken();
-  return api<T>(path, { ...opts, headers: t ? { Authorization: `Staff ${t}` } : {} });
+  return api<T>(path, { ...opts, headers: { ...(opts.headers ?? {}), ...(t ? { Authorization: `Staff ${t}` } : {}) } });
 }

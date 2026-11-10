@@ -4,7 +4,8 @@
 #   Internet -> Google Cloud external Application Load Balancer (TLS with a Google-managed
 #   certificate, Cloud Armor WAF and rate limits; IAP on the console)
 #     -> VM :3000 web (member site)   -> api, safety on the private network
-#     -> VM :3001 ops (staff console) -> safety
+#     -> VM :3001 ops (staff console) -> safety, growth (D-73)
+#     -> VM :3002 guide pages (only when a guides host is configured) -> growth
 #   api and safety are never published; PostgreSQL is Cloud SQL on a private IP. The VM
 #   firewall admits 3000/3001 only from Google's load-balancer ranges.
 #
@@ -30,7 +31,7 @@ services:
     restart: unless-stopped
     ports: ["3001:3000"]                     # load balancer only, behind IAP
     networks: [edge, app]
-    depends_on: { safety: { condition: service_healthy } }
+    depends_on: { safety: { condition: service_healthy }, growth: { condition: service_healthy } }
 
   api:
     image: ${API_IMAGE:?set API_IMAGE}
@@ -66,6 +67,25 @@ services:
     read_only: true
     healthcheck: { test: ["CMD", "/safety-svc", "healthcheck"], interval: 10s, retries: 30, start_period: 30s }
     networks: [app]
+
+  # Growth intelligence (D-73): staff API for the console on 8083 (private network only) and
+  # guide pages on 8084, published as 3002 for the load balancer's guides host. Its own
+  # database; it reaches the member platform only for weekly counts by city.
+  growth:
+    image: ${API_IMAGE:?set API_IMAGE}
+    entrypoint: ["/growth-svc"]
+    restart: unless-stopped
+    env_file: [/run/tryst/growth.env]
+    environment:
+      TRYST_ENV: ${TRYST_ENV:-prod}
+      PORT: "8083"
+      PUBLIC_ADDR: ":8084"
+      PLATFORM_INTERNAL_URL: http://api:8091
+    ports: ["3002:8084"]                     # load balancer only (firewall), guide pages only
+    stop_grace_period: 20s
+    read_only: true
+    healthcheck: { test: ["CMD", "/growth-svc", "healthcheck"], interval: 10s, retries: 30, start_period: 30s }
+    networks: [edge, app]
 
   prometheus:
     image: prom/prometheus:v3.5.0

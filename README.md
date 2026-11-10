@@ -21,6 +21,7 @@ Start at [`docs/spec/00_README.md`](docs/spec/00_README.md).
 | [07 Source B — founder brief (verbatim)](docs/spec/07_Source_B_Founder_Brief.md) | Everyone — the founder's specification word for word, with traceability |
 | [08 Source A — traceability](docs/spec/08_Source_A_Traceability.md) | Everyone — where each section of the consolidated Spec + ToS lives in the spec and code |
 | [09 Operating System (internal)](docs/spec/09_Operating_System.md) | Everyone — agent workforce and governance, command centres, self-managing layer, BitriPay door, connectors, ops/partner APIs, B2B licensing |
+| [10 Growth Intelligence (embedded)](docs/spec/10_Growth_Intelligence.md) | Growth, editors, engineering — the Trend Intelligence build spec, running invisibly inside TRYST (D-73) |
 | [Combined PDF](docs/spec/TRYST_Spec_v1.3.pdf) | Reading and sharing |
 
 Consistency check (runs in CI): `python3 scripts/check_spec.py`
@@ -32,7 +33,7 @@ Three parts, each built, tested and deployed on its own. They meet only through 
 | Path | What | Deploys as | CI |
 |---|---|---|---|
 | [`frontend/`](frontend/README.md) | Next.js web app (member site; the staff console is the same code built with `OPS_CONSOLE=1`). Talks to the backend only over HTTP (`/v1/*` proxied to `IDENTITY_URL` / `SAFETY_URL`) | Container on the Google Cloud VM (`frontend/Dockerfile`); not Vercel (D-66) | `frontend.yml` |
-| [`backend/`](backend/README.md) | Go services: `identity-svc` (the member API) and `safety-svc` (Trust & Safety), one image, two entrypoints; PostgreSQL | Containers on the Google Cloud VM (`backend/Dockerfile`) | `backend.yml` |
+| [`backend/`](backend/README.md) | Go services: `identity-svc` (the member API), `safety-svc` (Trust & Safety) and `growth-svc` (growth intelligence, invisible to members, D-73), one image, three entrypoints; PostgreSQL | Containers on the Google Cloud VM (`backend/Dockerfile`) | `backend.yml` |
 | [`shared/`](shared/README.md) | The contract between them: OpenAPI and Protobuf contracts, controlled vocabularies, test vectors both sides must pass, brand assets | Nothing to deploy | `shared.yml` |
 | [`site/`](site/README.md) | The public website and journal: one post per feature, selling each honestly, with editorial rules enforced by tests. Static, no cookies, no member data, indexable | Vercel | `site.yml` |
 | `agents/`, `crypto-core/`, `mobile/` | Later phases, **not deployed at launch**: Python agent services (P2), Rust media crypto for the native apps, native app requirements | — | `backend.yml` |

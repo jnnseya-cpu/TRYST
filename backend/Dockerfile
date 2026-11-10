@@ -14,14 +14,17 @@ RUN --mount=type=secret,id=ca,required=false \
     if [ -f /run/secrets/ca ]; then export SSL_CERT_FILE=/run/secrets/ca; fi; go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/identity-svc ./cmd/identity-svc && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/safety-svc ./cmd/safety-svc
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/safety-svc ./cmd/safety-svc && \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/growth-svc ./cmd/growth-svc
 
 FROM ${RUNTIME_IMAGE}
 COPY --from=build /out/identity-svc /identity-svc
 COPY --from=build /out/safety-svc /safety-svc
+COPY --from=build /out/growth-svc /growth-svc
 USER nonroot:nonroot
 # identity-svc: 8081 API, 8091 internal (safety service only), 9090 metrics.
 # safety-svc:   8082 API, 8092 internal (member platform only), 9092 metrics.
+# growth-svc:   8083 staff API (console only), 8084 guide pages (D-73).
 EXPOSE 8081 8082 8091 8092 9090 9092
 ENV METRICS_ADDR=:9090
 ENTRYPOINT ["/identity-svc"]

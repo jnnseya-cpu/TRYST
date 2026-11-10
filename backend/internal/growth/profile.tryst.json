@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "platform_slug": "tryst",
+  "mode": "live",
+  "default_market": "GB",
+  "default_locale": "en-GB",
+  "timezone": "Europe/London",
+  "policy_version": 1,
+  "allowed_channels": ["seo", "owned_placement", "organic_social"],
+  "objective": "join-page visits per guide view",
+  "outcome": {"conversion": "cta_join", "denominator": "guide_view"},
+  "prohibited_claims": [
+    "safe", "safest", "vetted", "background checked", "screened", "guaranteed", "guarantee", "military-grade",
+    "no sex offenders", "verified safe", "best", "number one", "#1", "100%", "AI", "artificial intelligence",
+    "algorithm", "cheat", "affair guaranteed", "anonymous"
+  ],
+  "sources": [
+    {"source_id": "platform_tonight", "family": "platform_activity", "access_path": "first_party", "kind": "count",
+     "quality": 85, "stale_after_hours": 216, "min_count": 50},
+    {"source_id": "platform_intents", "family": "platform_intents", "access_path": "first_party", "kind": "count",
+     "quality": 85, "stale_after_hours": 216, "min_count": 50},
+    {"source_id": "search_console", "family": "search_console", "access_path": "file_import", "kind": "count",
+     "quality": 80, "stale_after_hours": 240},
+    {"source_id": "trends_import", "family": "public_trends", "access_path": "file_import", "kind": "index",
+     "quality": 60, "stale_after_hours": 240, "context_only": true}
+  ],
+  "topics": [
+    {"topic_id": "discreet-dating-london", "label": "discreet dating London", "aliases": ["london"],
+     "markets": {"GB": {"fit": 90, "intent": 80}}, "readiness": 90,
+     "audience": "Adults in London who want to meet discreetly",
+     "intent": "find a discreet, verified way to meet someone in London",
+     "claim_ids": ["claim_verified", "claim_tonight"], "cta_id": "cta_join", "asset_ids": ["guide_london"]},
+    {"topic_id": "discreet-dating-manchester", "label": "discreet dating Manchester", "aliases": ["manchester"],
+     "markets": {"GB": {"fit": 90, "intent": 80}}, "readiness": 90,
+     "audience": "Adults in Manchester who want to meet discreetly",
+     "intent": "find a discreet, verified way to meet someone in Manchester",
+     "claim_ids": ["claim_verified", "claim_tonight"], "cta_id": "cta_join", "asset_ids": ["guide_manchester"]},
+    {"topic_id": "discreet-dating-birmingham", "label": "discreet dating Birmingham", "aliases": ["birmingham"],
+     "markets": {"GB": {"fit": 90, "intent": 80}}, "readiness": 90,
+     "audience": "Adults in Birmingham who want to meet discreetly",
+     "intent": "find a discreet, verified way to meet someone in Birmingham",
+     "claim_ids": ["claim_verified", "claim_tonight"], "cta_id": "cta_join", "asset_ids": ["guide_birmingham"]},
+    {"topic_id": "discreet-dating-brighton", "label": "discreet dating Brighton", "aliases": ["brighton"],
+     "markets": {"GB": {"fit": 90, "intent": 80}}, "readiness": 90,
+     "audience": "Adults in Brighton who want to meet discreetly",
+     "intent": "find a discreet, verified way to meet someone in Brighton",
+     "claim_ids": ["claim_verified", "claim_tonight"], "cta_id": "cta_join", "asset_ids": ["guide_brighton"]},
+    {"topic_id": "couples-meeting", "label": "couples meeting a third or another couple",
+     "aliases": ["couples", "couple", "third", "unicorn"],
+     "markets": {"GB": {"fit": 85, "intent": 75}}, "readiness": 90,
+     "audience": "Couples looking for a third or another couple",
+     "intent": "find verified people as a couple, with both partners having a say",
+     "claim_ids": ["claim_couples", "claim_verified"], "cta_id": "cta_join", "asset_ids": ["guide_couples"]}
+  ],
+  "claims": [
+    {"claim_id": "claim_verified",
+     "text": "Every member you can see has passed a live face check and a photo-ID check, and TRYST never keeps a copy of anyone's ID.",
+     "source": "site/content/posts/identity-and-age-verified.md (usp; truth audit E20)"},
+    {"claim_id": "claim_tonight",
+     "text": "With Tonight you're only visible to people who are also free tonight, and only for the hours you choose.",
+     "source": "site/content/posts/tonight.md (usp; truth audit E20)"},
+    {"claim_id": "claim_couples",
+     "text": "A couple on TRYST is two verified people who each confirmed it on their own device, and neither can be outvoted on who you meet.",
+     "source": "site/content/posts/couples.md (usp; truth audit E20)"}
+  ],
+  "ctas": [
+    {"cta_id": "cta_join", "text": "See how joining works", "url": "/join"}
+  ],
+  "assets": [
+    {"asset_id": "guide_london", "slug": "discreet-dating-london", "allowed_fields": ["title", "description", "headline", "cta_text"],
+     "write_enabled": true, "initial": {"title": "Meeting discreetly in London", "description": "How TRYST works in London: verified members, private interest and Tonight.", "headline": "Meeting discreetly in London", "cta_text": "See how joining works"}},
+    {"asset_id": "guide_manchester", "slug": "discreet-dating-manchester", "allowed_fields": ["title", "description", "headline", "cta_text"],
+     "write_enabled": true, "initial": {"title": "Meeting discreetly in Manchester", "description": "How TRYST works in Manchester: verified members, private interest and Tonight.", "headline": "Meeting discreetly in Manchester", "cta_text": "See how joining works"}},
+    {"asset_id": "guide_birmingham", "slug": "discreet-dating-birmingham", "allowed_fields": ["title", "description", "headline", "cta_text"],
+     "write_enabled": true, "initial": {"title": "Meeting discreetly in Birmingham", "description": "How TRYST works in Birmingham: verified members, private interest and Tonight.", "headline": "Meeting discreetly in Birmingham", "cta_text": "See how joining works"}},
+    {"asset_id": "guide_brighton", "slug": "discreet-dating-brighton", "allowed_fields": ["title", "description", "headline", "cta_text"],
+     "write_enabled": true, "initial": {"title": "Meeting discreetly in Brighton", "description": "How TRYST works in Brighton: verified members, private interest and Tonight.", "headline": "Meeting discreetly in Brighton", "cta_text": "See how joining works"}},
+    {"asset_id": "guide_couples", "slug": "couples", "allowed_fields": ["title", "description", "headline", "cta_text"],
+     "write_enabled": true, "initial": {"title": "Couples on TRYST", "description": "Two verified people, one link, and an equal say on who you meet.", "headline": "Couples on TRYST", "cta_text": "See how joining works"}}
+  ],
+  "inference": {"route": "deterministic"}
+}

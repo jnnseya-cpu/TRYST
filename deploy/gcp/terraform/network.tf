@@ -58,7 +58,7 @@ resource "google_compute_firewall" "lb" {
   target_tags   = ["tryst-web"]
   allow {
     protocol = "tcp"
-    ports    = ["3000", "3001"]
+    ports    = ["3000", "3001", "3002"]
   }
 }
 

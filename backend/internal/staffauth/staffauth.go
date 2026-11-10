@@ -130,7 +130,7 @@ func ParseRoster(s string) (map[string][]string, error) {
 		}
 		for _, r := range strings.Split(roles, ",") {
 			switch r {
-			case "moderator", "lead":
+			case "moderator", "lead", "growth", "editor": // growth and editor: growth-svc only (D-73)
 			default:
 				return nil, errors.New("unknown staff role " + r)
 			}

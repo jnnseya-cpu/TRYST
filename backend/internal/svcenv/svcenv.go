@@ -81,6 +81,18 @@ func Verifier(mode, caller, envVar string) *svcauth.Verifier {
 	return v
 }
 
+// Verifiers accepts several callers, each with its own secret (and rotation spare).
+func Verifiers(mode string, callers map[string]string) *svcauth.Verifier {
+	v := &svcauth.Verifier{Secrets: map[string][]byte{}, Previous: map[string][]byte{}}
+	for caller, envVar := range callers {
+		v.Secrets[caller] = InternalSecret(mode, envVar)
+		if p := PreviousSecret(envVar); p != nil {
+			v.Previous[caller] = p
+		}
+	}
+	return v
+}
+
 // ServeInternal runs an internal listener (never exposed publicly).
 func ServeInternal(addr string, h http.Handler) {
 	go func() {

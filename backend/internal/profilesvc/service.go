@@ -100,6 +100,11 @@ type Service struct {
 	standing map[string]string
 	// Notify records a masked notice for a member (notification service). May be nil.
 	Notify func(account, kind, link string)
+	// Activity counts distinct members by city and week for growth intelligence (D-73);
+	// only the count outlives the week. Nil: not counted.
+	Activity interface {
+		Inc(metric, city, member string)
+	}
 	// MinDiscoveryTier is the tier needed to use Tonight (V2 in production, E-01).
 	MinDiscoveryTier string
 	// EmailOnlyAlerts: no SMS channel exists, so trusted contacts must be email addresses.
@@ -735,4 +740,14 @@ func (s *Service) handleCard(w http.ResponseWriter, r *http.Request) {
 		"photos": photos, "verified": acc.Tier.String(),
 		"ready": profile.ValidateGallery(gallery(p)) == nil && p.DisplayName != "" && p.AreaID != "",
 	})
+}
+
+// countActivity adds one to a city's weekly count (caller holds s.mu).
+func (s *Service) countActivity(metric, account string, p *memberProfile) {
+	if s.Activity == nil || p == nil {
+		return
+	}
+	if a, ok := areaByID(p.AreaID); ok {
+		s.Activity.Inc(metric, a.City, account) // once per member per week; the id isn't kept
+	}
 }

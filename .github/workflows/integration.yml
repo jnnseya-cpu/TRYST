@@ -53,6 +53,11 @@ jobs:
           for i in $(seq 1 30); do curl -sf localhost:8082/readyz && break; sleep 1; done
           docker exec safety /safety-svc healthcheck
           ! docker run --rm --entrypoint /safety-svc tryst-api:ci   # production config refused
+          docker run -d --name growth -e TRYST_ENV=dev -p 8083:8083 -p 8084:8084 --entrypoint /growth-svc tryst-api:ci
+          for i in $(seq 1 30); do curl -sf localhost:8083/readyz && break; sleep 1; done
+          docker exec growth /growth-svc healthcheck
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8084/ops/v1/growth/overview)" = 404   # public port: guide pages only
+          ! docker run --rm --entrypoint /growth-svc tryst-api:ci   # production config refused
       - name: Image vulnerability scan (HIGH and CRITICAL fail the build)
         run: |
           for img in tryst-api:ci tryst-web:ci; do

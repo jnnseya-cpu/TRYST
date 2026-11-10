@@ -23,6 +23,8 @@ tags:
     description: Case queue, decisions and appeals
   - name: audit
     description: Audit log and transparency counts
+  - name: growth
+    description: "Growth intelligence (D-73), served by growth-svc: staff only, invisible to members"
 paths:
   /cases:
     get:
@@ -282,6 +284,234 @@ paths:
         '202': { description: Applying, content: { application/json: { schema: { type: object } } } }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Problem' }
+  /growth/overview:
+    get:
+      tags: [growth]
+      operationId: growthOverview
+      summary: "Growth staff (growth, editor, lead): profile revision, freeze state, guide pages, source health, briefs, approved claims and prohibited wording. Invisible to members (D-73)."
+      responses:
+        '200': { description: Overview, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /growth/observations:
+    post:
+      tags: [growth]
+      operationId: growthIngest
+      summary: "growth role: import aggregate observations (Search Console export, trends index). Atomic; 1-500 items, 1 MiB; registered sources only; personal data refused; exact replay is a duplicate, same source version with different content is 409. Needs Idempotency-Key."
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [items], properties: { items: { type: array, maxItems: 500, items: { $ref: '#/components/schemas/GrowthObservation' } } } } } }
+      responses:
+        '200': { description: Counts, content: { application/json: { schema: { type: object, properties: { accepted: { type: integer }, duplicate: { type: integer }, rejected: { type: integer } } } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '428': { $ref: '#/components/responses/Problem' }
+  /growth/refresh:
+    post:
+      tags: [growth]
+      operationId: growthRefresh
+      summary: "growth role: pull the member platform's weekly counts by city (k ≥ 50 only) and re-score every topic."
+      responses:
+        '202': { description: Scored, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /growth/opportunities:
+    get:
+      tags: [growth]
+      operationId: growthOpportunities
+      summary: "Latest frozen snapshot per topic with score, confidence, components, families, vetoes, reasons and evidence ids."
+      parameters: [{ name: status, in: query, schema: { type: string, enum: [archived, watching, eligible] } }]
+      responses:
+        '200': { description: Opportunities, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /growth/briefs:
+    post:
+      tags: [growth]
+      operationId: growthCreateBrief
+      summary: "growth role: draft a Growth Brief v1 (shared/contracts/growth/growth-brief.v1.schema.yaml) from one eligible snapshot."
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [snapshot_id], properties: { snapshot_id: { type: string } } } } }
+      responses:
+        '201': { description: Draft brief, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /growth/briefs/effective:
+    get:
+      tags: [growth]
+      operationId: growthEffectiveBrief
+      summary: "The one approved, fresh brief for a market, locale, topic and channel; 204 means use baseline behaviour."
+      parameters:
+        - { name: market, in: query, required: true, schema: { type: string } }
+        - { name: locale, in: query, required: true, schema: { type: string } }
+        - { name: topic, in: query, required: true, schema: { type: string } }
+        - { name: channel, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Growth Brief v1, content: { application/json: { schema: { type: object } } } }
+        '204': { description: "No approved, fresh brief" }
+        '401': { $ref: '#/components/responses/Problem' }
+  /growth/briefs/{id}:
+    parameters: [{ $ref: '#/components/parameters/GrowthId' }]
+    get:
+      tags: [growth]
+      operationId: growthBrief
+      summary: "A brief with its changes, the current guide page, approved claim wording and the snapshot behind it."
+      responses:
+        '200': { description: Brief, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /growth/briefs/{id}/approve:
+    parameters: [{ $ref: '#/components/parameters/GrowthId' }]
+    post:
+      tags: [growth]
+      operationId: growthApproveBrief
+      summary: "editor role: approve an exact brief version (If-Match). The author can't approve. Freezes the experiment and replaces the active brief for the scope."
+      parameters: [{ name: If-Match, in: header, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Approved, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '428': { $ref: '#/components/responses/Problem' }
+  /growth/briefs/{id}/drafts:
+    parameters: [{ $ref: '#/components/parameters/GrowthId' }]
+    post:
+      tags: [growth]
+      operationId: growthDrafts
+      summary: "growth role: the SEO and marketing workers draft changes for this approved brief (templates, or the deployment's own model). Drafts are proposals only."
+      responses:
+        '201': { description: Proposed changes, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /growth/actions:
+    post:
+      tags: [growth]
+      operationId: growthPropose
+      summary: "growth or editor role: propose a typed change (seo_metadata_patch, owned_content_patch, organic_social_draft) bound to the active brief and the page revision shown. Needs Idempotency-Key."
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/GrowthProposal' } } }
+      responses:
+        '200': { description: Already proposed, content: { application/json: { schema: { type: object } } } }
+        '201': { description: Proposed, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '428': { $ref: '#/components/responses/Problem' }
+  /growth/actions/{id}:
+    parameters: [{ $ref: '#/components/parameters/GrowthId' }]
+    get:
+      tags: [growth]
+      operationId: growthAction
+      summary: "A change with its state, payload hash, approval, previous fields, receipt and inference notes."
+      responses:
+        '200': { description: Change, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /growth/actions/{id}/approve:
+    parameters: [{ $ref: '#/components/parameters/GrowthId' }]
+    post:
+      tags: [growth]
+      operationId: growthApproveAction
+      summary: "editor role: approve the exact payload hash and page revision from the preview. The author can't approve."
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [payload_hash, target_revision], properties: { payload_hash: { type: string }, target_revision: { type: integer } } } } }
+      responses:
+        '200': { description: Approved, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /growth/actions/{id}/execute:
+    parameters: [{ $ref: '#/components/parameters/GrowthId' }]
+    post:
+      tags: [growth]
+      operationId: growthExecute
+      summary: "editor role: queue an approved change. The worker re-checks every guard and writes compare-and-set with the action key."
+      responses:
+        '202': { description: Queued, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /growth/actions/{id}/rollback:
+    parameters: [{ $ref: '#/components/parameters/GrowthId' }]
+    post:
+      tags: [growth]
+      operationId: growthRollback
+      summary: "editor role: queue a compensating change; it restores the page only if it is still at the revision this change produced, otherwise it stops for review. Allowed while frozen."
+      responses:
+        '202': { description: Queued, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /growth/actions/{id}/export:
+    parameters: [{ $ref: '#/components/parameters/GrowthId' }]
+    get:
+      tags: [growth]
+      operationId: growthExport
+      summary: "Export a draft for a channel with no write path (organic social); recorded in the audit."
+      responses:
+        '200': { description: Draft copy, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /growth/pages:
+    post:
+      tags: [growth]
+      operationId: growthCreatePage
+      summary: "editor role: create a guide page from its reviewed starting wording. No guide page exists until an editor creates it."
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [asset_id], properties: { asset_id: { type: string } } } } }
+      responses:
+        '201': { description: Page, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /growth/experiments/{id}:
+    parameters: [{ $ref: '#/components/parameters/GrowthId' }]
+    get:
+      tags: [growth]
+      operationId: growthExperiment
+      summary: "Observational report: guide views and join clicks before and after the first applied change; counts under 10 withheld; a decision only above the frozen minimum sample."
+      responses:
+        '200': { description: Report, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /growth/freeze:
+    post:
+      tags: [growth]
+      operationId: growthFreeze
+      summary: "editor or lead: freeze or unfreeze. Frozen: no new change starts; rollback still works."
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [frozen], properties: { frozen: { type: boolean } } } } }
+      responses:
+        '200': { description: Frozen state, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /growth/audit:
+    get:
+      tags: [growth]
+      operationId: growthAudit
+      summary: "The latest 500 growth audit entries (who, what, when)."
+      responses:
+        '200': { description: Entries, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     staffAccess:
@@ -290,6 +520,8 @@ components:
       name: Cf-Access-Jwt-Assertion
       description: The sign-in proxy's signed JWT (RS256/ES256), verified against its JWKS, issuer, audience and expiry. Alternatively X-Staff-Identity from a configured header-asserting proxy address.
   parameters:
+    GrowthId: { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{1,128}$' } }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, maxLength: 128 } }
     CaseId:
       name: id
       in: path
@@ -308,6 +540,41 @@ components:
               status: { type: integer }
               code: { type: string }
   schemas:
+    GrowthObservation:
+      type: object
+      description: One aggregate count or index value. Never a member identifier.
+      required: [source_id, source_record_id, term, market, locale, metric, value, unit, coverage, window_start, window_end, observed_at]
+      additionalProperties: false
+      properties:
+        source_id: { type: string }
+        source_record_id: { type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$' }
+        record_revision: { type: integer, minimum: 1 }
+        term: { type: string, minLength: 1, maxLength: 300 }
+        market: { type: string, pattern: '^[A-Z]{2}$' }
+        locale: { type: string }
+        metric: { type: string }
+        value: { type: number, minimum: 0 }
+        unit: { type: string, enum: [count, index] }
+        coverage: { type: number, minimum: 0, maximum: 1 }
+        window_start: { type: string, format: date-time }
+        window_end: { type: string, format: date-time }
+        observed_at: { type: string, format: date-time }
+        evidence_hash: { type: string }
+        evidence_uri: { type: string }
+    GrowthProposal:
+      type: object
+      required: [brief_id, brief_version, action_kind, channel, target_id, expected_target_revision, patch, evidence_ids, approved_claim_ids]
+      additionalProperties: false
+      properties:
+        brief_id: { type: string }
+        brief_version: { type: integer, minimum: 1 }
+        action_kind: { type: string, enum: [seo_metadata_patch, owned_content_patch, organic_social_draft] }
+        channel: { type: string, enum: [seo, owned_placement, organic_social] }
+        target_id: { type: string }
+        expected_target_revision: { type: integer }
+        patch: { type: object, additionalProperties: { type: string } }
+        evidence_ids: { type: array, items: { type: string } }
+        approved_claim_ids: { type: array, items: { type: string } }
     CaseSummary:
       type: object
       properties:

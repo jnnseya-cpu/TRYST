@@ -3,7 +3,8 @@
 
 baseline/manifest.json lists every locked item with a fingerprint: spec decisions and
 requirements, API operations, backend routes, tests, pages, journal posts, the message
-catalogue, vendor keys, prices, CI workflows, deployment files and the key documents.
+catalogue, vendor keys, prices, the growth profile and brief contract, CI workflows,
+deployment files and the key documents.
 
     python3 scripts/baseline.py                         check (CI runs this on every push)
     python3 scripts/baseline.py --update --reason "…"   accept the current state on purpose
@@ -95,6 +96,12 @@ def collect():
     # Journal posts, by content.
     for f in files("site/content/posts/*.md"):
         items["post:" + os.path.basename(f)] = h(read(f))
+
+    # Growth intelligence (D-73): the profile (approved claims, prohibited wording, topics,
+    # pages) and the Growth Brief contract with its fixtures, by content.
+    for f in files("backend/internal/growth/*.json") + files("shared/contracts/growth/**/*"):
+        if os.path.isfile(os.path.join(ROOT, f)):
+            items["growth:" + f] = h(read(f))
 
     # Every message TRYST sends, by its catalogue entry.
     comms = read("backend/internal/comms/comms.go")

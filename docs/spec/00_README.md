@@ -28,6 +28,7 @@ The specification is split by audience. Each document owns its topics; the other
 | 07 | [Source B — founder brief (verbatim) and traceability](07_Source_B_Founder_Brief.md) | Everyone | The founder's 17 Sep 2026 specification word for word, plus where each part is implemented, the agent mapping and the FR-ID crosswalk |
 | 08 | [Source A — traceability](08_Source_A_Traceability.md) | Everyone | Where each section of the consolidated Spec + ToS lives in the spec and the code |
 | 09 | [Operating System (internal)](09_Operating_System.md) | Leadership, engineering, security, payments, operations | Agent workforce and governance (autonomy levels, always-human actions, kill switch, audit chain), command centres for every user type, self-managing platform layer, BitriPay API door, connector register, ops and partner schemas and APIs, B2B licensing and ACU, Admin Super Control Centre, roadmap |
+| 10 | [Growth Intelligence (embedded)](10_Growth_Intelligence.md) | Growth, editors, engineering | The Trend Intelligence AI build specification v2.3 verbatim, and how TRYST embeds it invisibly: aggregate signals only, Growth Briefs, editor-approved guide pages, measurement, rollback (D-73) |
 
 A combined PDF of 00–09 is at [`TRYST_Spec_v1.3.pdf`](TRYST_Spec_v1.3.pdf). Brand assets (logo exactly as supplied, colour tokens) are in [`shared/brand/`](../../shared/brand/tokens.json).
 

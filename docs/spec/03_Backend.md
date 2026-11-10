@@ -102,6 +102,8 @@ Every agent has a policy file (`policies/<agent>.yaml`), a tool allow-list, a me
 
 Herald is a growth agent that sits **outside the member platform** (FR-074, FR-075, FR-077; [D-21](06_Decisions_and_Changes.md#2-decision-log)).
 
+> **v1.5 (D-73):** growth intelligence is now built *inside* the platform as `growth-svc` ([10](10_Growth_Intelligence.md)), invisible to members. D-21's data rule stands: no credential to any member database, weekly counts of at least 50 people by city only, and every published change approved by an editor. The table below remains the target for Herald's later tools (rank tracking, link graph, outreach drafts).
+
 | Aspect | Specification |
 |---|---|
 | Deployment | Separate cloud account and VPC; no network route or credentials to IDENTITY-, PROFILE-, SAFETY- or BAN-DB, the event bus or Feast. Python typed state machines, like the other agents, with their own policy file and eval set |

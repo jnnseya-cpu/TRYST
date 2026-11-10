@@ -52,7 +52,11 @@ in, so `STAFF_ACCESS_REQUIRE_AMR` stays unset). Then go to step 3.
 
 Write the roster in a file outside the repository, one person per line (`email role`, roles
 `moderator` and/or `lead`; at least three people and one lead, because a permanent removal
-needs two different moderators and an appeal needs a third who wasn't involved). Then:
+needs two different moderators and an appeal needs a third who wasn't involved). Growth
+intelligence (D-73) adds two roles that open nothing in the safety console: `growth` (imports
+search data, refreshes scores, drafts briefs and changes) and `editor` (approves, creates guide
+pages, applies, rolls back, freezes). Give `editor` to someone other than the `growth` people:
+nobody can approve their own brief or change. Then:
 
 Set `ROSTER_FILE=/secure/roster.txt` in `prod.conf` and run `deploy/gcp/setup.sh prod`. It
 calls `scripts/provision-safety-secrets.sh`, which generates the two internal secrets (one
@@ -104,3 +108,25 @@ successful deploy. The API drains for up to 25 s on stop so in-flight safety ale
 
 The API serves `/metrics` on port 9090 inside the VM; Prometheus on the VM scrapes it and
 listens on `127.0.0.1:9091` only (reach it through an IAP tunnel). Alert rules: `deploy/monitoring/alerts.yml`; what to do: `oncall.md`.
+
+## Growth intelligence (D-73)
+
+Runs as the `growth` service in the same compose file and image (`/growth-svc`). It is
+invisible to members: nothing in the member app shows it, and no guide page exists until an
+editor creates one in the console (**Growth**).
+
+- **Secrets and database:** `setup.sh` creates `tryst_growth` and its user (`DATABASE_URL_GROWTH`),
+  `INTERNAL_SECRET_GROWTH` (shared with the API, which answers growth on one aggregates path only)
+  and `GROWTH_CONFIG` (`SITE_URL`, `APP_URL`). `fetch-secrets.sh` writes `/run/tryst/growth.env`.
+  Cloud SQL makes every user created this way a member of `cloudsqlsuperuser`; for isolation at
+  the database level as well as by credential, revoke that membership from `growth_svc` once by hand.
+- **Guide pages are off the internet by default.** To publish them, set `guides_domain` (for
+  example `guides.<domain>`) in Terraform, apply, add its DNS record, and set `GUIDES_DOMAIN` in
+  `prod.conf` so the canonical links match; then an editor creates pages in the console.
+- **Drafting:** templates over the approved claims by default. A model served inside the
+  deployment can be used by setting `GROWTH_INFERENCE_URL` (an OpenAI-compatible server on the
+  private network) and changing `inference.route` to `deployment` in
+  `backend/internal/growth/profile.tryst.json` (a reviewed, baseline-recorded change). No
+  outside AI provider or key is used.
+- **Freeze:** an editor or lead presses **Freeze all changes** on the Growth page; queued changes
+  hold, rollback still works.

@@ -29,10 +29,15 @@ func TestProvisionScript(t *testing.T) {
 	}
 	roster := filepath.Join(t.TempDir(), "roster.txt")
 	os.WriteFile(roster, []byte("# T&S team\nLead@Corp.example lead,moderator\nb@corp.example moderator\n"), 0o600)
-	if out, err := run("--roster", roster); err == nil || !strings.Contains(out, "need at least 3 people") {
+	if out, err := run("--roster", roster); err == nil || !strings.Contains(out, "need at least 3 Trust & Safety people") {
 		t.Fatalf("small roster accepted: %s", out)
 	}
-	os.WriteFile(roster, []byte("lead@corp.example lead,moderator\nb@corp.example moderator\nc@corp.example moderator\n"), 0o600)
+	// Growth staff (D-73) don't make up the Trust & Safety minimum.
+	os.WriteFile(roster, []byte("lead@corp.example lead\nb@corp.example moderator\ng@corp.example growth\ne@corp.example editor\n"), 0o600)
+	if out, err := run("--roster", roster); err == nil || !strings.Contains(out, "have 2, 1 leads") {
+		t.Fatalf("growth staff counted as moderators: %s", out)
+	}
+	os.WriteFile(roster, []byte("lead@corp.example lead,moderator\nb@corp.example moderator\nc@corp.example moderator\ng@corp.example growth\ne@corp.example editor\n"), 0o600)
 	out, err := run("--roster", roster)
 	if err != nil {
 		t.Fatalf("%v: %s", err, out)

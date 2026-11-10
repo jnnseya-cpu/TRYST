@@ -92,7 +92,7 @@ For design reviews and demos with stand-in vendors and no real people:
 
 ```sh
 git clone <repo> /opt/tryst && cd /opt/tryst/deploy/gcp
-sudo install -d -m 0700 /run/tryst && sudo touch /run/tryst/api.env /run/tryst/safety.env
+sudo install -d -m 0700 /run/tryst && sudo touch /run/tryst/api.env /run/tryst/safety.env /run/tryst/growth.env
 printf 'LB_IP=127.0.0.1\nSITE_HOST=demo.<domain>\nAPI_IMAGE=…\nWEB_IMAGE=…\nOPS_IMAGE=…\n' | sudo tee /etc/tryst/images.env
 sudo TRYST_ENV=dev docker compose --env-file /etc/tryst/images.env --profile vps up -d
 ```

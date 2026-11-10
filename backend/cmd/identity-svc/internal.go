@@ -9,11 +9,36 @@ import (
 	"strings"
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/comms"
+	"github.com/jnnseya-cpu/tryst/backend/internal/growthsignals"
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
 	"github.com/jnnseya-cpu/tryst/backend/internal/notify"
 	"github.com/jnnseya-cpu/tryst/backend/internal/outbound"
 	"github.com/jnnseya-cpu/tryst/backend/internal/profilesvc"
+	"github.com/jnnseya-cpu/tryst/backend/internal/svcauth"
 )
+
+// byCaller sends the growth service to its own API and everyone else to the safety API, so
+// the growth service can never reach a member, a photo or a token (D-73).
+func byCaller(safetyAPI, growth http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if svcauth.Caller(r) == "growth" {
+			growth.ServeHTTP(w, r)
+			return
+		}
+		safetyAPI.ServeHTTP(w, r)
+	})
+}
+
+// growthAPI answers the growth service with weekly counts by city above the cohort floor,
+// and nothing else.
+func growthAPI(c *growthsignals.Counters) http.Handler {
+	m := http.NewServeMux()
+	m.HandleFunc("GET /internal/v1/growth/aggregates", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"items": c.Export(), "min_cohort": growthsignals.MinCohort})
+	})
+	return m
+}
 
 // internalAPI is the member platform's internal API for the safety service (D-59). It is
 // served on the internal listener behind svcauth.Verifier and gives the safety service only

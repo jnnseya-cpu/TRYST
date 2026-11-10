@@ -58,6 +58,7 @@ export default function Console() {
         <div className="op-row">
           <a className="ms-block" href="/ops/comms">Communications</a>
           <a className="ms-block" href="/ops/settings">Vendor keys</a>
+          <a className="ms-block" href="/ops/growth">Growth</a>
           {staffToken() && <button type="button" className="ms-block" onClick={() => { setStaffToken(null); setRows(null); load(); }}>Sign out</button>}
         </div>
       </div>

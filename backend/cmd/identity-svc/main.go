@@ -76,6 +76,7 @@ import (
 	"github.com/jnnseya-cpu/tryst/backend/internal/consent"
 	"github.com/jnnseya-cpu/tryst/backend/internal/dsr"
 	"github.com/jnnseya-cpu/tryst/backend/internal/gate"
+	"github.com/jnnseya-cpu/tryst/backend/internal/growthsignals"
 	"github.com/jnnseya-cpu/tryst/backend/internal/identity"
 	"github.com/jnnseya-cpu/tryst/backend/internal/metrics"
 	"github.com/jnnseya-cpu/tryst/backend/internal/notify"
@@ -159,6 +160,7 @@ type app struct {
 	stores     map[string]store.Store // by database name, for readiness and admin
 	vault      *store.Vault
 	mailer     outbound.Mailer // nil when no mailbox is configured (dev)
+	activity   *growthsignals.Counters
 }
 
 func main() {
@@ -303,6 +305,8 @@ func build() *app {
 		log.Fatal(err)
 	}
 	prof.Notify = notifyFn
+	activity := growthsignals.New(ctx, profStore, nil) // weekly counts by city only (D-73)
+	prof.Activity = activity
 	prof.Consent = consents.Granted
 	prof.EmailOnlyAlerts = mode != "dev" && !out.Phones()
 	prof.ShieldKeyOf, prof.BlindShield = srv.ShieldKeyOf, srv.BlindShield
@@ -380,7 +384,7 @@ func build() *app {
 		mailer = out.Email
 	}
 	return &app{mailer: mailer, mode: mode, srv: srv, prof: prof, commerce: commerce, notifier: notifier, rights: rights, vault: vault, consents: consents,
-		signals: signals, signalKick: signalKick, toSafety: toSafety,
+		signals: signals, signalKick: signalKick, toSafety: toSafety, activity: activity,
 		stores: map[string]store.Store{"identity": idStore, "profile": profStore, "keys": keyStore, "commerce": commerceStore, "ledger": ledger}}
 }
 
@@ -399,9 +403,11 @@ func serve(a *app) {
 			}
 		}
 	}()
-	// Internal API for the safety service (private listener, signed calls only).
-	internal := svcenv.Verifier(mode, "safety", "INTERNAL_SECRET_PLATFORM")
-	svcenv.ServeInternal(svcenv.Env("INTERNAL_ADDR", "127.0.0.1:8091"), internal.Wrap(internalAPI(a.srv, prof, notifier, a.mailer)))
+	// Internal API (private listener, signed calls only): the safety service, and the growth
+	// service on its one aggregates path (D-73).
+	internal := svcenv.Verifiers(mode, map[string]string{"safety": "INTERNAL_SECRET_PLATFORM", "growth": "INTERNAL_SECRET_GROWTH"})
+	svcenv.ServeInternal(svcenv.Env("INTERNAL_ADDR", "127.0.0.1:8091"),
+		internal.Wrap(byCaller(internalAPI(a.srv, prof, notifier, a.mailer), growthAPI(a.activity))))
 	go func() {
 		for range time.Tick(time.Minute) {
 			rights.Sweep(context.Background())

@@ -10,9 +10,11 @@
 #
 # Names are "tryst-<env>-<NAME>" in the current gcloud project, stored in europe-west2 only.
 #
-# roster.txt: one person per line, "email role[,role]" (roles: moderator, lead). Lines
-# starting with # are ignored. At least three people and one lead: a permanent removal
-# needs two different moderators and an appeal needs a third who wasn't involved.
+# roster.txt: one person per line, "email role[,role]" (roles: moderator, lead; and for
+# growth intelligence, D-73: growth, editor). Lines starting with # are ignored. At least
+# three Trust & Safety people and one lead: a permanent removal needs two different
+# moderators and an appeal needs a third who wasn't involved. Growth roles open nothing in
+# the safety console.
 set -euo pipefail
 env_name="${ENV:?set ENV (e.g. prod)}"
 roster="" rotate=0 finish=0
@@ -82,13 +84,15 @@ if [ -n "$roster" ]; then
     email="${line%% *}"; roles="${line#* }"
     email="$(echo "$email" | tr '[:upper:]' '[:lower:]')"
     [[ "$email" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[a-z]{2,}$ ]] || { echo "roster: not an email: $email" >&2; exit 1; }
-    [[ "$roles" =~ ^(moderator|lead)(,(moderator|lead))*$ ]] || { echo "roster: roles for $email must be moderator and/or lead" >&2; exit 1; }
+    [[ "$roles" =~ ^(moderator|lead|growth|editor)(,(moderator|lead|growth|editor))*$ ]] || { echo "roster: roles for $email must be moderator, lead, growth or editor" >&2; exit 1; }
     [ -z "${seen[$email]:-}" ] || { echo "roster: $email listed twice" >&2; exit 1; }
-    seen[$email]=1; staff=$((staff+1)); [[ "$roles" == *lead* ]] && leads=$((leads+1))
+    seen[$email]=1
+    [[ "$roles" =~ moderator|lead ]] && staff=$((staff+1)) # Trust & Safety people only
+    [[ "$roles" == *lead* ]] && leads=$((leads+1))
     entries+=("$email:$roles")
   done < "$roster"
-  [ "$staff" -ge 3 ] && [ "$leads" -ge 1 ] || { echo "roster: need at least 3 people and 1 lead (have $staff, $leads leads)" >&2; exit 1; }
+  [ "$staff" -ge 3 ] && [ "$leads" -ge 1 ] || { echo "roster: need at least 3 Trust & Safety people and 1 lead (have $staff, $leads leads)" >&2; exit 1; }
   (IFS=';'; printf '%s' "${entries[*]}") > "$tmp/roster"
   put STAFF_ROSTER "$tmp/roster"
-  echo "roster: $staff people, $leads leads. Redeploy the safety service to apply."
+  echo "roster: ${#entries[@]} people ($staff Trust & Safety, $leads leads). Redeploy the safety and growth services to apply."
 fi

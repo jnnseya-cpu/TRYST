@@ -22,7 +22,7 @@ func TestConsoleAndMemberRoutesRefuseUnauthenticatedCallers(t *testing.T) {
 		t.Setenv(k, "")
 	}
 	t.Setenv("TRYST_ENV", "dev")
-	t.Setenv("STAFF_DEV_TOKENS", "mod1:moderator:real-dev-token-0001")
+	t.Setenv("STAFF_DEV_TOKENS", "mod1:moderator:real-dev-token-0001,gr1:editor:growth-editor-token-01,gr2:growth:growth-analyst-token-01")
 	t.Setenv("PLATFORM_INTERNAL_URL", "http://127.0.0.1:1") // unreachable: members can't authenticate
 	h := svcenv.APIHeaders(routes(build()))
 
@@ -49,7 +49,7 @@ func TestConsoleAndMemberRoutesRefuseUnauthenticatedCallers(t *testing.T) {
 			}
 		}
 	}
-	read("../../../shared/contracts/openapi/ops.v1.yaml", "/ops/v1", func(p string) bool { return p != "/vouchers" })
+	read("../../../shared/contracts/openapi/ops.v1.yaml", "/ops/v1", func(p string) bool { return p != "/vouchers" && !strings.HasPrefix(p, "/growth") })
 	read("../../../shared/contracts/openapi/tryst.v1.yaml", "/v1", func(p string) bool {
 		return strings.HasPrefix(p, "/reports") || p == "/appeals" || p == "/me/standing"
 	})
@@ -59,7 +59,8 @@ func TestConsoleAndMemberRoutesRefuseUnauthenticatedCallers(t *testing.T) {
 	for k := range ops {
 		method, path, _ := strings.Cut(k, " ")
 		path = param.ReplaceAllString(path, "cs_000000000000000000")
-		for _, auth := range []string{"", "Bearer forged", "Staff forged-token-000000"} {
+		// Growth staff (D-73) hold no Trust & Safety access at all.
+		for _, auth := range []string{"", "Bearer forged", "Staff forged-token-000000", "Staff growth-editor-token-01", "Staff growth-analyst-token-01"} {
 			r := httptest.NewRequest(method, path, strings.NewReader("{}"))
 			if auth != "" {
 				r.Header.Set("Authorization", auth)

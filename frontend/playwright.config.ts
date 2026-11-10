@@ -35,6 +35,13 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
+      // Growth intelligence (D-73): staff API on 8083, guide pages on 8084, counts from the API.
+      command: "cd ../backend && go build -o ../frontend/.e2e-growth-svc ./cmd/growth-svc && TRYST_ENV=dev PORT=8083 PUBLIC_ADDR=:8084 SITE_URL=http://localhost:8084 APP_URL=http://localhost:3000 STAFF_DEV_TOKENS=gr1:growth:e2e-growth-analyst-0001,ed1:editor:e2e-growth-editor-0001,mod1:moderator:e2e-mod-one-token-0001 ../frontend/.e2e-growth-svc",
+      url: "http://localhost:8083/healthz",
+      timeout: 180_000,
+      reuseExistingServer: false,
+    },
+    {
       command: "OPS_CONSOLE=1 npm run build && TRYST_ENV=dev OPS_CONSOLE=1 npm run start -- -p 3000",
       url: "http://localhost:3000",
       timeout: 300_000,

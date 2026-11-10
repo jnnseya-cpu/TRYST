@@ -18,6 +18,11 @@ variable "console_domain" {
   type        = string
   description = "Staff console host, e.g. console.tryst.example"
 }
+variable "guides_domain" {
+  type        = string
+  default     = ""
+  description = "Optional public host for growth guide pages (D-73), e.g. guides.tryst.example. Empty: guide pages are not reachable from the internet."
+}
 variable "staff_group" {
   type        = string
   description = "Google group of the safety team (IAP access to the console), e.g. safety-team@company.example"
