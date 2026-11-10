@@ -27,7 +27,10 @@ for db in identity profile keys safety commerce; do
   if [ ! -f "$file" ] && [ -f "$file.enc" ]; then
     tmp=$(mktemp); openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass "file:${BACKUP_KEY_FILE:?}" -in "$file.enc" -out "$tmp"; file="$tmp"
   fi
-  pg_restore --no-owner --no-privileges --dbname="$(dsn_for "$name")" "$file"
+  # Render to SQL and drop the one session setting newer client tools (PostgreSQL 17+) emit
+  # that a PostgreSQL 16 server (Cloud SQL) doesn't know; stop on any other error.
+  pg_restore --no-owner --no-privileges --file=- "$file" | grep -v '^SET transaction_timeout' |
+    psql -q -v ON_ERROR_STOP=1 --dbname="$(dsn_for "$name")" >/dev/null
   export "DATABASE_URL_$(echo "$db" | tr '[:lower:]' '[:upper:]')=$(dsn_for "$name")"
 done
 export DATABASE_URL_LEDGER="${DRILL_LEDGER_URL:?DRILL_LEDGER_URL (the live ledger) is required}"

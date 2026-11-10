@@ -118,3 +118,12 @@ Every change to what has been built, with the reason. Written by `scripts/baseli
 - `test:go:backend/internal/growthsignals.TestOnlyCompleteWeeksAboveTheCohortFloorLeave`
 - `test:go:backend/internal/profilesvc.TestTonightCountsTheCityOnly`
 - `test:web:frontend/e2e/growth.spec.ts: growth: staff only, imports and scores, pages exist only when an editor creates them, members see nothing`
+
+## 2026-11-10: CI fixes after the runner moved to Ubuntu 26.04: restore drill tolerates newer pg_restore (transaction_timeout), browser job pinned to ubuntu-24.04, terraform fmt of secrets.tf
+1172 locked items. Removed 0, changed 3, added 0.
+
+**Changed:**
+
+- `build:.github/workflows/integration.yml`
+- `build:deploy/gcp/terraform/secrets.tf`
+- `build:scripts/restore-drill.sh`

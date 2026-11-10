@@ -23,7 +23,8 @@ permissions:
 jobs:
   e2e:
     name: Passkey login end-to-end (Chromium virtual authenticators)
-    runs-on: ubuntu-latest
+    # Pinned: the pinned Playwright release has no browser build for ubuntu-latest (26.04) yet.
+    runs-on: ubuntu-24.04
     defaults: { run: { working-directory: frontend } }
     env: { NEXT_TELEMETRY_DISABLED: "1" }
     steps:
