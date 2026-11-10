@@ -19,7 +19,7 @@ Some services charge to start every conversation, sell visibility to the highest
 
 - two-check sign-in, verification and all discretion controls;
 - daily introductions, Tonight, the handshake and encrypted messages;
-- meet check-ins, the safety line, reporting, data download and deletion;
+- meet check-ins with a duress PIN, reporting, data download and deletion;
 - **three intents a week**, and replying is always free.
 
 **TRYST+** adds one thing today: **unlimited intents**.

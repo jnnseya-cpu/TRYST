@@ -41,8 +41,8 @@
 //	                login face check and photo face match (fail closed without it)
 //	SIGHTENGINE_USER, SIGHTENGINE_SECRET, PHOTODNA_KEY  photo checks; without all of them
 //	                (and LIVENESS_URL) every photo waits for a person
-//	ARC_URL, ARC_API_KEY, ARC_SECRET  the alarm-receiving centre (safety line, Panic);
-//	                required in production (D-48)
+//	ARC_URL, ARC_API_KEY, ARC_SECRET  the alarm-receiving centre (safety line, Panic). Optional
+//	                (D-74): without it the safety line is hidden and trusted contacts are alerted
 //	METRICS_ADDR    internal listener for /metrics (default 127.0.0.1:9090); never public
 //	SALE_ITEMS      catalogue keys on sale, comma-separated, or "all" (default: TRYST+
 //	                monthly and annual only; D-60)
@@ -318,7 +318,14 @@ func build() *app {
 		}
 		prof.Alerts = &vendors.ARCAlerting{ARC: arc, Contact: out}
 	} else if mode != "dev" {
-		log.Fatal("ARC_URL is required in production: meet safety can't run without the safety line (D-48)")
+		// No alarm centre contracted (D-74): the safety line is hidden and never claimed;
+		// missed check-ins, duress and Panic alert the trusted contact, and Panic shows 999.
+		if out == nil {
+			log.Fatal("meet safety needs a message channel for trusted contacts (SMTP_*, POSTMARK_* or TWILIO_*)")
+		}
+		prof.Alerts = &vendors.ContactAlerting{Contact: out}
+		prof.NoSafetyLine = true
+		log.Printf("no alarm-receiving centre configured (ARC_URL): the safety line is hidden; trusted contacts are alerted")
 	} else {
 		prof.Alerts = &profilesvc.LogAlerting{}
 		log.Printf("DEV MODE: safety alerts go to the log, not to real contacts or the alarm-receiving centre.")

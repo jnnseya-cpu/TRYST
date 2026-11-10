@@ -127,3 +127,24 @@ Every change to what has been built, with the reason. Written by `scripts/baseli
 - `build:.github/workflows/integration.yml`
 - `build:deploy/gcp/terraform/secrets.tf`
 - `build:scripts/restore-drill.sh`
+
+## 2026-11-10: Founder decisions: launch without an alarm-receiving centre with the safety line hidden (D-74); journal posts and landing copy describe only what runs; guide pages stay off; staff security keys stay required
+1175 locked items. Removed 0, changed 9, added 3.
+
+**Changed:**
+
+- `doc:docs/runbooks/deploy.md`
+- `doc:docs/spec/06_Decisions_and_Changes.md`
+- `doc:launch-audit/README.md`
+- `doc:launch-audit/human-actions.md`
+- `post:meet-check-ins-and-duress-pin.md`
+- `post:tryst-plus-honest-pricing.md`
+- `vendor-key:ARC_API_KEY`
+- `vendor-key:ARC_SECRET`
+- `vendor-key:ARC_URL`
+
+**Added:**
+
+- `spec:D-74`
+- `test:go:backend/internal/profilesvc.TestWithoutAnAlarmCentreTheSafetyLineIsHiddenAndNeverClaimed`
+- `test:go:backend/internal/vendors.TestContactAlertingWithoutAnAlarmCentre`

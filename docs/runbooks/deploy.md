@@ -19,7 +19,7 @@ are present (see the header of `backend/cmd/identity-svc/main.go`):
 | `DSR_SIGNING_KEY` | Signs deletion completion proofs |
 | `CONTACT_PEPPER` (≥ 32 bytes) | Contact hashes |
 | `SMTP_*` (the Hostinger mailbox), `POSTMARK_SERVER_TOKEN` or `TWILIO_*` | Sign-up codes must be deliverable; without `TWILIO_*` sign-up and trusted contacts are email only |
-| `ARC_URL`, `ARC_SECRET` (+ a message channel) | Meet safety can't run without the safety line (D-48) |
+| A message channel (`SMTP_*`) | Meet safety alerts trusted contacts by email. `ARC_URL` and `ARC_SECRET` are optional (D-74): without them the 24/7 safety line is hidden from members and never claimed |
 | `SAFETY_INTERNAL_URL`, `INTERNAL_SECRET_SAFETY`, `INTERNAL_SECRET_PLATFORM` | The API reaches the standalone safety service (D-59) |
 | `ASSURANCE_URL`, `ASSURANCE_SECRET`, `ASSURANCE_CALLBACK_SECRET` (≥ 32 chars) | Nobody can be verified without the identity provider (D-61) |
 | `ANCHOR_PEPPER` (hex, ≥ 32 bytes) | One-way document codes: one account per ID, bans, recovery (D-61, D-62) |

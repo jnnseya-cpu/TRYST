@@ -12,7 +12,7 @@ import "../../../profile/profile.css";
 import "../../messages.css";
 import "./meet.css";
 
-type Meet = { id: string; state: "proposed" | "confirmed" | "cancelled" | "done"; mine: boolean; start: string; end: string; safety_active?: boolean };
+type Meet = { id: string; state: "proposed" | "confirmed" | "cancelled" | "done"; mine: boolean; start: string; end: string; safety_active?: boolean; safety_line?: boolean; safety_line_available?: boolean };
 
 const when = (iso: string) => new Date(iso).toLocaleString([], { weekday: "long", hour: "2-digit", minute: "2-digit" });
 
@@ -89,7 +89,8 @@ export default function MeetPage() {
     if (!meet) return;
     const r = await api<Meet>(`/v1/meets/${meet.id}/safety`, {
       method: "POST", token: getToken(),
-      body: { every_minutes: every, pin, duress_pin: duress, trusted_contact: trusted, safety_line: line },
+      // The safety line is offered only when an alarm-receiving centre is contracted (D-74).
+      body: { every_minutes: every, pin, duress_pin: duress, trusted_contact: trusted, safety_line: line && meet.safety_line_available !== false },
     });
     if (r.status !== 200) return setErr(problemTitle(r.data));
     setMeet(r.data);
@@ -147,7 +148,11 @@ export default function MeetPage() {
           <h1>Call 999 now</h1>
           <a className="button mt-call" href="tel:999">Call 999</a>
           <p>If you can&rsquo;t speak, dial 999 and press <strong>55</strong> when asked. The police will know it&rsquo;s a real emergency.</p>
-          <p className="note">We&rsquo;ve alerted the safety line{meet?.safety_active ? " and your trusted contact" : ""} with the location you shared.</p>
+          {meet?.safety_line && meet.safety_line_available !== false ? (
+            <p className="note">We&rsquo;ve alerted the safety line{meet?.safety_active ? " and your trusted contact" : ""} with the location you shared.</p>
+          ) : meet?.safety_active ? (
+            <p className="note">We&rsquo;ve alerted your trusted contact.</p>
+          ) : null}
         </section>
       </Shell>
     );
@@ -216,7 +221,9 @@ export default function MeetPage() {
             <h2 id="safe-h">Check-ins</h2>
             {!meet.safety_active ? (
               <>
-                <p className="note">If you don&rsquo;t check in, we tell your trusted contact, then the 24/7 safety line. Your duress PIN looks like a normal check-in but quietly raises the alarm.</p>
+                <p className="note">{meet.safety_line_available === false
+                  ? "If you don\u2019t check in, we tell your trusted contact. Your duress PIN looks like a normal check-in but quietly tells them it\u2019s urgent."
+                  : "If you don\u2019t check in, we tell your trusted contact, then the 24/7 safety line. Your duress PIN looks like a normal check-in but quietly raises the alarm."}</p>
                 <div className="pf-details">
                   <div><label htmlFor="every">Check in every</label>
                     <select id="every" className="input pf-select" value={every} onChange={(e) => setEvery(Number(e.target.value))}>
@@ -226,7 +233,9 @@ export default function MeetPage() {
                   <div><label htmlFor="duress">Duress PIN</label><input id="duress" className="input" inputMode="numeric" type="password" value={duress} onChange={(e) => setDuress(e.target.value)} /></div>
                   <div><label htmlFor="trusted">Trusted contact (this meet only)</label><input id="trusted" className="input" value={trusted} onChange={(e) => setTrusted(e.target.value)} placeholder="+44… or email" /></div>
                 </div>
-                <label className="pf-check"><input type="checkbox" checked={line} onChange={(e) => setLine(e.target.checked)} /> Use the 24/7 safety line</label>
+                {meet.safety_line_available !== false && (
+                  <label className="pf-check"><input type="checkbox" checked={line} onChange={(e) => setLine(e.target.checked)} /> Use the 24/7 safety line</label>
+                )}
                 <div className="mt-row">
                   <button type="button" className="button inline" onClick={startSafety}>Start check-ins</button>
                   <button type="button" className="button ghost inline" onClick={sharePlan}>Share my plan</button>

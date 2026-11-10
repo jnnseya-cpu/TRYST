@@ -46,7 +46,7 @@ type Group struct {
 var Groups = []Group{
 	{"email", "Email (Hostinger mailbox)", true, "Sign-up codes and trusted-contact alerts."},
 	{"identity", "Identity and age checks", true, "Face check, photo-ID check and the phone sign-in face check. Production won't start without it."},
-	{"safety_line", "24/7 safety line (alarm-receiving centre)", true, "Missed check-ins, duress and Panic. Production won't start without it."},
+	{"safety_line", "24/7 safety line (alarm-receiving centre)", false, "Optional (D-74). Without it the safety line is hidden from members and trusted contacts are alerted instead. Add all three to offer it."},
 	{"payments", "Payments (Stripe)", false, "Only needed to sell TRYST+. Without it, launch is free-only."},
 	{"photos", "Photo checks (Sightengine, PhotoDNA)", false, "Without them every photo waits for a moderator, and known-abuse matching doesn't run."},
 }
@@ -69,9 +69,9 @@ var Catalogue = []Setting{
 	{Name: "LIVENESS_API_KEY", Group: "identity", Label: "Sign-in face check API key", Secret: true, Required: true, Help: "Provider dashboard → API keys", check: text(8, 4096)},
 	{Name: "LIVENESS_SECRET", Group: "identity", Label: "Sign-in face check signing secret", Secret: true, Required: true, Help: "Provider dashboard → signing secret", check: text(16, 4096)},
 
-	{Name: "ARC_URL", Group: "safety_line", Label: "Alarm centre address", Required: true, Help: "From the alarm-receiving centre's integration pack", check: httpsURL},
-	{Name: "ARC_API_KEY", Group: "safety_line", Label: "Alarm centre API key", Secret: true, Required: true, Help: "From the alarm-receiving centre", check: text(8, 4096)},
-	{Name: "ARC_SECRET", Group: "safety_line", Label: "Alarm centre signing secret", Secret: true, Required: true, Help: "From the alarm-receiving centre", check: text(16, 4096)},
+	{Name: "ARC_URL", Group: "safety_line", Label: "Alarm centre address", Required: false, Help: "From the alarm-receiving centre's integration pack", check: httpsURL},
+	{Name: "ARC_API_KEY", Group: "safety_line", Label: "Alarm centre API key", Secret: true, Required: false, Help: "From the alarm-receiving centre", check: text(8, 4096)},
+	{Name: "ARC_SECRET", Group: "safety_line", Label: "Alarm centre signing secret", Secret: true, Required: false, Help: "From the alarm-receiving centre", check: text(16, 4096)},
 
 	{Name: "STRIPE_SECRET_KEY", Group: "payments", Label: "Secret key", Secret: true, Help: "Stripe → Developers → API keys (sk_live_… or a restricted rk_live_…)", check: prefixed("sk_live_", "sk_test_", "rk_live_", "rk_test_")},
 	{Name: "STRIPE_WEBHOOK_SECRET", Group: "payments", Label: "Webhook signing secret", Secret: true, Help: "Stripe → Webhooks → your endpoint → signing secret (whsec_…)", check: prefixed("whsec_")},

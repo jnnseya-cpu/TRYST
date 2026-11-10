@@ -25,7 +25,7 @@ it's contracts, accounts, a pen test and legal sign-off.
 | ID | Sev | Area | Blocker | Required | Status |
 |---|---|---|---|---|---|
 | H1 | P0 | Verification | No identity and age provider; production won't start, and the new phone face check is untested against a real provider | Contract plus sandbox keys, then a gateway mapping (~1 day) | Open (human) |
-| H2 | P0 | Safety | No alarm-receiving centre; production won't start (D-48) | Contract, or approve making the safety line optional | Open (human) |
+| H2 | — | Safety | No alarm-receiving centre | Decided (D-74): launch without; the line is hidden and never claimed, trusted contacts are alerted | Closed (decision) |
 | H3 | P0 | Deployment | Nothing deployed: no smoke, restore, alert, load or rollback test on the real system | Google Cloud projects; `setup.sh` | Open (human) |
 | H6 | P0 | Legal | No counsel opinion, DPIA, Online Safety Act assessments or final Terms | Counsel and DPO | Open (human) |
 | H7 | P1 | Security | No independent penetration test | CREST firm on staging | Open (human) |

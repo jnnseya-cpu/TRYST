@@ -41,7 +41,7 @@ function PhoneDecoy() {
           <div><span>Discovery</span><b>Paused</b></div>
         </div>
         <span className="button">Burn this device</span>
-        <p style={{ marginTop: 14, fontSize: 11 }}>Panic is a separate control. It calls for help and keeps what responders need.</p>
+        <p style={{ marginTop: 14, fontSize: 11 }}>Panic is a separate control. It shows you how to call 999 and alerts your trusted contact.</p>
       </div>
     </div>
   );

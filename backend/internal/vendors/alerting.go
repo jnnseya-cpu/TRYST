@@ -2,6 +2,7 @@ package vendors
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jnnseya-cpu/tryst/backend/internal/meet"
@@ -73,3 +74,19 @@ func TrustedContactText(alias, window string, duress bool) string {
 func (a *ARCAlerting) TrustedContact(ctx context.Context, to, alias, window string, duress bool) error {
 	return a.Contact.Message(ctx, to, TrustedContactText(alias, window, duress))
 }
+
+// ContactAlerting is used when no alarm-receiving centre is contracted (D-74): trusted
+// contacts are alerted exactly as with one, and nothing is ever sent to a safety line.
+// The profile service never asks it to (NoSafetyLine); if something did, it fails loudly
+// rather than pretend an alarm centre was told.
+type ContactAlerting struct{ Contact Messenger }
+
+func (a *ContactAlerting) TrustedContact(ctx context.Context, to, alias, window string, duress bool) error {
+	return a.Contact.Message(ctx, to, TrustedContactText(alias, window, duress))
+}
+
+func (a *ContactAlerting) SafetyLine(context.Context, meet.Alert) error { return ErrNoSafetyLine }
+func (a *ContactAlerting) Emergency(context.Context, meet.Alert) error  { return ErrNoSafetyLine }
+
+// ErrNoSafetyLine: no alarm-receiving centre is configured.
+var ErrNoSafetyLine = errors.New("no alarm-receiving centre is configured")

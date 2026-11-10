@@ -3,6 +3,7 @@ package vendors
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/jnnseya-cpu/tryst/backend/internal/comms"
 	"io"
 	"net/http"
@@ -265,5 +266,26 @@ func TestCatalogueTrustedContactWordingMatchesSender(t *testing.T) {
 	duress, _ := comms.Lookup("safety.duress")
 	if missed.Text != TrustedContactText("Sam", "20:00–23:00 UK time", false) || duress.Text != TrustedContactText("Sam", "", true) {
 		t.Fatal("catalogue wording differs from what the trusted contact receives")
+	}
+}
+
+// TestContactAlertingWithoutAnAlarmCentre (D-74): trusted contacts get exactly the same
+// wording as with an alarm centre, and a safety-line or emergency send fails loudly instead
+// of pretending a centre was told.
+func TestContactAlertingWithoutAnAlarmCentre(t *testing.T) {
+	var got []string
+	a := &ContactAlerting{Contact: messengerFunc(func(_ context.Context, to, text string) error {
+		got = append(got, to+": "+text)
+		return nil
+	})}
+	if err := a.TrustedContact(context.Background(), "friend@example.com", "Ana", "19:00–22:00 UK time", true); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != "friend@example.com: "+TrustedContactText("Ana", "19:00–22:00 UK time", true) {
+		t.Fatalf("got %v", got)
+	}
+	if !errors.Is(a.SafetyLine(context.Background(), meet.Alert{}), ErrNoSafetyLine) ||
+		!errors.Is(a.Emergency(context.Background(), meet.Alert{}), ErrNoSafetyLine) {
+		t.Fatal("a send to a safety line that doesn't exist must fail")
 	}
 }

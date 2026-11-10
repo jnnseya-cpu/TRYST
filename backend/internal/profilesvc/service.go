@@ -105,6 +105,10 @@ type Service struct {
 	Activity interface {
 		Inc(metric, city, member string)
 	}
+	// NoSafetyLine: no alarm-receiving centre is contracted (D-74). The safety line can't be
+	// chosen, nothing is sent to one, and members are never told it was; trusted contacts
+	// and 999 guidance work as before.
+	NoSafetyLine bool
 	// MinDiscoveryTier is the tier needed to use Tonight (V2 in production, E-01).
 	MinDiscoveryTier string
 	// EmailOnlyAlerts: no SMS channel exists, so trusted contacts must be email addresses.

@@ -260,3 +260,37 @@ func TestCheckInsSurviveARestart(t *testing.T) {
 		t.Fatal("ended plan still stored")
 	}
 }
+
+// TestWithoutAnAlarmCentreTheSafetyLineIsHiddenAndNeverClaimed (D-74): the line can't be
+// chosen, nothing is sent to one, the app is told it isn't there, and trusted contacts are
+// still alerted for a missed check-in, duress and Panic.
+func TestWithoutAnAlarmCentreTheSafetyLineIsHiddenAndNeverClaimed(t *testing.T) {
+	w, al, id := confirmedMeet(t)
+	w.s.NoSafetyLine = true
+	if _, m := w.do("ana", "GET", "/v1/meets/"+id, ""); m["safety_line_available"] != false {
+		t.Fatalf("the app must be told there's no safety line: %v", m)
+	}
+	if c, out := w.do("ana", "POST", "/v1/meets/"+id+"/safety", `{"every_minutes":30,"pin":"2468","duress_pin":"1357","trusted_contact":"friend@example.com","safety_line":true}`); c != 422 || out["code"] != "safety_line_unavailable" {
+		t.Fatalf("safety line accepted without an alarm centre: %d %v", c, out)
+	}
+	if c, out := w.do("ana", "POST", "/v1/meets/"+id+"/safety", `{"every_minutes":30,"pin":"2468","duress_pin":"1357"}`); c != 422 || strings.Contains(fmt.Sprint(out), "safety line") {
+		t.Fatalf("a plan with nobody to tell must be refused without mentioning the line: %d %v", c, out)
+	}
+	if c, _ := w.do("ana", "POST", "/v1/meets/"+id+"/safety", `{"every_minutes":30,"pin":"2468","duress_pin":"1357","trusted_contact":"friend@example.com"}`); c != 200 {
+		t.Fatal("check-ins with a trusted contact must work")
+	}
+	w.now = w.now.Add(3 * time.Hour) // well past every escalation step
+	w.s.SweepSafety(context.Background())
+	w.s.WaitAlerts()
+	if len(al.Trusted) != 1 || len(al.Line) != 0 {
+		t.Fatalf("missed check-in: trusted=%v line=%v", al.Trusted, al.Line)
+	}
+	_, out := w.do("ana", "POST", "/v1/safety/panic", fmt.Sprintf(`{"meet_id":"%s"}`, id))
+	w.s.WaitAlerts()
+	if out["call"] != "999" || out["safety_line"] != false || len(al.Panics) != 0 {
+		t.Fatalf("panic: reply %v, alarm-centre alerts %d", out, len(al.Panics))
+	}
+	if len(al.Trusted) < 2 || !al.Urgent[len(al.Urgent)-1] {
+		t.Fatalf("panic must reach the trusted contact urgently: %v %v", al.Trusted, al.Urgent)
+	}
+}

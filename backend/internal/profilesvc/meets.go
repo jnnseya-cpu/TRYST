@@ -21,6 +21,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -286,7 +287,8 @@ func (s *Service) handleProposeMeet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) meetView(me string, m *meetRecord) map[string]any {
-	v := map[string]any{"id": m.ID, "thread": m.Thread, "start": m.Start, "end": m.End, "state": m.State, "mine": m.Proposer == me}
+	v := map[string]any{"id": m.ID, "thread": m.Thread, "start": m.Start, "end": m.End, "state": m.State, "mine": m.Proposer == me,
+		"safety_line_available": !s.NoSafetyLine}
 	if ss, ok := s.mt.sessions[m.ID+"|"+me]; ok && !ss.Ended {
 		v["safety_active"] = true
 		v["safety_line"] = ss.SafetyLine
@@ -372,6 +374,10 @@ func (s *Service) handleSafetyStart(w http.ResponseWriter, r *http.Request) {
 		fail(w, 422, "validation_failed", "PINs need at least 4 digits.")
 		return
 	}
+	if in.SafetyLine && s.NoSafetyLine {
+		fail(w, 422, "safety_line_unavailable", "Add a trusted contact: they're told if you don't check in.")
+		return
+	}
 	in.Trusted = strings.TrimSpace(in.Trusted)
 	if in.Trusted != "" && !(strings.Contains(in.Trusted, "@") || strings.HasPrefix(in.Trusted, "+")) {
 		fail(w, 422, "validation_failed", "Give your trusted contact as an email or a phone number starting with +.")
@@ -407,7 +413,7 @@ func sentencePlan(err error) string {
 	case meet.ErrPinsMustDiffer:
 		return "Your duress PIN must be different from your check-in PIN."
 	case meet.ErrNoEscalation:
-		return "Add a trusted contact or turn on the safety line, so someone is told if you don't check in."
+		return "Add a trusted contact, so someone is told if you don't check in."
 	case meet.ErrInterval:
 		return "Choose check-ins between every 15 minutes and every 3 hours."
 	}
@@ -492,8 +498,11 @@ func (s *Service) handlePanic(w http.ResponseWriter, r *http.Request) {
 		s.tickSession(r.Context(), ss, s.now())
 		s.saveSafety(r.Context(), ss)
 	}
-	s.dispatch("emergency", "safety.panic", acc.ID, func(ctx context.Context) error { return s.Alerts.Emergency(ctx, a) })
-	writeJSON(w, 200, map[string]any{"alert": a.ID, "call": "999", "silent_solution": "If you can't speak, dial 999, then press 55 when asked."})
+	if !s.NoSafetyLine {
+		s.dispatch("emergency", "safety.panic", acc.ID, func(ctx context.Context) error { return s.Alerts.Emergency(ctx, a) })
+	}
+	writeJSON(w, 200, map[string]any{"alert": a.ID, "call": "999", "silent_solution": "If you can't speak, dial 999, then press 55 when asked.",
+		"safety_line": !s.NoSafetyLine})
 }
 
 func jsonNum(f float64) string {
@@ -529,6 +538,7 @@ func (s *Service) tickSession(ctx context.Context, ss *safetySession, now time.T
 	if len(acts) > 0 {
 		defer s.saveSafety(ctx, ss) // escalation times are part of the saved plan
 	}
+	panicked := slices.Contains(acts, meet.Emergency)
 	for _, act := range acts {
 		reason := "missed_check_in"
 		duress := ss.sess.Duress()
@@ -542,17 +552,25 @@ func (s *Service) tickSession(ctx context.Context, ss *safetySession, now time.T
 		switch act {
 		case meet.AlertTrusted:
 			if to, alias := ss.Trusted, ss.Alias; to != "" {
+				// Duress and Panic both get the urgent wording ("call them now, and 999").
+				urgent := duress || panicked
 				event := "safety.checkin_missed"
-				if duress {
+				if urgent {
 					event = "safety.duress"
 				}
 				s.dispatch("trusted_contact", event, ss.Member, func(ctx context.Context) error {
-					return s.Alerts.TrustedContact(ctx, to, alias, window, duress)
+					return s.Alerts.TrustedContact(ctx, to, alias, window, urgent)
 				})
 			}
 		case meet.AlertSafetyLine:
+			if s.NoSafetyLine {
+				continue // no alarm centre: never chosen, never sent (D-74)
+			}
 			s.dispatch("safety_line", "safety.line_alert", ss.Member, func(ctx context.Context) error { return s.Alerts.SafetyLine(ctx, a) })
 		case meet.Emergency:
+			if s.NoSafetyLine {
+				continue // the trusted contact is alerted by the AlertTrusted action that comes with it
+			}
 			s.dispatch("emergency", "safety.panic", ss.Member, func(ctx context.Context) error { return s.Alerts.Emergency(ctx, a) })
 		}
 	}
